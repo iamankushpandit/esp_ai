@@ -72,6 +72,10 @@ int ui_box_set(ui_box_t *b, const char *text);
 void ui_box_set_color(ui_box_t *b, uint16_t fg);  // repaints non-empty rows
 void ui_box_invalidate(ui_box_t *b);               // next set() repaints all rows
 
+// Render text into an off-screen RGB565 buffer (CPU byte order) of bw x bh
+// pixels at (x, y); only glyph pixels are written. For small custom widgets.
+void ui_text_into(uint16_t *buf, int bw, int bh, int x, int y, const char *s, uint16_t fg);
+
 // Draw one row of text at (x,y), padded with bg to width w.
 void ui_draw_row(int x, int y, int w, const char *s, uint16_t fg, uint16_t bg);
 // Same, with a per-character color: palette[attr[i]] (attr may be NULL).

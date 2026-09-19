@@ -76,8 +76,8 @@ static void draw_header(void)
     ui_draw_row(0, ROW_Y(0), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
 
     char title[16] = {(char)(UI_G_SPIN0 + 3), ' '};
-    strcpy(title + 2, "ESP Bot");
-    header_row(1, title, 0, 2, 7);                  // ✻ accent, "ESP Bot" white
+    strcpy(title + 2, "Braino AI");
+    header_row(1, title, 0, 2, 9);                  // ✻ accent, "Braino AI" white
     header_row(2, "  (c) iamankushpandit", -1, 0, 0);
 
     row[0] = UI_G_BL[0];
@@ -151,17 +151,21 @@ void app_ui_detail(const char *text)
 }
 
 // ---------------------------------------------------------------- ask button
-// An orange spark (irregular starburst) on a dark rounded tile, drawn
-// procedurally with 2x2 supersampling. Only the 52x52 tile is ever redrawn.
-#define BTN_SIZE 52
-#define BTN_X ((BOARD_LCD_W - BTN_SIZE) / 2)
-#define BTN_Y 263
-#define BTN_TOUCH_PAD 10                 // generous touch target around the tile
+// A slim outlined pill "✻ Ask" in the CLI style: 1 px border, small
+// symmetric spark, white label. Anti-aliased edges (4x4 supersampling for the
+// outline, 2x2 for the spark). Only this 84x26 rect is ever redrawn.
+#define BTN_W 84
+#define BTN_H 26
+#define BTN_X ((BOARD_LCD_W - BTN_W) / 2)
+#define BTN_Y 280
+#define BTN_TOUCH_PAD 14                 // touch target larger than the drawing
 
 static int s_btn_state = -1;
 
 static uint16_t mix565(uint16_t a, uint16_t b, float t)   // t: 0 -> a, 1 -> b
 {
+    if (t <= 0) return a;
+    if (t >= 1) return b;
     int ar = a >> 11, ag = (a >> 5) & 63, ab = a & 31;
     int br = b >> 11, bg = (b >> 5) & 63, bb = b & 31;
     int r = ar + (int)((br - ar) * t + 0.5f), g = ag + (int)((bg - ag) * t + 0.5f),
@@ -169,22 +173,27 @@ static uint16_t mix565(uint16_t a, uint16_t b, float t)   // t: 0 -> a, 1 -> b
     return (uint16_t)((r << 11) | (g << 5) | bl);
 }
 
-// Coverage of the spark at (x, y) relative to its center, radius R.
+// Signed distance to a rounded rectangle centered at 0 (half sizes hx, hy, radius r).
+static float rrect(float x, float y, float hx, float hy, float r)
+{
+    float qx = fabsf(x) - (hx - r), qy = fabsf(y) - (hy - r);
+    float ox = qx > 0 ? qx : 0, oy = qy > 0 ? qy : 0;
+    float in = (qx > qy ? qx : qy);
+    return sqrtf(ox * ox + oy * oy) + (in < 0 ? in : 0) - r;
+}
+
+// Small symmetric 8-ray spark, radius R, centered at 0: 1 inside, 0 outside.
 static float spark(float x, float y, float R)
 {
-    // 12 rays with hand-drawn-looking lengths and a slight rotation.
-    static const float len[12] = {1.00f, 0.74f, 0.93f, 0.70f, 0.98f, 0.78f,
-                                  0.90f, 0.72f, 1.00f, 0.76f, 0.94f, 0.71f};
     float r = sqrtf(x * x + y * y);
-    if (r < 0.20f * R) return 1.0f;                      // solid core
-    for (int k = 0; k < 12; k++) {
-        float a = (float)k * (6.2831853f / 12.0f) + 0.13f;
+    if (r < 0.22f * R) return 1.0f;
+    for (int k = 0; k < 8; k++) {
+        float a = (float)k * 0.78539816f;
         float dx = cosf(a), dy = sinf(a);
-        float along = x * dx + y * dy;                   // distance along the ray
-        if (along <= 0 || along > len[k] * R) continue;
-        float perp = fabsf(-x * dy + y * dx);            // distance from the ray axis
-        float half_w = 0.105f * R * (1.0f - 0.85f * along / (len[k] * R)) + 0.4f;  // tapered
-        if (perp <= half_w) return 1.0f;
+        float along = x * dx + y * dy;
+        if (along <= 0 || along > R) continue;
+        float perp = fabsf(-x * dy + y * dx);
+        if (perp <= 0.16f * R * (1.0f - 0.8f * along / R) + 0.3f) return 1.0f;
     }
     return 0.0f;
 }
@@ -193,40 +202,54 @@ void app_ui_button(app_btn_state_t st)
 {
     if ((int)st == s_btn_state) return;                  // dirty-region: only on change
     s_btn_state = (int)st;
-    uint16_t tile = st == BTN_PRESSED ? RGB565(70, 44, 36) : RGB565(34, 34, 34);
-    uint16_t edge = st == BTN_PRESSED ? UI_ACCENT : RGB565(70, 70, 70);
-    uint16_t ink = st == BTN_BUSY ? RGB565(120, 80, 66)
-                 : st == BTN_PRESSED ? RGB565(250, 160, 125) : UI_ACCENT;
-    const float R = BTN_SIZE * 0.36f, c = (BTN_SIZE - 1) / 2.0f, corner = 11.0f;
+    const uint16_t bg = UI_BLACK;
+    uint16_t fill = st == BTN_PRESSED ? RGB565(48, 28, 22) : bg;
+    uint16_t edge = st == BTN_PRESSED ? UI_ACCENT : st == BTN_BUSY ? RGB565(60, 60, 60) : RGB565(95, 95, 95);
+    uint16_t icon = st == BTN_BUSY ? RGB565(110, 70, 58) : UI_ACCENT;
+    uint16_t text = st == BTN_BUSY ? RGB565(90, 90, 90) : UI_WHITE;
 
-    board_lcd_window(BTN_X, BTN_Y, BTN_SIZE, BTN_SIZE);
-    uint16_t *buf = board_lcd_stream_buf();
-    for (int py = 0; py < BTN_SIZE; py++) {
-        for (int px = 0; px < BTN_SIZE; px++) {
-            // Rounded-square tile with a 1 px edge; outside the corners stays black.
-            float qx = fabsf(px - c) - (c - corner), qy = fabsf(py - c) - (c - corner);
-            float d = (qx > 0 && qy > 0) ? sqrtf(qx * qx + qy * qy) - corner
-                                         : (qx > qy ? qx : qy) - corner;
-            uint16_t col;
-            if (d > 0.5f) col = UI_BLACK;
-            else if (d > -0.5f) col = edge;
-            else {
-                float cov = 0;
-                for (int s = 0; s < 4; s++)
-                    cov += spark(px - c + ((s & 1) ? 0.25f : -0.25f), py - c + ((s & 2) ? 0.25f : -0.25f), R);
-                col = mix565(tile, ink, cov / 4.0f);
+    static uint16_t px[BTN_W * BTN_H];
+    const float cx = (BTN_W - 1) / 2.0f, cy = (BTN_H - 1) / 2.0f;
+    const float hx = BTN_W / 2.0f - 0.5f, hy = BTN_H / 2.0f - 0.5f, rad = hy;
+    for (int y = 0; y < BTN_H; y++) {
+        for (int x = 0; x < BTN_W; x++) {
+            // outline coverage: |distance| < 0.5 px band, supersampled
+            float ring = 0, inside = 0;
+            for (int s = 0; s < 16; s++) {
+                float sx = x - cx + ((s & 3) - 1.5f) * 0.25f, sy = y - cy + ((s >> 2) - 1.5f) * 0.25f;
+                float d = rrect(sx, sy, hx, hy, rad);
+                if (fabsf(d + 0.5f) <= 0.5f) ring += 1;
+                else if (d < -1.0f) inside += 1;
             }
-            buf[py * BTN_SIZE + px] = (uint16_t)((col >> 8) | (col << 8));
+            uint16_t c = mix565(bg, fill, inside / 16.0f);
+            px[y * BTN_W + x] = mix565(c, edge, ring / 16.0f);
         }
     }
-    board_lcd_stream_push(buf, BTN_SIZE * BTN_SIZE);
+    // Icon + label, centered as a group: [spark 11 px][gap 6][Ask 24 px]
+    const float R = 5.5f;
+    const int group = 11 + 6 + 3 * UI_FONT_W, gx = (BTN_W - group) / 2;
+    const float icx = gx + 5.0f, icy = cy;
+    for (int y = 0; y < BTN_H; y++) {
+        for (int x = gx - 1; x < gx + 12; x++) {
+            float cov = 0;
+            for (int s = 0; s < 4; s++)
+                cov += spark(x - icx + ((s & 1) ? 0.25f : -0.25f), y - icy + ((s & 2) ? 0.25f : -0.25f), R);
+            if (cov > 0) px[y * BTN_W + x] = mix565(px[y * BTN_W + x], icon, cov / 4.0f);
+        }
+    }
+    ui_text_into(px, BTN_W, BTN_H, gx + 17, (BTN_H - UI_FONT_H) / 2, "Ask", text);
+
+    board_lcd_window(BTN_X, BTN_Y, BTN_W, BTN_H);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < BTN_W * BTN_H; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, BTN_W * BTN_H);
     board_lcd_stream_end();
 }
 
 bool app_ui_button_hit(int x, int y)
 {
-    return x >= BTN_X - BTN_TOUCH_PAD && x < BTN_X + BTN_SIZE + BTN_TOUCH_PAD &&
-           y >= BTN_Y - BTN_TOUCH_PAD && y < BTN_Y + BTN_SIZE + BTN_TOUCH_PAD;
+    return x >= BTN_X - BTN_TOUCH_PAD && x < BTN_X + BTN_W + BTN_TOUCH_PAD &&
+           y >= BTN_Y - BTN_TOUCH_PAD && y < BTN_Y + BTN_H + BTN_TOUCH_PAD;
 }
 
 void app_ui_clear_turn(void)

@@ -1,7 +1,7 @@
 // The single assistant screen (portrait 240x320), styled like a CLI session:
 //
 //   ╭────────────────────────────╮
-//   │ ✻ ESP Bot                  │
+//   │ ✻ Braino AI                │
 //   │   (c) iamankushpandit      │
 //   ╰────────────────────────────╯
 //   > what color is a banana         <- session transcript: every turn of
@@ -11,7 +11,7 @@
 //   ● A dog has four legs.
 //   ⎿  8 tok · 6.2 tok/s              <- dim detail line
 //   ✻ Thinking…                      <- status / spinner
-//              [ ✻ ]               <- ask button (tap to talk)
+//              ( ✻ Ask )           <- ask button (tap to talk)
 //
 // Every region is a dirty-row box: only rows whose text changed are redrawn,
 // in place (no clears). Scrolling rewrites the rows that shifted.
@@ -36,7 +36,7 @@ void app_ui_llm_progress(const char *text, int tokens, float tok_per_s);
 // Last generation speed shown (for keeping it visible while speaking).
 float app_ui_last_tok_rate(void);
 
-// Ask button: an orange spark on a dark rounded tile, bottom center.
+// Ask button: slim outlined pill with a small spark and "Ask", bottom center.
 typedef enum { BTN_IDLE = 0, BTN_PRESSED, BTN_BUSY } app_btn_state_t;
 void app_ui_button(app_btn_state_t st);     // redraws only the button tile, only on change
 bool app_ui_button_hit(int x, int y);       // touch coordinates -> inside the button?

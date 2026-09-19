@@ -46,6 +46,23 @@ void ui_draw_row_attr(int x, int y, int w, const char *s, const uint8_t *attr,
     board_lcd_stream_end();
 }
 
+void ui_text_into(uint16_t *buf, int bw, int bh, int x, int y, const char *s, uint16_t fg)
+{
+    for (int ci = 0; s[ci]; ci++) {
+        bool ext;
+        const uint8_t *g = glyph((unsigned char)s[ci], &ext);
+        if (!g) continue;
+        for (int r = 0; r < UI_FONT_H; r++) {
+            int py = y + r;
+            if (py < 0 || py >= bh) continue;
+            for (int b = 0; b < UI_FONT_W; b++) {
+                int px = x + ci * UI_FONT_W + b;
+                if (px >= 0 && px < bw && (g[r] & (0x80 >> b))) buf[py * bw + px] = fg;
+            }
+        }
+    }
+}
+
 void ui_draw_row(int x, int y, int w, const char *s, uint16_t fg, uint16_t bg)
 {
     ui_draw_row_attr(x, y, w, s, NULL, &fg, bg);

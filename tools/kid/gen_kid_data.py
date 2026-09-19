@@ -65,7 +65,7 @@ def arithmetic():
                   f"what is {A} add {B}", f"how much is {A} plus {B}", f"what is {a} + {b}",
                   f"can you add {A} and {B}"],
                  f"{cap(w(a))} plus {w(b)} is {S}.",
-                 [f"hey story what does {A} plus {B} make", f"what do you get if you add {A} and {B}"])
+                 [f"hey braino what does {A} plus {B} make", f"what do you get if you add {A} and {B}"])
     for a in range(0, 21):
         for b in range(0, a + 1):
             A, B, D = spoken(a), spoken(b), w(a - b)
@@ -74,7 +74,7 @@ def arithmetic():
                   f"what is {A} subtract {B}"],
                  f"{cap(w(a))} minus {w(b)} is {D}.",
                  [f"if i have {A} and take away {B} how many are left",
-                  f"hey story what does {A} minus {B} make"])
+                  f"hey braino what does {A} minus {B} make"])
     for a in range(0, 11):
         for b in range(0, 11):
             A, B, P = spoken(a), spoken(b), w(a * b)
@@ -82,7 +82,7 @@ def arithmetic():
                   f"what is {A} multiplied by {B}", f"what is {a} x {b}",
                   f"what is {A} x {B}"],
                  f"{cap(w(a))} times {w(b)} is {P}.",
-                 [f"hey story what does {A} times {B} make", f"can you multiply {A} and {B}"])
+                 [f"hey braino what does {A} times {B} make", f"can you multiply {A} and {B}"])
     for b in range(1, 11):
         for q in range(0, 11):
             a = b * q
@@ -90,7 +90,7 @@ def arithmetic():
             fact([f"what is {A} divided by {B}", f"what's {A} divided by {B}",
                   f"{A} divided by {B}", f"what is {a} / {b}"],
                  f"{cap(w(a))} divided by {w(b)} is {Q}.",
-                 [f"hey story what does {A} divided by {B} make",
+                 [f"hey braino what does {A} divided by {B} make",
                   f"if you share {A} cookies with {B} friends how many does each get"])
 
 
