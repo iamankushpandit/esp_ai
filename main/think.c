@@ -8,8 +8,11 @@
 
 static const char *TAG = "think";
 
-#define LLM_MODEL_PATH BOARD_SD_MOUNT "/story/llm/model.bin"
-#define LLM_TOK_PATH BOARD_SD_MOUNT "/story/llm/tok.bin"
+// Model directory holds model.bin + tok.bin; swap models without rebuilding.
+static char s_dir[64] = BOARD_SD_MOUNT "/story/llm8m";
+
+void think_set_model_dir(const char *dir) { snprintf(s_dir, sizeof s_dir, "%s", dir); }
+const char *think_model_dir(void) { return s_dir; }
 
 typedef struct {
     think_stream_fn fn;
@@ -53,8 +56,11 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
     bool ok = false;
     int64_t t0 = story_time_us();
     llm_blobs_t b = {0};
-    b.model = asset_load(&g_bulk, LLM_MODEL_PATH, &b.model_len);
-    b.tok = asset_load(&g_bulk, LLM_TOK_PATH, &b.tok_len);
+    char mp[80], tp[80];
+    snprintf(mp, sizeof mp, "%s/model.bin", s_dir);
+    snprintf(tp, sizeof tp, "%s/tok.bin", s_dir);
+    b.model = asset_load(&g_bulk, mp, &b.model_len);
+    b.tok = asset_load(&g_bulk, tp, &b.tok_len);
     static llm_t llm;   // ~ small struct; buffers live in the arenas
     if (!b.model || !b.tok) {
         ESP_LOGE(TAG, "LLM assets unavailable on SD");

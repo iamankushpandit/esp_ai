@@ -10,3 +10,7 @@ typedef void (*think_stream_fn)(void *user, const char *text_so_far, int tokens,
 // Runs the whole THINKING phase (load, generate, unload). Arenas must be free.
 bool think_answer(const llm_history_t *hist, const char *question, char *answer, size_t cap,
                   think_stream_fn fn, void *user, llm_stats_t *st);
+
+// SD directory containing model.bin + tok.bin (default /sd/story/llm8m).
+void think_set_model_dir(const char *dir);
+const char *think_model_dir(void);

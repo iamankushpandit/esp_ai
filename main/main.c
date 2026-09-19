@@ -129,6 +129,10 @@ static void dispatch(const char *line)
     } else if (!strncmp(line, "ask ", 4)) {
         cmd_ask(line + 4);
         printf("OK\n");
+    } else if (!strncmp(line, "llmdir ", 7)) {
+        think_set_model_dir(line + 7);
+        printf("LLM dir %s\n", think_model_dir());
+        printf("OK\n");
     } else if (!strcmp(line, "go")) {
         pipeline_turn(&s_hear, NULL);
         printf("OK\n");

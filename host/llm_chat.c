@@ -49,10 +49,10 @@ int main(int argc, char **argv)
 
     // Same arena split as the device: 264 KB "internal" + 3 MB "PSRAM".
     static uint8_t fast_mem[264 * 1024] __attribute__((aligned(16)));
-    uint8_t *bulk_mem = _aligned_malloc(3 << 20, 16);
+    uint8_t *bulk_mem = _aligned_malloc(7 << 20, 16);
     story_arena_t fast, bulk;
     story_arena_init(&fast, fast_mem, sizeof fast_mem);
-    story_arena_init(&bulk, bulk_mem, 3 << 20);
+    story_arena_init(&bulk, bulk_mem, 7 << 20);
     CHECK(story_arena_begin(&fast, "think"));
     CHECK(story_arena_begin(&bulk, "think"));
 
