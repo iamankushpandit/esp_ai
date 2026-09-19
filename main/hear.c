@@ -15,6 +15,7 @@
 static const char *TAG = "hear";
 
 volatile int g_hear_listen_count;
+volatile bool g_hear_abort;          // Stop button: end listening now, no transcript
 
 #define STT_MODEL_PATH BOARD_SD_MOUNT "/story/stt/model.bin"
 #define RING_SLOTS 24
@@ -115,6 +116,7 @@ hear_result_t hear_listen(const hear_params_t *p, char *text, size_t cap, hear_s
     bool started = false;
     const uint32_t ring_n = RING_SLOTS * STT_CHUNK_SAMPLES;
     while (1) {
+        if (g_hear_abort) { res = HEAR_NO_SPEECH; break; }
         if (c->samples < (next + 1) * STT_CHUNK_SAMPLES) {
             vTaskDelay(pdMS_TO_TICKS(10));
             continue;

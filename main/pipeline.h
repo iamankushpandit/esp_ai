@@ -8,6 +8,7 @@ typedef enum {
     PIPE_NOT_UNDERSTOOD,
     PIPE_ERROR,
     PIPE_BYE,
+    PIPE_CANCELLED,     // Stop button
 } pipeline_result_t;
 
 #define SESSION_MAX_TURNS 4   // first question + three follow-ups
@@ -19,6 +20,10 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
 // A question typed on the T9 keypad: answered (built-in or AI), shown and
 // spoken, like a voice turn but without listening.
 pipeline_result_t pipeline_typed(const char *question);
+
+// Stop button: cancels whatever the running turn is doing (listening,
+// generating, speaking) and ends the session. Safe from any task.
+void pipeline_cancel(void);
 
 // Full conversation session; returns when it ends (screen off afterwards).
 void pipeline_session(const hear_params_t *hp, int max_turns);

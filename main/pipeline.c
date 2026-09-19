@@ -20,6 +20,21 @@ static const char *TAG = "turn";
 static void status_cb(const char *s) { app_ui_status(s, UI_BUSY); }
 static void stream_cb(void *u, const char *t, int in, int out, float rate) { app_ui_llm_progress(t, in, out, rate); }
 
+static volatile bool s_cancel;
+
+void pipeline_cancel(void)
+{
+    s_cancel = true;
+    g_hear_abort = true;
+    think_stop();
+}
+
+static void cancel_reset(void)
+{
+    s_cancel = false;
+    g_hear_abort = false;
+}
+
 static void speak_error(const char *msg)
 {
     app_ui_story(msg);
@@ -50,6 +65,7 @@ static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist,
     if (typed) snprintf(question, sizeof question, "%s", typed);
     else hr = hear_listen(hp, question, sizeof question, status_cb, &hs);
     int64_t t_hear = story_time_us();
+    if (s_cancel) { res = PIPE_CANCELLED; goto done; }
     if (hr == HEAR_NO_SPEECH) {
         res = PIPE_NO_SPEECH;
         if (followup) goto done;          // quiet follow-up window: end normally
@@ -85,12 +101,23 @@ static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist,
     int64_t t_think0 = story_time_us();
     if (!builtin) app_ui_status("Thinking...", UI_BUSY);
     if (!builtin && (!think_answer(hist, question, answer, sizeof answer, stream_cb, NULL, &ls) || !answer[0])) {
-        app_ui_status("LLM error", UI_ERR);
-        speak_error("I can't answer that right now.");
+        const char *why = think_last_error();
+        app_ui_status(why[0] ? why : "LLM error", UI_ERR);
+        if (why[0]) {                     // e.g. a GGUF model that can't run here
+            app_ui_story(why);
+            speak_text("Sorry, I can't use that model.", NULL, NULL);
+        } else {
+            speak_error("I can't answer that right now.");
+        }
         res = PIPE_ERROR;
         goto done;
     }
     int64_t t_think = story_time_us() - t_think0;
+    if (s_cancel) {                       // stopped mid-answer: keep what was shown, don't speak
+        app_ui_status("Stopped", UI_GREY);
+        res = PIPE_CANCELLED;
+        goto done;
+    }
     if (hist && !builtin) llm_history_push(hist, question, answer);   // context without the sign-off
     if (last) {
         size_t n = strlen(answer);
@@ -102,7 +129,7 @@ static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist,
     // ---- SPEAK
     app_ui_status("Speaking...", UI_ACCENT);   // detail line keeps the tok/s
     int64_t t_speak0 = story_time_us();
-    if (!speak_text(answer, NULL, &ss)) {
+    if (!speak_text(answer, &s_cancel, &ss) && !s_cancel) {
         app_ui_status("TTS error (answer shown)", UI_ERR);   // answer stays on screen
         res = PIPE_ERROR;
     }
@@ -138,8 +165,9 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
 pipeline_result_t pipeline_typed(const char *question)
 {
     // One stand-alone turn: answer on screen and spoken, no follow-ups.
+    cancel_reset();
     pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question);
-    app_ui_status("Ready", UI_OK);
+    app_ui_status(r == PIPE_CANCELLED ? "Stopped" : "Ready", r == PIPE_CANCELLED ? UI_GREY : UI_OK);
     return r;
 }
 
@@ -150,13 +178,14 @@ void pipeline_session(const hear_params_t *hp, int max_turns)
 {
     static llm_history_t hist;
     llm_history_clear(&hist);
-    static const char *why[] = {"answered", "no speech", "not understood", "error", "bye"};
+    static const char *why[] = {"answered", "no speech", "not understood", "error", "bye", "stopped"};
+    cancel_reset();
     const char *reason = "last turn";
     int turn = 1;
     story_mem_log("session-start");
     for (; turn <= max_turns; turn++) {
         pipeline_result_t r = pipeline_turn(hp, &hist, turn, max_turns);
-        if (r == PIPE_BYE || r == PIPE_ERROR || (r == PIPE_NO_SPEECH)) { reason = why[r]; break; }
+        if (r == PIPE_BYE || r == PIPE_ERROR || r == PIPE_NO_SPEECH || r == PIPE_CANCELLED) { reason = why[r]; break; }
         if (turn < max_turns) {
             char st[64];
             snprintf(st, sizeof st, "Listening... follow-up %d/%d", turn, max_turns - 1);
@@ -166,6 +195,11 @@ void pipeline_session(const hear_params_t *hp, int max_turns)
     ESP_LOGI(TAG, "SESSION END after %d turn(s): %s", turn > max_turns ? max_turns : turn, reason);
     printf("SESSION END turns=%d reason=%s\n", turn > max_turns ? max_turns : turn, reason);
     llm_history_clear(&hist);           // no conversation state survives the session
+    if (s_cancel) {                     // Stop button: stay on, keep the transcript
+        app_ui_status("Stopped", UI_GREY);
+        story_mem_log("session-end");
+        return;
+    }
     app_ui_status("Session ended", UI_GREY);
     screen_off();                       // screen off; a tap wakes it
     app_ui_clear_turn();                // cleared while dark, so the next session starts clean

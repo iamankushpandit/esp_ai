@@ -21,6 +21,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
+#include "freertos/timers.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -290,6 +291,22 @@ static void dispatch(const char *line)
         app_ui_status("Restarting...", UI_ERR);
         vTaskDelay(pdMS_TO_TICKS(200));
         esp_restart();
+    } else if (!strncmp(line, "gostop ", 7) || !strncmp(line, "askstop ", 8)) {
+        // Test the Stop button: "gostop <ms>" (voice session) or
+        // "askstop <ms> <question>" (typed), cancelled after <ms>.
+        static int stop_ms;
+        char q[128] = "";
+        bool typed = line[0] == 'a';
+        sscanf(line + (typed ? 8 : 7), "%d %127[^\n]", &stop_ms, q);
+        TimerHandle_t t = xTimerCreate("stop", pdMS_TO_TICKS(stop_ms > 0 ? stop_ms : 1), pdFALSE, NULL,
+                                       (TimerCallbackFunction_t)pipeline_cancel);
+        xTimerStart(t, 0);
+        app_ui_busy(true);
+        if (typed) pipeline_typed(q);
+        else pipeline_session(&s_hear, SESSION_MAX_TURNS);
+        app_ui_busy(false);
+        xTimerDelete(t, 0);
+        printf("OK\n");
     } else if (!strcmp(line, "go")) {
         pipeline_session(&s_hear, SESSION_MAX_TURNS);
         printf("OK\n");

@@ -38,3 +38,5 @@ hear_result_t hear_wav(const char *path, char *text, size_t cap, hear_stats_t *s
 
 // Incremented each time the mic opens for a question (test harness hook).
 extern volatile int g_hear_listen_count;
+// Set by the Stop button: the current hear_listen() returns HEAR_NO_SPEECH.
+extern volatile bool g_hear_abort;

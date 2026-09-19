@@ -58,6 +58,7 @@ static const struct { int x, w; const char *label; bool spark; } BAR[BAR_COUNT] 
     [BAR_SETTINGS] = {150, 86, "/settings", false},
 };
 #define BAR_MAX_W 86
+#define ASK_BUSY_LABEL "Stop"           // the Ask pill while a request runs
 #define BTN_PX_MAX (80 * 32)             // pixel scratch: pills, keys, icons
 
 static ui_box_t s_status, s_convo, s_detail;
@@ -692,7 +693,7 @@ static int s_spark_x0 = -1;
 static void spark_mask_init(void)
 {
     const int W = BAR[BAR_ASK].w, H = BAR_H;
-    const int label_w = (int)strlen(BAR[BAR_ASK].label) * UI_FONT_W;
+    const int label_w = (int)strlen(ASK_BUSY_LABEL) * UI_FONT_W;   // pulses only while busy
     const int gx = (W - (label_w + 17)) / 2;
     const float icx = gx + 5.0f, icy = (H - 1) / 2.0f, R = 5.5f;
     s_spark_x0 = gx - 1;
@@ -735,7 +736,7 @@ static void icon_pulse(bool on)
 
 void app_ui_tick(void)
 {
-    if (!s_pulse || !s_btn_px) return;
+    if (!s_pulse || !s_btn_px || !s_busy) return;
     UI_LOCK();
     int64_t now = story_time_us();
     if (s_pulse && now - s_pulse_last >= PULSE_FRAME_US) {
@@ -1053,6 +1054,10 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st)
     s_bar_state[b] = (int)st;
     const int W = BAR[b].w, H = BAR_H;
     const uint16_t bg = UI_BLACK;
+    // While busy the Ask pill is the Stop button (active, pink); the others dim.
+    const bool stop = b == BAR_ASK && s_busy;
+    const char *label = stop ? ASK_BUSY_LABEL : BAR[b].label;
+    if (stop && st == BTN_BUSY) st = BTN_ACTIVE;
     bool dim = st == BTN_BUSY;
     uint16_t fill = st == BTN_PRESSED ? RGB565(52, 34, 38) : bg;
     uint16_t edge = st == BTN_PRESSED || st == BTN_ACTIVE ? UI_ACCENT
@@ -1076,7 +1081,7 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st)
             px[y * W + x] = mix565(c, edge, ring / 16.0f);
         }
     }
-    int label_w = (int)strlen(BAR[b].label) * UI_FONT_W;
+    int label_w = (int)strlen(label) * UI_FONT_W;
     int group = label_w + (BAR[b].spark ? 17 : 0), gx = (W - group) / 2;
     if (BAR[b].spark) {
         const float R = 5.5f, icx = gx + 5.0f, icy = cy;
@@ -1089,7 +1094,7 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st)
             }
         gx += 17;
     }
-    ui_text_into(px, W, H, gx, (H - UI_FONT_H) / 2, BAR[b].label, text);
+    ui_text_into(px, W, H, gx, (H - UI_FONT_H) / 2, label, text);
 
     board_lcd_window(BAR[b].x, BAR_Y, W, H);
     uint16_t *buf = board_lcd_stream_buf();

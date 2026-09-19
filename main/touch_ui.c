@@ -5,6 +5,7 @@
 #include "models.h"
 #include "net.h"
 #include "prefs.h"
+#include "pipeline.h"
 #include "story_mem.h"
 #include "ui.h"
 #include "esp_log.h"
@@ -95,8 +96,14 @@ static void bar_action(int b)
 {
     switch (b) {
     case BAR_ASK:
-        ESP_LOGI(TAG, "ask");
-        xSemaphoreGive(s_ask);
+        if (app_ui_is_busy()) {
+            ESP_LOGW(TAG, "stop requested");
+            app_ui_status("Stopping...", UI_ERR);
+            pipeline_cancel();
+        } else {
+            ESP_LOGI(TAG, "ask");
+            xSemaphoreGive(s_ask);
+        }
         break;
     case BAR_MODEL:
         if (app_ui_page_get() != PAGE_MODELS) models_scan();   // pick up newly copied models
@@ -271,7 +278,8 @@ static void touch_task(void *arg)
                 g = app_ui_is_busy() ? G_OTHER : G_RESTART;  // ignored during a session
                 if (g == G_RESTART) app_ui_restart_state(BTN_PRESSED);
             } else if ((bar = app_ui_bar_hit(x, y)) >= 0) {
-                g = app_ui_is_busy() ? G_OTHER : G_BAR;     // bar is disabled while busy
+                // While busy only the Ask pill works: it is the Stop button.
+                g = app_ui_is_busy() && bar != BAR_ASK ? G_OTHER : G_BAR;
                 if (g == G_BAR) app_ui_bar_state((app_bar_t)bar, BTN_PRESSED);
             } else if (app_ui_convo_hit(x, y)) {
                 g = G_PAGE_MAYBE;

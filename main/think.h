@@ -15,3 +15,10 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
 // SD directory containing model.bin + tok.bin (default /sd/story/llm8m).
 void think_set_model_dir(const char *dir);
 const char *think_model_dir(void);
+
+// Why the last think_answer() failed ("" if it didn't): e.g. a GGUF model
+// that is too big or uses an unsupported architecture.
+const char *think_last_error(void);
+
+// Asks a running generation to stop (from another task, e.g. the Stop button).
+void think_stop(void);

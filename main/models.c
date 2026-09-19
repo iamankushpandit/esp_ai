@@ -7,10 +7,12 @@
 #include <dirent.h>
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 
 static const char *TAG = "models";
 #define ROOT BOARD_SD_MOUNT "/story"
+#define GGUF_ROOT BOARD_SD_MOUNT "/models"
 
 static model_info_t s_models[MODELS_MAX];
 static int s_count, s_active = -1;
@@ -94,7 +96,20 @@ int models_scan(void)
     }
     closedir(d);
 
-    // Stable order: by folder name.
+    // GGUF files (llama.cpp format) dropped into /sd/models/.
+    DIR *g = opendir(GGUF_ROOT);
+    while (g && (e = readdir(g)) && s_count < MODELS_MAX) {
+        size_t nl = strlen(e->d_name);
+        if (nl < 6 || strcasecmp(e->d_name + nl - 5, ".gguf") != 0) continue;
+        model_info_t *m = &s_models[s_count];
+        snprintf(m->dir, sizeof m->dir, GGUF_ROOT "/%.50s", e->d_name);
+        if (!file_size(m->dir, &m->bytes)) continue;
+        snprintf(m->name, sizeof m->name, "%.*s (GGUF)", (int)(nl - 5 > 30 ? 30 : nl - 5), e->d_name);
+        s_count++;
+    }
+    if (g) closedir(g);
+
+    // Stable order: by path (story folders first, then GGUF files).
     for (int i = 1; i < s_count; i++)
         for (int j = i; j > 0 && strcmp(s_models[j - 1].dir, s_models[j].dir) > 0; j--) {
             model_info_t t = s_models[j];
