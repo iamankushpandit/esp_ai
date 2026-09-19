@@ -936,6 +936,11 @@ bool gguf_llm_answer(gguf_llm_t *m, const char *question, const llm_params_t *p,
     int tok = ids[0], prev = -1;
     st->stop_reason = "hard";
     char tmp[64];
+    // Repetition guard (as in story_llm.c): stop and trim when the last
+    // REP_N generated tokens already occurred in this answer.
+    enum { REP_N = 6, REP_HIST = 96 };
+    int gen_ids[REP_HIST];
+    size_t gen_alen[REP_HIST];
     for (int pos = 0; pos < m->ctx - 1; pos++) {
         if (m->stop) { st->stop_reason = "stopped"; break; }
         float *logits = gguf_llm_forward(m, tok, pos);
@@ -946,7 +951,20 @@ bool gguf_llm_answer(gguf_llm_t *m, const char *question, const llm_params_t *p,
         } else {
             next = neo_sample(&smp, logits, m->vocab);
             if (next == m->eos || (m->tok_type && m->tok_type[next] == 3)) { st->stop_reason = "eos"; break; }
-            st->gen_tokens++;
+            int g = st->gen_tokens++;
+            if (g < REP_HIST) { gen_ids[g] = next; gen_alen[g] = alen; }
+            if (g + 1 >= 2 * REP_N && g < REP_HIST) {
+                int s0 = g + 1 - REP_N;
+                bool looped = false;
+                for (int j = 0; j + REP_N <= s0 && !looped; j++)
+                    looped = !memcmp(gen_ids + j, gen_ids + s0, REP_N * sizeof(int));
+                if (looped) {
+                    alen = gen_alen[s0];
+                    ans[alen] = 0;
+                    st->stop_reason = "repeat";
+                    break;
+                }
+            }
             int pl;
             const char *pc = gguf_llm_piece(m, next, tok, &pl, tmp);
             // No leading blank; a plain-completion model continues the question,

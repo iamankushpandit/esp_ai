@@ -8,8 +8,8 @@ dropped (quantized rows are independent blocks, so they're sliced as-is).
 Kept tokens: control/unknown/byte tokens, every single character, and every
 token that appears in the corpus tokenization -- including the intermediate
 pieces of the greedy merges, so the on-device tokenizer can still reach every
-kept token. --output-q4 also requantizes a Q8_0/F32 output layer to Q4_0
-(about half its size). --prompt stores the prompt template as "ivy.prompt".
+kept token. --output-q4 requantizes the output layer to Q4_0, --requant-q4
+every 2-D weight (Q8_0/F16/F32 -> Q4_0, about half the size). --prompt stores the prompt template as "ivy.prompt".
 """
 import argparse
 import re
@@ -68,6 +68,7 @@ def main():
     ap.add_argument("--max-chars", type=int, default=3_000_000)
     ap.add_argument("--min-count", type=int, default=2)
     ap.add_argument("--output-q4", action="store_true")
+    ap.add_argument("--requant-q4", action="store_true", help="all 2-D weights to Q4_0 (from Q8_0/F16/F32)")
     ap.add_argument("--prompt", default=None)
     a = ap.parse_args()
 
@@ -115,10 +116,12 @@ def main():
         shape = [int(x) for x in t.shape]              # [ne0, ne1]
         if t.name in ("token_embd.weight", "output.weight"):
             rows = data.reshape(shape[1], -1)[keep]
-            if t.name == "output.weight" and a.output_q4 and qt != QT.Q4_0:
-                f32 = dequantize(rows, qt).reshape(len(keep), shape[0]).astype(np.float32)
-                rows, qt = quantize(f32, QT.Q4_0), QT.Q4_0
             data, shape = rows, [shape[0], len(keep)]
+        is_matrix = len(shape) > 1 and shape[1] > 1 and shape[0] % 32 == 0
+        want_q4 = a.requant_q4 or (t.name == "output.weight" and a.output_q4)
+        if is_matrix and want_q4 and qt != QT.Q4_0:
+            f32 = dequantize(np.asarray(data), qt).reshape(shape[1], shape[0]).astype(np.float32)
+            data, qt = quantize(f32, QT.Q4_0), QT.Q4_0
         if qt in (QT.F32, QT.F16):
             data = np.asarray(data).reshape(list(reversed(shape)) if shape[-1] > 1 or len(shape) > 1 else shape)
         else:
