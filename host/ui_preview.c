@@ -87,9 +87,9 @@ static void stream(const char *ans, int tok, float rate)
     for (int k = 14, i = 1; k < n; k += 18, i++) {
         memcpy(part, ans, (size_t)k);
         part[k] = 0;
-        STEP("  stream update", app_ui_llm_progress(part, i * 3, rate));
+        STEP("  stream update", app_ui_llm_progress(part, 12, i * 3, rate));
     }
-    STEP("  answer final", app_ui_llm_progress(ans, tok, rate));
+    STEP("  answer final", app_ui_llm_progress(ans, 12, tok, rate));
 }
 
 int main(int argc, char **argv)
@@ -129,18 +129,18 @@ int main(int argc, char **argv)
     STEP("back to chat", app_ui_page(PAGE_CHAT));
     STEP("ask pressed", app_ui_button(BTN_PRESSED));
     dump();
-    STEP("turn 1: listening", app_ui_busy(true); app_ui_clear_turn(); app_ui_status("Listening...", UI_ACCENT));
-    STEP("turn 1: transcribing", app_ui_status("Transcribing...", UI_ACCENT));
+    STEP("turn 1: listening", app_ui_busy(true); app_ui_clear_turn(); app_ui_status("Listening...", UI_BUSY));
+    STEP("turn 1: transcribing", app_ui_status("Transcribing...", UI_BUSY); app_ui_tick());
     STEP("turn 1: transcript", app_ui_you("what color is a banana"));
     stream("I know! The banana is yellow.", 8, 6.1f);
     STEP("turn 1: speaking", app_ui_status("Speaking...", UI_ACCENT));
-    STEP("follow-up 1 listening", app_ui_status("Listening... follow-up 1/3", UI_ACCENT));
+    STEP("follow-up 1 listening", app_ui_status("Listening... follow-up 1/3", UI_BUSY));
     STEP("turn 2: transcript", app_ui_you("how many legs does a dog have"));
     stream("A dog has four legs.", 6, 6.3f);
     STEP("turn 3: built-in", app_ui_you("what time is it"); app_ui_builtin("It is 12:51 PM.", "device clock"));
     dump();
 
-    STEP("follow-up 2 listening", app_ui_status("Listening... follow-up 2/3", UI_ACCENT));
+    STEP("follow-up 2 listening", app_ui_status("Listening... follow-up 2/3", UI_BUSY));
     STEP("turn 3: transcript (scrolls)", app_ui_you("tell me a story about a cat"));
     stream("Once upon a time, there was a big, strong cat. The cat saw a little mouse. "
            "They became good friends. Bye bye.", 34, 6.4f);
@@ -149,7 +149,7 @@ int main(int argc, char **argv)
     STEP("scroll: drag down 3 rows", app_ui_scroll_begin(); app_ui_scroll_drag(3 * UI_ROW_H));
     STEP("scroll: drag further (to top)", app_ui_scroll_drag(20 * UI_ROW_H));
     dump();
-    STEP("new text while scrolled (no jump)", app_ui_llm_progress("Once upon a time, there was a big, strong cat. The cat saw a little mouse. They became good friends. Bye bye!", 35, 6.4f));
+    STEP("new text while scrolled (no jump)", app_ui_llm_progress("Once upon a time, there was a big, strong cat. The cat saw a little mouse. They became good friends. Bye bye!", 14, 35, 6.4f));
     STEP("scroll back to bottom", app_ui_scroll_begin(); app_ui_scroll_drag(-40 * UI_ROW_H));
     STEP("session end", app_ui_status("Session ended", UI_GREY); app_ui_busy(false));
     return 0;

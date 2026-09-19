@@ -17,6 +17,7 @@ const char *think_model_dir(void) { return s_dir; }
 
 typedef struct {
     think_stream_fn fn;
+    const llm_stats_t *st;     // prompt_tokens is set before the first piece
     void *user;
     char buf[LLM_ANSWER_CHARS + 1];
     size_t len, flushed;
@@ -42,7 +43,7 @@ static bool on_piece(void *u, const char *p, int n)
     if (s->tokens++ == 0) s->first_us = now;
     bool sentence = n > 0 && strchr(".!?", p[n - 1]);
     if (s->fn && (now - s->last_us > 150000 || sentence)) {
-        s->fn(s->user, s->buf, s->tokens, rate(s, now));
+        s->fn(s->user, s->buf, s->st->prompt_tokens, s->tokens, rate(s, now));
         s->flushed = s->len;
         s->last_us = now;
     }
@@ -52,6 +53,8 @@ static bool on_piece(void *u, const char *p, int n)
 bool think_answer(const llm_history_t *hist, const char *question, char *answer, size_t cap,
                   think_stream_fn fn, void *user, llm_stats_t *st)
 {
+    llm_stats_t local;
+    if (!st) st = &local;   // the stream callback reads the prompt size from here
     char topic[LLM_TURN_CHARS];
     story_intent_t intent = story_intent(question, topic, sizeof topic);
     phase_t ph;
@@ -71,15 +74,15 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
         llm_params_t p = llm_default_params();
         if (llm_load(&llm, &b, &p, &g_fast, &g_bulk)) {
             int64_t load_us = story_time_us() - t0;
-            stream_t s = {.fn = fn, .user = user};
+            stream_t s = {.fn = fn, .user = user, .st = st};
             if (intent == INTENT_STORY) {
                 ESP_LOGI(TAG, "intent: story about \"%s\"", topic);
                 ok = llm_story(&llm, topic, answer, cap, on_piece, &s, st);
             } else {
                 ok = llm_answer(&llm, hist, question, answer, cap, on_piece, &s, st);
             }
-            if (fn) fn(user, answer, st ? st->gen_tokens : s.tokens,
-                       st && st->gen_us ? st->gen_tokens / (st->gen_us / 1e6f) : rate(&s, story_time_us()));
+            if (fn) fn(user, answer, st->prompt_tokens, st->gen_tokens,
+                       st->gen_us ? st->gen_tokens / (st->gen_us / 1e6f) : rate(&s, story_time_us()));
             if (st) st->load_us = load_us;
             llm_unload(&llm);
         }

@@ -30,7 +30,7 @@ static const char *TAG = "main";
 #define FAST_ARENA_BYTES (264 * 1024)
 #define BULK_ARENA_BYTES (7 * 1024 * 1024)
 
-static void ui_stream(void *u, const char *text, int tok, float rate) { app_ui_llm_progress(text, tok, rate); }
+static void ui_stream(void *u, const char *text, int in, int out, float rate) { app_ui_llm_progress(text, in, out, rate); }
 
 static void cmd_ask(const char *q)
 {

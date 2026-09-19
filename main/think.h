@@ -4,8 +4,9 @@
 #include "story_llm.h"
 
 // Called (batched) with the answer-so-far while tokens stream, plus the
-// generated token count and the live generation speed.
-typedef void (*think_stream_fn)(void *user, const char *text_so_far, int tokens, float tok_per_s);
+// prompt ("in") and generated ("out") token counts and the live speed.
+typedef void (*think_stream_fn)(void *user, const char *text_so_far, int in_tokens, int out_tokens,
+                                float tok_per_s);
 
 // Runs the whole THINKING phase (load, generate, unload). Arenas must be free.
 bool think_answer(const llm_history_t *hist, const char *question, char *answer, size_t cap,

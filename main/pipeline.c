@@ -18,7 +18,7 @@
 static const char *TAG = "turn";
 
 static void status_cb(const char *s) { app_ui_status(s, UI_BUSY); }
-static void stream_cb(void *u, const char *t, int tok, float rate) { app_ui_llm_progress(t, tok, rate); }
+static void stream_cb(void *u, const char *t, int in, int out, float rate) { app_ui_llm_progress(t, in, out, rate); }
 
 static void speak_error(const char *msg)
 {
@@ -143,7 +143,7 @@ void pipeline_session(const hear_params_t *hp, int max_turns)
         if (turn < max_turns) {
             char st[64];
             snprintf(st, sizeof st, "Listening... follow-up %d/%d", turn, max_turns - 1);
-            app_ui_status(st, UI_ACCENT);
+            app_ui_status(st, UI_BUSY);
         }
     }
     ESP_LOGI(TAG, "SESSION END after %d turn(s): %s", turn > max_turns ? max_turns : turn, reason);

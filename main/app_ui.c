@@ -5,6 +5,7 @@
 #include "models.h"
 #include "builtin.h"
 #include "prefs.h"
+#include "story_mem.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -234,6 +235,9 @@ static void build_settings(void)
     add_para("", -1);
     snprintf(line, sizeof line, "  Volume     [-] %3d%% [+]", p->volume);
     add_para(line, TAG_SET_VOLUME);
+    add_para("", -1);
+    snprintf(line, sizeof line, "  Voice gain [-] +%ddB [+]", p->voice_gain_db);
+    add_para(line, TAG_SET_GAIN);
     add_para("", -1);
     snprintf(line, sizeof line, "  Brightness [-] %3d%% [+]", p->brightness);
     add_para(line, TAG_SET_BRIGHT);
@@ -521,6 +525,96 @@ void app_ui_splash(void)
 // │         (c) iamankushpandit
 // ╰──────────────────────────╯
 #define HDR_TEXT_COL 5                   // text starts right of the icon
+#define ICON_X (UI_FONT_W + ((HDR_TEXT_COL - 1) * UI_FONT_W - LOGO_ICON_W) / 2)   // centered in cols 1..4
+#define ICON_Y ROW_Y(1)
+
+// ---------------------------------------------------------------- AI activity
+// While the AI works (listening, transcribing, thinking) its spark symbol
+// flashes: the Ask pill's spark pulses in pink (cosine, 25..100 %) and the
+// status-line spinner keeps turning even when the status text doesn't
+// change. Only the spark's 14x14 patch and the status row are redrawn.
+#define PULSE_PERIOD_US 1000000
+#define PULSE_FRAME_US 80000
+#define SPIN_FRAME_US 200000
+static bool s_pulse;
+static int64_t s_pulse_t0, s_pulse_last, s_spin_last;
+static char s_stat_text[64];
+static uint16_t s_stat_color;
+
+static float spark(float x, float y, float R);
+static uint16_t mix565(uint16_t a, uint16_t b, float t);
+
+// The Ask pill's spark, drawn over the pill's black interior. Its coverage
+// mask is computed once; each frame only recolours it (cheap: the LLM is
+// running on both cores while this animates).
+#define SPARK_W 14
+#define SPARK_H 14
+#define SPARK_Y0 6
+static uint8_t s_spark_mask[SPARK_W * SPARK_H];   // coverage 0..255
+static int s_spark_x0 = -1;
+
+static void spark_mask_init(void)
+{
+    const int W = BAR[BAR_ASK].w, H = BAR_H;
+    const int label_w = (int)strlen(BAR[BAR_ASK].label) * UI_FONT_W;
+    const int gx = (W - (label_w + 17)) / 2;
+    const float icx = gx + 5.0f, icy = (H - 1) / 2.0f, R = 5.5f;
+    s_spark_x0 = gx - 1;
+    for (int y = 0; y < SPARK_H; y++)
+        for (int x = 0; x < SPARK_W; x++) {
+            float cov = 0;
+            for (int k = 0; k < 4; k++)
+                cov += spark(s_spark_x0 + x - icx + ((k & 1) ? 0.25f : -0.25f),
+                             SPARK_Y0 + y - icy + ((k & 2) ? 0.25f : -0.25f), R);
+            s_spark_mask[y * SPARK_W + x] = (uint8_t)(cov / 4.0f * 255.0f + 0.5f);
+        }
+}
+
+static void draw_ask_spark(float level)
+{
+    if (s_spark_x0 < 0) spark_mask_init();
+    uint16_t col = mix565(RGB565(40, 26, 30), UI_ACCENT, level);
+    board_lcd_window(BAR[BAR_ASK].x + s_spark_x0, BAR_Y + SPARK_Y0, SPARK_W, SPARK_H);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < SPARK_W * SPARK_H; i++) {
+        uint16_t c = s_spark_mask[i] ? mix565(UI_BLACK, col, s_spark_mask[i] / 255.0f) : UI_BLACK;
+        buf[i] = (uint16_t)((c >> 8) | (c << 8));
+    }
+    board_lcd_stream_push(buf, SPARK_W * SPARK_H);
+    board_lcd_stream_end();
+}
+
+static void icon_pulse(bool on)
+{
+    if (on == s_pulse) return;
+    s_pulse = on;
+    s_pulse_t0 = story_time_us();
+    s_pulse_last = s_spin_last = 0;
+    if (!on && s_btn_px) {                       // restore the pill's normal look
+        int st = s_bar_state[BAR_ASK];
+        s_bar_state[BAR_ASK] = -1;
+        if (st >= 0) app_ui_bar_state(BAR_ASK, (app_btn_state_t)st);
+    }
+}
+
+void app_ui_tick(void)
+{
+    if (!s_pulse || !s_btn_px) return;
+    UI_LOCK();
+    int64_t now = story_time_us();
+    if (s_pulse && now - s_pulse_last >= PULSE_FRAME_US) {
+        s_pulse_last = now;
+        float ph = (float)((now - s_pulse_t0) % PULSE_PERIOD_US) / PULSE_PERIOD_US;
+        draw_ask_spark(0.25f + 0.75f * (0.5f + 0.5f * cosf(6.2831853f * ph)));
+    }
+    if (s_pulse && now - s_spin_last >= SPIN_FRAME_US) {
+        s_spin_last = now;
+        char text[64];
+        snprintf(text, sizeof text, "%s", s_stat_text);
+        app_ui_status(text, s_stat_color);       // next spinner frame, same text
+    }
+    UI_UNLOCK();
+}
 
 static int s_bat_pct;
 static void draw_battery(int pct);
@@ -554,9 +648,7 @@ static void draw_header(void)
     header_row(2, "(c) iamankushpandit", UI_DIM);
     // Leaf icon over the two text rows, left of the title (after the rows,
     // so their background doesn't cover it).
-    blit_rgb(logo_icon, LOGO_ICON_W, LOGO_ICON_H,
-             UI_FONT_W + ((HDR_TEXT_COL - 1) * UI_FONT_W - LOGO_ICON_W) / 2,   // centered in cols 1..4
-             ROW_Y(1));
+    blit_rgb(logo_icon, LOGO_ICON_W, LOGO_ICON_H, ICON_X, ICON_Y);
     if (s_bat_pct != -2) draw_battery(s_bat_pct);
 
     row[0] = UI_G_BL[0];
@@ -600,12 +692,15 @@ void app_ui_status(const char *s, uint16_t color)
 {
     UI_LOCK();
     char buf[64];
+    if (s != s_stat_text) snprintf(s_stat_text, sizeof s_stat_text, "%s", s);
+    s_stat_color = color;
     bool idle = color == UI_OK || color == UI_GREY;
     char lead = idle ? UI_G_MIDDOT[0] : (char)(UI_G_SPIN0 + (s_spin++ % UI_SPIN_FRAMES));
     snprintf(buf, sizeof buf, "%c %s", lead, s);
     char *dots = strstr(buf, "...");
     if (dots) { dots[0] = UI_G_ELLIPSIS[0]; memmove(dots + 1, dots + 3, strlen(dots + 3) + 1); }
     uint16_t fg = idle ? UI_DIM : (color == UI_ERR ? UI_ERR : UI_ACCENT);
+    icon_pulse(color == UI_BUSY);           // listening / transcribing / thinking
     if (fg != s_status.fg) {
         // Color change: restyle, then let the single set() below repaint once.
         ui_box_style(&s_status, 1, fg, 0);
@@ -665,8 +760,8 @@ void app_ui_builtin(const char *text, const char *source)
 void app_ui_detail(const char *text)
 {
     UI_LOCK();
-    char buf[48];
-    if (text && text[0]) snprintf(buf, sizeof buf, "  " UI_G_RESULT "  %s", text);
+    char buf[64];
+    if (text && text[0]) snprintf(buf, sizeof buf, " " UI_G_RESULT " %s", text);
     else buf[0] = 0;
     ui_box_set(&s_detail, buf);
     UI_UNLOCK();
@@ -682,15 +777,18 @@ void app_ui_clear_turn(void)
     UI_UNLOCK();
 }
 
-void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)
+void app_ui_llm_progress(const char *text, int in_tokens, int out_tokens, float tok_per_s)
 {
     UI_LOCK();
-    char d[40];
-    // "AI" marks answers generated by the language model (vs "no AI" built-ins).
-    if (tok_per_s > 0) snprintf(d, sizeof d, "AI " UI_G_MIDDOT " %d tok " UI_G_MIDDOT " %.1f tok/s", tokens, tok_per_s);
-    else snprintf(d, sizeof d, "AI " UI_G_MIDDOT " %d tok", tokens);
+    char d[48];
+    // "AI" marks answers generated by the language model (vs "no AI" built-ins):
+    // prompt tokens in, generated tokens out, generation speed.
+    if (tok_per_s > 0)
+        snprintf(d, sizeof d, "AI %d in " UI_G_MIDDOT " %d out " UI_G_MIDDOT " %.1f/s", in_tokens, out_tokens, tok_per_s);
+    else
+        snprintf(d, sizeof d, "AI %d in " UI_G_MIDDOT " %d out", in_tokens, out_tokens);
     s_last_rate = tok_per_s;
-    app_ui_status("Thinking...", UI_ACCENT);   // advances the spinner
+    app_ui_status("Thinking...", UI_BUSY);     // advances the spinner, pulses the icon
     app_ui_story(text);
     app_ui_detail(d);
     UI_UNLOCK();

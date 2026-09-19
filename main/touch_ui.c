@@ -174,6 +174,11 @@ static void settings_tap(int tag, int col)
         board_audio_set_volume(prefs_step_volume(dir));
         s_volume_changed = story_time_us();  // main loop says "Hi there" at the new level
         break;
+    case TAG_SET_GAIN:
+        if (!dir) return;
+        prefs_step_voice_gain(dir);
+        s_volume_changed = story_time_us();  // hear the new gain too
+        break;
     case TAG_SET_BRIGHT:
         if (!dir) return;
         board_backlight(prefs_step_brightness(dir));
@@ -270,6 +275,7 @@ static void touch_task(void *arg)
         }
         down = t;
         restart_expire();
+        app_ui_tick();                                      // spark pulse + spinner while the AI works
         if (battery_poll(app_ui_is_busy())) {               // charger connected: wake up
             if (!s_screen) screen_on();
             else s_activity = story_time_us();

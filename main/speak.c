@@ -3,6 +3,8 @@
 #include "phase.h"
 #include "board.h"
 #include "story_tts.h"
+#include "prefs.h"
+#include <math.h>
 #include "esp_log.h"
 
 static const char *TAG = "speak";
@@ -15,11 +17,34 @@ typedef struct {
     long samples;
 } spk_ctx_t;
 
+// Voice gain (Settings): digital boost on the TTS samples. Above KNEE the
+// signal is compressed smoothly toward full scale instead of hard clipping,
+// so +12 dB stays clean on loud syllables.
+#define KNEE 24000.0f
+
+static inline int16_t gain_sample(int16_t s, float g)
+{
+    float y = s * g, a = y < 0 ? -y : y;
+    if (a > KNEE) a = KNEE + (a - KNEE) / (1.0f + (a - KNEE) / (32767.0f - KNEE));
+    return (int16_t)(y < 0 ? -a : a);
+}
+
 static bool to_speaker(void *u, const int16_t *pcm, size_t n)
 {
     spk_ctx_t *c = (spk_ctx_t *)u;
     if (!c->first_us) c->first_us = story_time_us();
-    board_spk_write(pcm, n, 1000);
+    const int db = prefs()->voice_gain_db;
+    if (db <= 0) {
+        board_spk_write(pcm, n, 1000);
+    } else {
+        const float g = powf(10.0f, db / 20.0f);
+        int16_t buf[256];
+        for (size_t off = 0; off < n; off += 256) {
+            size_t k = n - off < 256 ? n - off : 256;
+            for (size_t i = 0; i < k; i++) buf[i] = gain_sample(pcm[off + i], g);
+            board_spk_write(buf, k, 1000);
+        }
+    }
     c->samples += n;
     return true;
 }

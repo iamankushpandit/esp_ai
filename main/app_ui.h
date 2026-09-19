@@ -9,7 +9,7 @@
 //                                  ▐    or /settings. Thin scrollbar on the right.
 //   > how many legs does a dog have
 //   ● A dog has four legs.
-//   ⎿  8 tok · 6.2 tok/s              <- dim detail line
+//   ⎿ AI 12 in · 8 out · 6.2/s        <- dim detail line (tokens + speed)
 //   ✻ Thinking…                      <- status / spinner
 //   ( /model ) ( ✻ Ask ) ( /settings ) <- bottom bar (tap)
 //
@@ -35,8 +35,12 @@ void app_ui_builtin(const char *text, const char *source);
 void app_ui_detail(const char *text);
 // Clears the whole transcript (new session).
 void app_ui_clear_turn(void);
-// Streaming answer + live generation speed on the detail line.
-void app_ui_llm_progress(const char *text, int tokens, float tok_per_s);
+// Streaming answer + prompt/generated token counts and live speed on the
+// detail line.
+void app_ui_llm_progress(const char *text, int in_tokens, int out_tokens, float tok_per_s);
+// Animation tick (call every ~20 ms): while the AI works the Ask spark pulses
+// and the status spinner turns (any UI_BUSY status: listening, transcribing, thinking).
+void app_ui_tick(void);
 // Last generation speed shown (for keeping it visible while speaking).
 float app_ui_last_tok_rate(void);
 
@@ -56,6 +60,7 @@ void app_ui_refresh_page(void);            // e.g. after the model list changed
 #define TAG_SET_SCREEN 112                 // tap cycles the screen-off time
 #define TAG_SET_WAKE 113                   // tap toggles the wake word
 #define TAG_SET_ABOUT 114
+#define TAG_SET_GAIN 115                   // voice gain [-] / [+]
 // Settings rows "Label      [-] 70% [+]": columns 13..18 step down, 20.. step
 // up; a tap on the label does nothing.
 #define SET_MINUS_COL_MIN 13
