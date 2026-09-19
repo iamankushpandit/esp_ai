@@ -22,6 +22,15 @@ int models_active(void) { return s_act; }
 bool models_select(int i) { s_act = i; return true; }
 int models_scan(void) { return 3; }
 
+// Clock / network stubs (the device versions live in main/builtin.c, main/net.c).
+#include "builtin.h"
+#include "net.h"
+void clock_short(char *out, size_t cap) { snprintf(out, cap, "Sat 12:51 PM"); }
+static bool s_wifi_set = true;
+bool net_has_credentials(void) { return s_wifi_set; }
+const char *net_ssid(void) { return "HomeNet"; }
+const char *net_last_msg(void) { return "Clock set"; }
+
 static uint16_t fb[BOARD_LCD_H][BOARD_LCD_W];
 static uint16_t dma[BOARD_LCD_STREAM_PX];
 static int wx, wy, ww, wpos;
@@ -99,6 +108,18 @@ int main(int argc, char **argv)
     STEP("select model 0", models_select(0); app_ui_refresh_page());
     STEP("/about page", app_ui_page(PAGE_ABOUT));
     dump();
+    {
+        static const net_ap_t aps[] = {{"HomeNet", -52, false}, {"Neighbors 5G", -68, false},
+                                       {"CoffeeShop", -80, true}};
+        STEP("wifi page (scanning)", app_ui_page(PAGE_WIFI); app_ui_wifi_scanning());
+        STEP("wifi page (results)", app_ui_wifi_results(aps, 3));
+        dump();
+        STEP("keyboard", app_ui_kb_open("HomeNet"));
+        STEP("type p", app_ui_kb_tap(9 * 24 + 5, 62 + 32 + 26 + 5));
+        STEP("type w", app_ui_kb_tap(1 * 24 + 5, 62 + 32 + 26 + 5));
+        dump();
+        STEP("back to wifi", app_ui_page(PAGE_WIFI));
+    }
     STEP("back to chat", app_ui_page(PAGE_CHAT));
     STEP("ask pressed", app_ui_button(BTN_PRESSED));
     dump();
@@ -110,6 +131,7 @@ int main(int argc, char **argv)
     STEP("follow-up 1 listening", app_ui_status("Listening... follow-up 1/3", UI_ACCENT));
     STEP("turn 2: transcript", app_ui_you("how many legs does a dog have"));
     stream("A dog has four legs.", 6, 6.3f);
+    STEP("turn 3: built-in", app_ui_you("what time is it"); app_ui_builtin("It is 12:51 PM.", "device clock"));
     dump();
 
     STEP("follow-up 2 listening", app_ui_status("Listening... follow-up 2/3", UI_ACCENT));

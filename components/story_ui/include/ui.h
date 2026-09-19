@@ -24,7 +24,7 @@ extern "C" {
 #define UI_YELLOW RGB565(255, 220, 60)
 #define UI_GREEN RGB565(90, 230, 120)
 #define UI_RED RGB565(255, 80, 80)
-#define UI_ACCENT RGB565(217, 119, 87)   // terracotta, CLI-style accent
+#define UI_ACCENT RGB565(244, 194, 194)  // baby pink accent (#F4C2C2)
 
 // Extra glyphs (byte codes, see tools/gen_font.py). Use as separate string
 // literals so a following hex digit isn't swallowed: UI_G_BULLET " " "text".
@@ -43,6 +43,8 @@ extern "C" {
 // Invisible row marker: a line starting with it can be drawn entirely in a
 // marker color (see ui_box_mark_row); wrapped continuation rows keep it.
 #define UI_G_ROWMARK "\x8E"
+// Diamond: bullet for answers from plain C code (clock, name), not the model.
+#define UI_G_DIAMOND "\x8F"
 
 typedef struct {
     int16_t x, y, w;
@@ -52,9 +54,9 @@ typedef struct {
     uint16_t lead_fg;
     uint8_t hang;            // continuation rows are indented by this many cols
     uint8_t nmarks;          // rows starting with mark_ch[k] draw that char in mark_fg[k]
-    char mark_ch[3];
-    uint16_t mark_fg[3];
-    bool mark_row[3];        // true: the whole row uses mark_fg[k]
+    char mark_ch[4];
+    uint16_t mark_fg[4];
+    bool mark_row[4];        // true: the whole row uses mark_fg[k]
     char shown[UI_MAX_ROWS][UI_MAX_COLS + 1];
 } ui_box_t;
 
@@ -71,7 +73,7 @@ void ui_box_init(ui_box_t *b, int x, int y, int w, int rows, uint16_t fg, uint16
 void ui_box_style(ui_box_t *b, uint8_t lead_n, uint16_t lead_fg, uint8_t hang);
 // Per-row marker coloring (e.g. '>' dim, bullet accent) for transcript boxes.
 void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg);
-// Rows starting with `ch` are drawn entirely in `fg` (k = 0..2).
+// Rows starting with `ch` are drawn entirely in `fg` (k = 0..3).
 void ui_box_mark_row(ui_box_t *b, int k, char ch, uint16_t fg);
 // Returns number of rows repainted.
 int ui_box_set(ui_box_t *b, const char *text);

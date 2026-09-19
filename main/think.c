@@ -54,15 +54,6 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
 {
     char topic[LLM_TURN_CHARS];
     story_intent_t intent = story_intent(question, topic, sizeof topic);
-    if (intent == INTENT_IDENTITY) {
-        // Deterministic answer; no need to load the model at all.
-        snprintf(answer, cap, "%s", INTENT_IDENTITY_ANSWER);
-        if (st) { memset(st, 0, sizeof *st); st->stop_reason = "identity"; }
-        if (fn) fn(user, answer, 0, 0);
-        ESP_LOGI(TAG, "intent: identity (canned answer)");
-        return true;
-    }
-
     phase_t ph;
     if (!phase_begin(&ph, "THINK")) return false;
     bool ok = false;

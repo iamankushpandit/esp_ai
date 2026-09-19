@@ -3,6 +3,7 @@
 #include "ui.h"
 #include "board_lcd_stream.h"
 #include "models.h"
+#include "builtin.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -66,6 +67,7 @@ static float s_last_rate;
 typedef struct {
     char q[Q_CHARS];
     char a[A_CHARS];
+    bool builtin;                  // answered by plain C code (clock, name), not the model
 } turn_t;
 static turn_t *s_turns;
 static int s_nturns;
@@ -168,8 +170,8 @@ static void build_chat(void)
         if (i > 0) n += (size_t)snprintf(buf + n, cap - n, "\n\n");   // blank line between turns
         if (s_turns[i].q[0]) n += (size_t)snprintf(buf + n, cap - n, "> %s", s_turns[i].q);
         if (s_turns[i].a[0])
-            n += (size_t)snprintf(buf + n, cap - n, "%s" UI_G_BULLET " %s",
-                                  s_turns[i].q[0] ? "\n" : "", s_turns[i].a);
+            n += (size_t)snprintf(buf + n, cap - n, "%s%s %s", s_turns[i].q[0] ? "\n" : "",
+                                  s_turns[i].builtin ? UI_G_DIAMOND : UI_G_BULLET, s_turns[i].a);
     }
     add_para(buf, -1);
 }
@@ -201,7 +203,15 @@ static void build_about(void)
     add_para("Ivy AI", -1);
     add_para(UI_G_ROWMARK "(c) iamankushpandit", -1);
     add_para("", -1);
-    add_prose("An offline voice assistant. Everything runs on this device: no internet, no cloud.");
+    add_prose("A voice assistant that listens, thinks and speaks entirely on this device. "
+              "Wi-Fi is used only to set the clock.");
+    add_para("", -1);
+    char clk[40];
+    clock_short(clk, sizeof clk);
+    add_para(UI_G_DIAMOND " Wi-Fi & clock  >", TAG_WIFI_SETUP);
+    snprintf(line, sizeof line, UI_G_ROWMARK "  %.12s " UI_G_MIDDOT " %s",
+             net_has_credentials() ? net_ssid() : "not set up", clk);
+    add_para(line, TAG_WIFI_SETUP);
     add_para("", -1);
     add_prose(UI_G_ROWMARK "Wakes: \"Hey Ivy\" (Espressif WakeNet)");
     add_prose(UI_G_ROWMARK "Hears: conformer STT (NVIDIA, lspr98; CC-BY-4.0)");
@@ -216,13 +226,231 @@ static void build_about(void)
               "behaviour of this device. Children should use it with adult supervision.");
 }
 
+// ---------------------------------------------------------------- Wi-Fi page
+static void render_page(void);
+#define MAX_APS 12
+static net_ap_t s_aps[MAX_APS];
+static int s_nap = -2;                 // -2: never scanned, -1: scan failed
+static bool s_scanning;
+
+void app_ui_wifi_scanning(void)
+{
+    UI_LOCK();
+    s_scanning = true;
+    if (s_page == PAGE_WIFI) render_page();
+    UI_UNLOCK();
+}
+
+void app_ui_wifi_results(const net_ap_t *aps, int n)
+{
+    UI_LOCK();
+    s_scanning = false;
+    s_nap = n < 0 ? -1 : n > MAX_APS ? MAX_APS : n;
+    for (int i = 0; i < s_nap; i++) s_aps[i] = aps[i];
+    if (s_page == PAGE_WIFI) render_page();
+    UI_UNLOCK();
+}
+
+const net_ap_t *app_ui_wifi_ap(int i) { return i >= 0 && i < s_nap ? &s_aps[i] : NULL; }
+bool app_ui_wifi_scanned(void) { return s_nap != -2 || s_scanning; }
+
+static void build_wifi(void)
+{
+    char line[96], clk[40];
+    add_prose(UI_G_ROWMARK "Wi-Fi is used only to set the clock (NTP), once an hour. Answers never use the internet.");
+    add_para("", -1);
+    clock_short(clk, sizeof clk);
+    if (net_has_credentials()) {
+        snprintf(line, sizeof line, UI_G_DIAMOND " %s", net_ssid());
+        add_para(line, -1);
+        snprintf(line, sizeof line, UI_G_ROWMARK "  Clock: %s", clk);
+        add_para(line, -1);
+        if (net_last_msg()[0]) {
+            snprintf(line, sizeof line, UI_G_ROWMARK "  Last sync: %s", net_last_msg());
+            add_para(line, -1);
+        }
+        add_para("  [ Sync now ]", TAG_WIFI_SYNC);
+        add_para("  [ Forget network ]", TAG_WIFI_FORGET);
+    } else {
+        snprintf(line, sizeof line, UI_G_ROWMARK "Not set up. Clock: %s", clk);
+        add_para(line, -1);
+    }
+    add_para("", -1);
+    add_para("Tap your network:", -1);
+    if (s_scanning) add_para(UI_G_ROWMARK "  Scanning" UI_G_ELLIPSIS, -1);
+    else if (s_nap == -1) add_para(UI_G_ROWMARK "  Scan failed.", -1);
+    else if (s_nap == 0) add_para(UI_G_ROWMARK "  No networks found.", -1);
+    for (int i = 0; !s_scanning && i < s_nap; i++) {
+        int r = s_aps[i].rssi;
+        const char *bars = r > -60 ? "|||" : r > -72 ? "|| " : "|  ";
+        snprintf(line, sizeof line, "  %s %.21s%s", bars, s_aps[i].ssid, s_aps[i].open ? " (open)" : "");
+        add_para(line, i);
+    }
+    add_para("  [ Scan again ]", TAG_WIFI_RESCAN);
+}
+
+// ---------------------------------------------------------------- keyboard
+// Password entry drawn straight into the page area: a title row, the field,
+// four 10-key rows and a control row. Only the field and the touched key are
+// redrawn on a key press; a layer switch redraws the key rows.
+#define KB_TITLE_Y CONVO_Y
+#define KB_FIELD_Y (CONVO_Y + UI_ROW_H)
+#define KB_KEYS_Y (CONVO_Y + 2 * UI_ROW_H + 4)
+#define KB_KEY_W 24
+#define KB_KEY_H 24
+#define KB_PITCH 26
+static const char KB_LAYERS[3][4][11] = {
+    {"1234567890", "qwertyuiop", "asdfghjkl-", "zxcvbnm.@_"},
+    {"1234567890", "QWERTYUIOP", "ASDFGHJKL-", "ZXCVBNM.@_"},
+    {"1234567890", "!@#$%^&*()", "-_=+[]{};:", "'\",.<>/?~\\"},
+};
+static const struct { int x, w; const char *label; } KB_CTRL[] = {
+    {0, 36, "aA"}, {36, 36, "#+"}, {72, 72, "space"}, {144, 40, "del"}, {184, 56, "Join"},
+};
+enum { KB_SHIFT, KB_SYM, KB_SPACE, KB_DEL, KB_JOIN, KB_NCTRL };
+static char s_kb_text[NET_PASS_MAX], s_kb_ssid[NET_SSID_MAX];
+static int s_kb_len, s_kb_layer;
+
+static void draw_key(int x, int y, int w, const char *label, bool pressed, bool accent)
+{
+    const int h = KB_KEY_H;
+    uint16_t bg = pressed ? UI_ACCENT : accent ? RGB565(70, 50, 56) : RGB565(40, 40, 40);
+    uint16_t fg = pressed ? UI_BLACK : UI_WHITE;
+    uint16_t *px = s_btn_px;
+    for (int yy = 0; yy < h; yy++)
+        for (int xx = 0; xx < w; xx++) {
+            bool corner = (xx == 0 || xx == w - 1) && (yy == 0 || yy == h - 1);
+            bool gap = xx == w - 1 || yy == h - 1;        // 1 px gutter right/bottom
+            px[yy * w + xx] = corner || gap ? UI_BLACK : bg;
+        }
+    int lw = (int)strlen(label) * UI_FONT_W;
+    ui_text_into(px, w, h, (w - 1 - lw) / 2, (h - 1 - UI_FONT_H) / 2, label, fg);
+    board_lcd_window(x, y, w, h);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < w * h; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, (size_t)w * h);
+    board_lcd_stream_end();
+}
+
+static void kb_draw_char_key(int row, int col, bool pressed)
+{
+    char s[2] = {KB_LAYERS[s_kb_layer][row][col], 0};
+    draw_key(col * KB_KEY_W, KB_KEYS_Y + row * KB_PITCH, KB_KEY_W, s, pressed, false);
+}
+
+static void kb_draw_ctrl(int k, bool pressed)
+{
+    bool on = (k == KB_SHIFT && s_kb_layer == 1) || (k == KB_SYM && s_kb_layer == 2) || k == KB_JOIN;
+    draw_key(KB_CTRL[k].x, KB_KEYS_Y + 4 * KB_PITCH, KB_CTRL[k].w, KB_CTRL[k].label, pressed, on);
+}
+
+static void kb_draw_keys(void)
+{
+    for (int r = 0; r < 4; r++)
+        for (int c = 0; c < 10; c++) kb_draw_char_key(r, c, false);
+    for (int k = 0; k < KB_NCTRL; k++) kb_draw_ctrl(k, false);
+}
+
+static void kb_draw_field(void)
+{
+    // Masked except the last character typed, like a phone keyboard.
+    char row[UI_MAX_COLS + 1];
+    int shown = s_kb_len > 26 ? 26 : s_kb_len, start = s_kb_len - shown, n = 0;
+    row[n++] = '>';
+    row[n++] = ' ';
+    for (int i = start; i < s_kb_len; i++) row[n++] = i == s_kb_len - 1 ? s_kb_text[i] : '*';
+    row[n++] = '_';
+    row[n] = 0;
+    ui_draw_row(0, KB_FIELD_Y, BOARD_LCD_W, row, UI_WHITE, UI_BLACK);
+}
+
+static void kb_draw_all(void)
+{
+    ui_box_set_rows(&s_convo, NULL, 0);       // blank the text rows (dirty rows only)
+    ui_box_invalidate(&s_convo);              // text pages repaint over the keys later
+    s_total = 0;
+    draw_scrollbar();
+    char title[UI_MAX_COLS + 1];
+    snprintf(title, sizeof title, "Password: %.19s", s_kb_ssid);
+    ui_draw_row(0, KB_TITLE_Y, BOARD_LCD_W, title, UI_ACCENT, UI_BLACK);
+    kb_draw_field();
+    kb_draw_keys();
+}
+
+void app_ui_kb_open(const char *ssid)
+{
+    UI_LOCK();
+    snprintf(s_kb_ssid, sizeof s_kb_ssid, "%s", ssid);
+    s_kb_text[0] = 0;
+    s_kb_len = 0;
+    s_kb_layer = 0;
+    app_ui_page(PAGE_KEYBOARD);
+    UI_UNLOCK();
+}
+
+const char *app_ui_kb_text(void) { return s_kb_text; }
+const char *app_ui_kb_ssid(void) { return s_kb_ssid; }
+
+static void kb_flash_pause(void)
+{
+#ifndef STORY_HOST
+    vTaskDelay(pdMS_TO_TICKS(70));
+#endif
+}
+
+int app_ui_kb_tap(int x, int y)
+{
+    if (s_page != PAGE_KEYBOARD || y < KB_KEYS_Y) return 0;
+    int row = (y - KB_KEYS_Y) / KB_PITCH;
+    if (row > 4) return 0;
+    UI_LOCK();
+    int ret = 0;
+    if (row < 4) {
+        int col = x / KB_KEY_W;
+        if (col > 9) col = 9;
+        if (s_kb_len < NET_PASS_MAX - 1) {
+            s_kb_text[s_kb_len++] = KB_LAYERS[s_kb_layer][row][col];
+            s_kb_text[s_kb_len] = 0;
+        }
+        kb_draw_char_key(row, col, true);
+        kb_draw_field();
+        kb_flash_pause();
+        kb_draw_char_key(row, col, false);
+    } else {
+        int k = 0;
+        while (k < KB_NCTRL - 1 && x >= KB_CTRL[k].x + KB_CTRL[k].w) k++;
+        kb_draw_ctrl(k, true);
+        kb_flash_pause();
+        switch (k) {
+        case KB_SHIFT: s_kb_layer = s_kb_layer == 1 ? 0 : 1; kb_draw_keys(); break;
+        case KB_SYM: s_kb_layer = s_kb_layer == 2 ? 0 : 2; kb_draw_keys(); break;
+        case KB_SPACE:
+            if (s_kb_len < NET_PASS_MAX - 1) { s_kb_text[s_kb_len++] = ' '; s_kb_text[s_kb_len] = 0; }
+            kb_draw_ctrl(k, false);
+            kb_draw_field();
+            break;
+        case KB_DEL:
+            if (s_kb_len > 0) s_kb_text[--s_kb_len] = 0;
+            kb_draw_ctrl(k, false);
+            kb_draw_field();
+            break;
+        case KB_JOIN: kb_draw_ctrl(k, false); ret = 1; break;
+        }
+    }
+    UI_UNLOCK();
+    return ret;
+}
+
 static void render_page(void)
 {
+    if (s_page == PAGE_KEYBOARD) { kb_draw_all(); return; }
     s_total = 0;
     switch (s_page) {
     case PAGE_CHAT: build_chat(); break;
     case PAGE_MODELS: build_models(); break;
     case PAGE_ABOUT: build_about(); break;
+    case PAGE_WIFI: build_wifi(); break;
+    default: break;
     }
     show_window();
 }
@@ -330,6 +558,7 @@ void app_ui_init(void)
     ui_box_mark(&s_convo, 0, '>', UI_DIM);
     ui_box_mark(&s_convo, 1, UI_G_BULLET[0], UI_ACCENT);
     ui_box_mark_row(&s_convo, 2, UI_G_ROWMARK[0], UI_DIM);
+    ui_box_mark(&s_convo, 3, UI_G_DIAMOND[0], UI_CYAN);   // built-in (non-AI) answers
     ui_box_init(&s_detail, 0, ROW_Y(16) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
     ui_box_init(&s_status, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
     ui_box_style(&s_status, 1, UI_ACCENT, 0);
@@ -368,6 +597,7 @@ void app_ui_you(const char *text)
     }
     sanitize(s_turns[s_nturns].q, Q_CHARS, text);
     s_turns[s_nturns].a[0] = 0;
+    s_turns[s_nturns].builtin = false;
     s_nturns++;
     s_follow = true;               // a new question always jumps to the bottom
     s_page = PAGE_CHAT;
@@ -385,6 +615,22 @@ void app_ui_story(const char *text)
     }
     sanitize(s_turns[s_nturns - 1].a, A_CHARS, text);
     if (s_page == PAGE_CHAT) render_page();
+    UI_UNLOCK();
+}
+
+void app_ui_builtin(const char *text, const char *source)
+{
+    UI_LOCK();
+    if (s_nturns == 0) {
+        s_turns[0].q[0] = 0;
+        s_nturns = 1;
+    }
+    s_turns[s_nturns - 1].builtin = true;
+    sanitize(s_turns[s_nturns - 1].a, A_CHARS, text);
+    if (s_page == PAGE_CHAT) render_page();
+    char d[40];
+    snprintf(d, sizeof d, "%s " UI_G_MIDDOT " no AI", source);
+    app_ui_detail(d);
     UI_UNLOCK();
 }
 
@@ -412,8 +658,9 @@ void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)
 {
     UI_LOCK();
     char d[40];
-    if (tok_per_s > 0) snprintf(d, sizeof d, "%d tok " UI_G_MIDDOT " %.1f tok/s", tokens, tok_per_s);
-    else snprintf(d, sizeof d, "%d tok", tokens);
+    // "AI" marks answers generated by the language model (vs "no AI" built-ins).
+    if (tok_per_s > 0) snprintf(d, sizeof d, "AI " UI_G_MIDDOT " %d tok " UI_G_MIDDOT " %.1f tok/s", tokens, tok_per_s);
+    else snprintf(d, sizeof d, "AI " UI_G_MIDDOT " %d tok", tokens);
     s_last_rate = tok_per_s;
     app_ui_status("Thinking...", UI_ACCENT);   // advances the spinner
     app_ui_story(text);
@@ -432,8 +679,9 @@ void app_ui_page(app_page_t p)
         s_follow = p == PAGE_CHAT;     // pages open at the top, chat at the bottom
         s_top = 0;
         render_page();
+        bool about = p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD;   // /about is their parent
         app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
-        app_ui_bar_state(BAR_ABOUT, p == PAGE_ABOUT ? BTN_ACTIVE : BTN_IDLE);
+        app_ui_bar_state(BAR_ABOUT, about ? BTN_ACTIVE : BTN_IDLE);
     }
     UI_UNLOCK();
 }
@@ -443,7 +691,7 @@ app_page_t app_ui_page_get(void) { return s_page; }
 void app_ui_refresh_page(void)
 {
     UI_LOCK();
-    render_page();
+    if (s_page != PAGE_KEYBOARD) render_page();   // don't redraw the keyboard under a finger
     UI_UNLOCK();
 }
 
@@ -536,10 +784,10 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st)
     const int W = BAR[b].w, H = BAR_H;
     const uint16_t bg = UI_BLACK;
     bool dim = st == BTN_BUSY;
-    uint16_t fill = st == BTN_PRESSED ? RGB565(48, 28, 22) : bg;
+    uint16_t fill = st == BTN_PRESSED ? RGB565(52, 34, 38) : bg;
     uint16_t edge = st == BTN_PRESSED || st == BTN_ACTIVE ? UI_ACCENT
                   : dim ? RGB565(55, 55, 55) : RGB565(95, 95, 95);
-    uint16_t icon = dim ? RGB565(110, 70, 58) : UI_ACCENT;
+    uint16_t icon = dim ? RGB565(112, 84, 88) : UI_ACCENT;
     uint16_t text = dim ? RGB565(85, 85, 85) : st == BTN_ACTIVE ? UI_ACCENT : UI_WHITE;
 
     uint16_t *px = s_btn_px;
@@ -622,7 +870,7 @@ void app_ui_restart_state(app_btn_state_t st)
     UI_LOCK();
     if ((int)st == s_rst_state) { UI_UNLOCK(); return; }     // dirty-region: only on change
     s_rst_state = (int)st;
-    uint16_t fill = st == BTN_PRESSED ? RGB565(48, 28, 22) : UI_BLACK;
+    uint16_t fill = st == BTN_PRESSED ? RGB565(52, 34, 38) : UI_BLACK;
     uint16_t edge = st == BTN_ACTIVE || st == BTN_PRESSED ? UI_ACCENT
                   : st == BTN_BUSY ? RGB565(55, 55, 55) : RGB565(95, 95, 95);
     uint16_t ink = st == BTN_ACTIVE || st == BTN_PRESSED ? UI_ACCENT

@@ -94,7 +94,7 @@ void ui_box_invalidate(ui_box_t *b)
 
 void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg)
 {
-    if (k < 0 || k > 2) return;
+    if (k < 0 || k > 3) return;
     b->mark_ch[k] = ch;
     b->mark_fg[k] = fg;
     b->mark_row[k] = false;

@@ -11,6 +11,12 @@ extern story_arena_t g_bulk;   // PSRAM, reserved at boot
 
 bool phase_arenas_init(size_t fast_bytes, size_t bulk_bytes);
 
+// Idle-time memory reuse: give the internal arena back to the system heap
+// (e.g. for Wi-Fi during a clock sync), then reserve it again. While lent,
+// phase_begin() is refused. Reclaim re-sizes adaptively and logs the size.
+bool phase_fast_lend(const char *who);
+bool phase_fast_reclaim(void);
+
 typedef struct {
     const char *name;
     int64_t t0;

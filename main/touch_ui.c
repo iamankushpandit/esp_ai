@@ -3,6 +3,7 @@
 #include "battery.h"
 #include "board.h"
 #include "models.h"
+#include "net.h"
 #include "story_mem.h"
 #include "ui.h"
 #include "esp_log.h"
@@ -53,7 +54,7 @@ bool touch_ui_wait_ask(uint32_t timeout_ms)
 
 typedef enum { G_NONE, G_WAKE, G_BAR, G_RESTART, G_PAGE_MAYBE, G_SCROLL, G_OTHER } gesture_t;
 
-// Restart button: the first tap arms it (orange + prompt), a second tap
+// Restart button: the first tap arms it (pink + prompt), a second tap
 // within 3 s restarts; otherwise it disarms on its own.
 #define RESTART_CONFIRM_US 3000000
 static int64_t s_restart_armed;
@@ -86,7 +87,8 @@ static void bar_release_look(int b)
 {
     if (app_ui_is_busy()) { app_ui_bar_state((app_bar_t)b, BTN_BUSY); return; }
     app_page_t p = app_ui_page_get();
-    bool active = (b == BAR_MODEL && p == PAGE_MODELS) || (b == BAR_ABOUT && p == PAGE_ABOUT);
+    bool active = (b == BAR_MODEL && p == PAGE_MODELS) ||
+                  (b == BAR_ABOUT && (p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD));
     app_ui_bar_state((app_bar_t)b, active ? BTN_ACTIVE : BTN_IDLE);
 }
 
@@ -101,15 +103,68 @@ static void bar_action(int b)
         if (app_ui_page_get() != PAGE_MODELS) models_scan();   // pick up newly copied models
         app_ui_page(app_ui_page_get() == PAGE_MODELS ? PAGE_CHAT : PAGE_MODELS);
         break;
-    case BAR_ABOUT:
-        app_ui_page(app_ui_page_get() == PAGE_ABOUT ? PAGE_CHAT : PAGE_ABOUT);
+    case BAR_ABOUT: {
+        // /about closes itself; from Wi-Fi or the keyboard it goes back one level.
+        app_page_t p = app_ui_page_get();
+        app_ui_page(p == PAGE_ABOUT ? PAGE_CHAT : p == PAGE_KEYBOARD ? PAGE_WIFI : PAGE_ABOUT);
         break;
+    }
+    }
+}
+
+static void join(const char *ssid, const char *pass)
+{
+    char st[48];
+    if (!net_set_credentials(ssid, pass)) {
+        app_ui_status("Network name or password too long", UI_RED);
+        return;
+    }
+    snprintf(st, sizeof st, "Joining %.30s", ssid);
+    app_ui_status(st, UI_CYAN);
+    net_request_sync();                  // the main task connects and sets the clock
+    app_ui_page(PAGE_WIFI);
+}
+
+static void wifi_tap(int tag)
+{
+    if (app_ui_is_busy()) return;
+    const net_ap_t *ap = app_ui_wifi_ap(tag);
+    if (ap) {
+        if (ap->open) join(ap->ssid, "");
+        else app_ui_kb_open(ap->ssid);
+    } else if (tag == TAG_WIFI_SYNC) {
+        net_request_sync();
+        app_ui_status("Setting clock" UI_G_ELLIPSIS, UI_CYAN);
+    } else if (tag == TAG_WIFI_FORGET) {
+        net_clear_credentials();
+        app_ui_status("Wi-Fi forgotten", UI_GREEN);
+        app_ui_refresh_page();
+    } else if (tag == TAG_WIFI_RESCAN) {
+        net_request_scan();
+        app_ui_wifi_scanning();
     }
 }
 
 static void page_tap(int x, int y)
 {
+    app_page_t page = app_ui_page_get();
+    if (page == PAGE_KEYBOARD) {
+        if (app_ui_kb_tap(x, y) == 1) join(app_ui_kb_ssid(), app_ui_kb_text());
+        return;
+    }
     int tag = app_ui_convo_tap(x, y);
+    if (page == PAGE_ABOUT && tag == TAG_WIFI_SETUP) {
+        app_ui_page(PAGE_WIFI);
+        if (!app_ui_wifi_scanned()) {       // first visit: look for networks
+            net_request_scan();
+            app_ui_wifi_scanning();
+        }
+        return;
+    }
+    if (page == PAGE_WIFI) {
+        if (tag >= 0) wifi_tap(tag);
+        return;
+    }
     if (app_ui_page_get() == PAGE_MODELS && tag >= 0 && !app_ui_is_busy() && tag != models_active()) {
         if (models_select(tag)) {
             char st[48];
@@ -151,7 +206,7 @@ static void touch_task(void *arg)
         } else if (t && down) {                             // move
             s_activity = story_time_us();
             int dy = y - y0;
-            if (g == G_PAGE_MAYBE && abs(dy) > DRAG_SLOP_PX) g = G_SCROLL;
+            if (g == G_PAGE_MAYBE && abs(dy) > DRAG_SLOP_PX && app_ui_page_get() != PAGE_KEYBOARD) g = G_SCROLL;
             if (g == G_SCROLL) app_ui_scroll_drag(dy);
             if (g == G_BAR && app_ui_bar_hit(x, y) != bar) {  // slid off: cancel
                 bar_release_look(bar);

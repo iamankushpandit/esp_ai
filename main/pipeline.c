@@ -7,6 +7,7 @@
 #include "phase.h"
 #include "speak.h"
 #include "think.h"
+#include "builtin.h"
 #include "story_intent.h"
 #include "touch_ui.h"
 #include "ui.h"
@@ -71,22 +72,28 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
         goto done;
     }
 
+    // ---- BUILT-IN (name, time, date): plain C, no model, labelled as such
+    const char *src = NULL;
+    bool builtin = builtin_answer(question, answer, sizeof answer, &src);
+    if (builtin) ESP_LOGI(TAG, "built-in answer (%s): %s", src, answer);
+
     // ---- THINK
-    app_ui_status("Thinking...", UI_YELLOW);
     int64_t t_think0 = story_time_us();
-    if (!think_answer(hist, question, answer, sizeof answer, stream_cb, NULL, &ls) || !answer[0]) {
+    if (!builtin) app_ui_status("Thinking...", UI_YELLOW);
+    if (!builtin && (!think_answer(hist, question, answer, sizeof answer, stream_cb, NULL, &ls) || !answer[0])) {
         app_ui_status("LLM error", UI_RED);
         speak_error("I can't answer that right now.");
         res = PIPE_ERROR;
         goto done;
     }
     int64_t t_think = story_time_us() - t_think0;
-    if (hist) llm_history_push(hist, question, answer);   // context without the sign-off
+    if (hist && !builtin) llm_history_push(hist, question, answer);   // context without the sign-off
     if (last) {
         size_t n = strlen(answer);
         snprintf(answer + n, sizeof answer - n, " Bye bye.");
     }
-    app_ui_story(answer);
+    if (builtin) app_ui_builtin(answer, src);
+    else app_ui_story(answer);
 
     // ---- SPEAK
     app_ui_status("Speaking...", UI_ACCENT);   // detail line keeps the tok/s

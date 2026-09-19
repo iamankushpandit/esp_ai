@@ -29,6 +29,9 @@ void app_ui_status(const char *s, uint16_t color);
 void app_ui_you(const char *text);
 // Sets (or streams) the answer of the latest turn.
 void app_ui_story(const char *text);
+// Answer produced by plain C code (clock, name), not the model: drawn with a
+// cyan diamond instead of the pink bullet, detail line "<source> . no AI".
+void app_ui_builtin(const char *text, const char *source);
 void app_ui_detail(const char *text);
 // Clears the whole transcript (new session).
 void app_ui_clear_turn(void);
@@ -38,10 +41,30 @@ void app_ui_llm_progress(const char *text, int tokens, float tok_per_s);
 float app_ui_last_tok_rate(void);
 
 // Pages shown in the scrollable area.
-typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_ABOUT } app_page_t;
+typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_ABOUT, PAGE_WIFI, PAGE_KEYBOARD } app_page_t;
 void app_ui_page(app_page_t p);            // switch page (re-renders the area)
 app_page_t app_ui_page_get(void);
 void app_ui_refresh_page(void);            // e.g. after the model list changed
+
+// Row tags on the /about and Wi-Fi pages (network rows use their index 0..).
+#define TAG_WIFI_SETUP 100                 // /about: "Wi-Fi & clock" row
+#define TAG_WIFI_SYNC 101
+#define TAG_WIFI_FORGET 102
+#define TAG_WIFI_RESCAN 103
+
+// Wi-Fi page: scan state and results (copied).
+#include "net.h"
+void app_ui_wifi_scanning(void);
+void app_ui_wifi_results(const net_ap_t *aps, int n);   // n < 0: scan failed
+const net_ap_t *app_ui_wifi_ap(int i);                  // NULL if out of range
+bool app_ui_wifi_scanned(void);
+
+// On-screen keyboard (password entry) in the page area. app_ui_kb_tap()
+// returns 1 when Join was tapped; the text is then in app_ui_kb_text().
+void app_ui_kb_open(const char *ssid);
+int app_ui_kb_tap(int x, int y);
+const char *app_ui_kb_text(void);
+const char *app_ui_kb_ssid(void);
 
 // Scrolling (touch drag). While at the bottom the chat follows new text;
 // after scrolling up it stays put until dragged back or a new question.

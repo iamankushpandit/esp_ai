@@ -6,7 +6,7 @@
 static char clean(unsigned char c)
 {
     if (c >= 0x20 && c < 0x7F) return (char)c;
-    if (c >= 0x80 && c <= 0x8E) return (char)c;   // UI glyphs + row marker (see ui.h)
+    if (c >= 0x80 && c <= 0x8F) return (char)c;   // UI glyphs + row marker (see ui.h)
     return '?';
 }
 

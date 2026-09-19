@@ -3,6 +3,8 @@
 #include "ui.h"
 #include "app_ui.h"
 #include "battery.h"
+#include "builtin.h"
+#include "net.h"
 #include "phase.h"
 #include "think.h"
 #include "speak.h"
@@ -37,6 +39,13 @@ static void cmd_ask(const char *q)
     llm_stats_t st;
     app_ui_clear_turn();
     app_ui_you(q);
+    const char *src;
+    if (builtin_answer(q, ans, sizeof ans, &src)) {
+        app_ui_builtin(ans, src);
+        printf("ANSWER (%s): %s\n", src, ans);
+        app_ui_status("Ready", UI_GREEN);
+        return;
+    }
     app_ui_status("Thinking...", UI_YELLOW);
     if (think_answer(&hist, q, ans, sizeof ans, ui_stream, NULL, &st)) {
         printf("ANSWER: %s\n", ans);
@@ -49,6 +58,41 @@ static void cmd_ask(const char *q)
 }
 
 static void ui_status_cb(const char *s) { app_ui_status(s, UI_YELLOW); }
+
+// Set the clock over Wi-Fi/NTP, showing progress on the status line.
+static void clock_sync_ui(void)
+{
+    char msg[48];
+    app_ui_status("Setting clock (Wi-Fi)...", UI_CYAN);
+    // Wi-Fi borrows the idle internal arena for the few seconds it's on.
+    bool lent = phase_fast_lend("NET");
+    bool ok = net_sync_time(msg, sizeof msg);
+    if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_RED);
+    printf("TIMESYNC %s: %s\n", ok ? "ok" : "failed", msg);
+    app_ui_status(ok ? "Ready" : msg, ok ? UI_GREEN : UI_RED);
+    app_ui_refresh_page();
+}
+
+// Parse up to two double-quoted strings: "a" "b". Returns how many were found.
+static int parse_quoted(const char *s, char *a, size_t acap, char *b, size_t bcap)
+{
+    char *outs[2] = {a, b};
+    size_t caps[2] = {acap, bcap};
+    int n = 0;
+    while (n < 2) {
+        const char *q = strchr(s, '"');
+        if (!q) break;
+        const char *e = strchr(q + 1, '"');
+        if (!e) break;
+        size_t len = (size_t)(e - q - 1);
+        if (len >= caps[n]) len = caps[n] - 1;
+        memcpy(outs[n], q + 1, len);
+        outs[n][len] = 0;
+        n++;
+        s = e + 1;
+    }
+    return n;
+}
 
 static hear_params_t s_hear;
 
@@ -185,6 +229,41 @@ static void dispatch(const char *line)
             board_audio_set_volume(70);
         }
         printf("OK\n");
+    } else if (!strncmp(line, "wifi ", 5)) {
+        // wifi "<network>" "<password>"   |   wifi clear
+        char ssid[NET_SSID_MAX] = "", pass[NET_PASS_MAX] = "";
+        if (!strcmp(line + 5, "clear")) {
+            net_clear_credentials();
+            printf("WIFI cleared\n");
+        } else if (parse_quoted(line + 5, ssid, sizeof ssid, pass, sizeof pass) >= 1 &&
+                   net_set_credentials(ssid, pass)) {
+            printf("WIFI saved \"%s\"\n", ssid);
+            clock_sync_ui();
+        } else {
+            printf("usage: wifi \"<network>\" \"<password>\" | wifi clear\n");
+        }
+        app_ui_refresh_page();
+        printf("OK\n");
+    } else if (!strcmp(line, "wifiscan")) {
+        net_ap_t aps[12];
+        bool lent = phase_fast_lend("NET");
+        int n = net_scan(aps, 12);
+        if (lent) phase_fast_reclaim();
+        for (int i = 0; i < n; i++) printf("AP %d %s %d dBm%s\n", i, aps[i].ssid, aps[i].rssi, aps[i].open ? " open" : "");
+        printf("OK\n");
+    } else if (!strcmp(line, "timesync")) {
+        clock_sync_ui();
+        printf("OK\n");
+    } else if (!strncmp(line, "tz ", 3)) {
+        net_set_tz(line + 3);
+        printf("TZ %s\n", net_tz());
+        printf("OK\n");
+    } else if (!strcmp(line, "time")) {
+        char t[80], d[80];
+        clock_say_time(t, sizeof t);
+        clock_say_date(d, sizeof d);
+        printf("TIME %s %s (tz %s)\n", t, d, net_tz()[0] ? net_tz() : "UTC");
+        printf("OK\n");
     } else if (!strcmp(line, "bat")) {
         int mv = board_battery_mv();
         printf("BAT %d mV -> %d %%%s\n", mv, battery_pct_from_mv(mv), battery_charging() ? ", charging" : "");
@@ -218,6 +297,7 @@ void app_main(void)
 {
     // Reserve the phase arenas before any driver fragments internal RAM.
     story_mem_log("boot");
+    net_warmup();   // Wi-Fi's permanent first-start allocations go below the arena
     bool arenas = phase_arenas_init(FAST_ARENA_BYTES, BULK_ARENA_BYTES);
     console_init();
 
@@ -230,6 +310,7 @@ void app_main(void)
     esp_err_t au = board_audio_init();
     esp_err_t sd = board_sd_mount(false);
     if (sd == ESP_OK) models_scan();    // selectable LLMs on the SD card + saved choice
+    net_init();                         // Wi-Fi credentials + time zone (clock via NTP)
     story_mem_log("drivers");
     s_hear = hear_default_params();
     const int64_t SPLASH_MIN_US = 2000000;
@@ -288,6 +369,22 @@ void app_main(void)
             app_ui_busy(true);
             pipeline_session(&s_hear, SESSION_MAX_TURNS);   // ends with the screen off
             app_ui_busy(false);
+            if (wake_ok) wake_start(touch_ui_post_ask);
+        }
+        if (!start && !app_ui_is_busy() && net_take_scan_request()) {
+            static net_ap_t aps[12];
+            wake_stop();
+            bool lent = phase_fast_lend("NET");
+            int n = net_scan(aps, 12);
+            if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_RED);
+            app_ui_wifi_results(aps, n);
+            if (wake_ok) wake_start(touch_ui_post_ask);
+        }
+        if (!start && !app_ui_is_busy() && net_sync_due()) {
+            // Clock: at boot, then once per hour. The radio is on only for
+            // this; WakeNet pauses so Wi-Fi gets its internal RAM.
+            wake_stop();
+            clock_sync_ui();
             if (wake_ok) wake_start(touch_ui_post_ask);
         }
         if (screen_is_on() && story_time_us() - screen_last_activity_us() > SCREEN_TIMEOUT_US) {

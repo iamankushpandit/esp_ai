@@ -20,7 +20,7 @@ CONFIG_SPIRAM=y
 CONFIG_SPIRAM_MODE_OCT=y
 CONFIG_SPIRAM_SPEED_80M=y
 CONFIG_SPIRAM_USE_CAPS_ALLOC=y
-CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=n
+CONFIG_SPIRAM_TRY_ALLOCATE_WIFI_LWIP=y
 
 # ---- Console: USB-Serial/JTAG (board enumerates as USB Serial Device)
 CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
@@ -37,8 +37,13 @@ CONFIG_FATFS_VFS_FSTAT_BLKSIZE=16384
 CONFIG_LOG_DEFAULT_LEVEL_INFO=y
 CONFIG_FREERTOS_HZ=1000
 
-# ---- Radio off: everything is offline
+# ---- Radio: Bluetooth off. Wi-Fi is used only to set the clock over NTP
+# (main/net.c) and is de-initialised between syncs. Its code runs from flash
+# and its buffers prefer PSRAM so internal RAM stays with the phase arena.
 CONFIG_BT_ENABLED=n
+CONFIG_ESP_WIFI_IRAM_OPT=n
+CONFIG_ESP_WIFI_RX_IRAM_OPT=n
+CONFIG_LWIP_IRAM_OPTIMIZATION=n
 
 # ---- Wake word: esp-sr WakeNet9 "Hey Ivy" (stock model, until a custom "Braino")
 CONFIG_MODEL_IN_FLASH=y

@@ -14,14 +14,17 @@ story_arena_t g_fast, g_bulk;
 #define INTERNAL_RESERVE_BYTES (90 * 1024)
 #define FAST_MIN_BYTES (128 * 1024)
 
-bool phase_arenas_init(size_t fast_bytes, size_t bulk_bytes)
+static const uint32_t FAST_CAPS = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT;
+static size_t s_fast_want, s_fast_lent;
+
+// Size the internal arena to what this build/boot actually has, instead of
+// demanding a fixed size: static RAM use changes with components (esp-sr,
+// Wi-Fi). Engines degrade gracefully when it's smaller. NULL if < minimum.
+static void *reserve_fast(size_t *bytes)
 {
-    // Size the internal arena to what this build/boot actually has, instead
-    // of demanding a fixed size: static RAM use changes with components
-    // (e.g. esp-sr adds ~23 KB). Engines degrade gracefully when it's smaller.
-    const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT;
-    size_t largest = heap_caps_get_largest_free_block(caps);
-    size_t total = heap_caps_get_free_size(caps);
+    size_t fast_bytes = *bytes;
+    size_t largest = heap_caps_get_largest_free_block(FAST_CAPS);
+    size_t total = heap_caps_get_free_size(FAST_CAPS);
     size_t cap = largest > 64 ? largest - 64 : 0;
     if (total > INTERNAL_RESERVE_BYTES && total - INTERNAL_RESERVE_BYTES < cap) cap = total - INTERNAL_RESERVE_BYTES;
     if (fast_bytes > cap) {
@@ -34,9 +37,54 @@ bool phase_arenas_init(size_t fast_bytes, size_t bulk_bytes)
         ESP_LOGE(TAG, "ARENA RESERVE FAILED: only %u B of internal RAM usable (need >= %u)",
                  (unsigned)fast_bytes, (unsigned)FAST_MIN_BYTES);
         story_mem_log("arena-fail");
+        return NULL;
+    }
+    *bytes = fast_bytes;
+    return heap_caps_aligned_alloc(16, fast_bytes, FAST_CAPS);
+}
+
+bool phase_fast_lend(const char *who)
+{
+    if (g_fast.owner || !g_fast.base) {
+        ESP_LOGE(TAG, "cannot lend internal arena to %s: %s", who, g_fast.owner ? g_fast.owner : "not reserved");
         return false;
     }
-    void *f = heap_caps_aligned_alloc(16, fast_bytes, caps);
+    ESP_LOGI(TAG, "lending internal arena (%u B) to %s", (unsigned)g_fast.cap, who);
+    s_fast_lent = g_fast.cap;
+    heap_caps_free(g_fast.base);
+    story_arena_init(&g_fast, NULL, 0);
+    g_fast.owner = who;              // phase_begin() now fails loudly until reclaimed
+    story_mem_log(who);
+    return true;
+}
+
+bool phase_fast_reclaim(void)
+{
+    // Take back the same size that was lent. The drivers' share was already
+    // set aside at boot, so the boot-time reserve rule doesn't apply here;
+    // step down only if the borrower left the heap fragmented.
+    size_t bytes = s_fast_lent;
+    void *f = NULL;
+    while (bytes >= FAST_MIN_BYTES && !(f = heap_caps_aligned_alloc(16, bytes, FAST_CAPS))) bytes -= 4096;
+    story_arena_init(&g_fast, f, f ? bytes : 0);
+    if (!f) {
+        ESP_LOGE(TAG, "ARENA RECLAIM FAILED (had %u B)", (unsigned)s_fast_lent);
+        story_mem_log("arena-fail");
+        return false;
+    }
+    if (bytes < s_fast_lent)
+        ESP_LOGW(TAG, "internal arena reclaimed smaller: %u B (was %u B)", (unsigned)bytes, (unsigned)s_fast_lent);
+    else
+        ESP_LOGI(TAG, "internal arena reclaimed: %u B @%p", (unsigned)bytes, f);
+    story_mem_log("reclaimed");
+    return true;
+}
+
+bool phase_arenas_init(size_t fast_bytes, size_t bulk_bytes)
+{
+    s_fast_want = fast_bytes;
+    void *f = reserve_fast(&fast_bytes);
+    if (!f) return false;
     void *b = heap_caps_aligned_alloc(64, bulk_bytes, MALLOC_CAP_SPIRAM);
     if (!f || !b) {
         ESP_LOGE(TAG, "ARENA RESERVE FAILED: fast %u B -> %p, bulk %u B -> %p",

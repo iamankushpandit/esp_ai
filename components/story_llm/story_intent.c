@@ -38,6 +38,19 @@ story_intent_t story_intent(const char *text, char *topic, size_t topic_cap)
     if (has(s, "your name") || has(s, "who are you") || has(s, "what are you") || has(s, "call you"))
         return INTENT_IDENTITY;
 
+    // Clock questions are answered by the device clock, never the model.
+    static const char *time_q[] = {"time is it", "what's the time", "whats the time", "what is the time",
+                                   "tell me the time", "current time", "the time now", "time right now"};
+    for (size_t i = 0; i < sizeof time_q / sizeof time_q[0]; i++)
+        if (has(s, time_q[i])) return INTENT_TIME;
+    static const char *date_q[] = {"what day is it", "what day is today", "which day is it", "which day is today",
+                                   "what's the date", "whats the date", "what is the date", "today's date",
+                                   "todays date", "what is today", "what's today", "whats today", "date today",
+                                   "what month is it", "which month is it", "what year is it",
+                                   "day of the week is it", "day of the week today"};
+    for (size_t i = 0; i < sizeof date_q / sizeof date_q[0]; i++)
+        if (has(s, date_q[i])) return INTENT_DATE;
+
     if (has(s, "story") || has(s, "fairy tale") || has(s, "bedtime")) {
         const char *about = strstr(s, "about ");
         const char *t = about ? about + 6 : NULL;

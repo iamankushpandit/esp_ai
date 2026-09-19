@@ -12,6 +12,8 @@ typedef enum {
     INTENT_STORY,      // "tell me a story about X" -> story format, topic filled
     INTENT_IDENTITY,   // "what is your name / who are you" -> fixed answer
     INTENT_BYE,        // short "bye / goodbye / that's all" -> end the session
+    INTENT_TIME,       // "what time is it" -> device clock (no model)
+    INTENT_DATE,       // "what day / date / month / year is it" -> device clock (no model)
 } story_intent_t;
 
 #define INTENT_IDENTITY_ANSWER "My name is Ivy AI. I am a little talking robot. I like to chat and tell stories."

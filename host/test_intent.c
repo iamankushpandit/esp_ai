@@ -23,6 +23,15 @@ int main(void)
     CHECK(story_intent("tell me a story about a bus stop", t, sizeof t) == INTENT_STORY);
     CHECK(story_intent("what is a butterfly", t, sizeof t) == INTENT_CHAT);      // "bye" inside a word
     CHECK(story_intent("why do people say goodbye when they leave the house", t, sizeof t) == INTENT_CHAT);
+    CHECK(story_intent("what time is it", t, sizeof t) == INTENT_TIME);
+    CHECK(story_intent("Hey, what's the time?", t, sizeof t) == INTENT_TIME);
+    CHECK(story_intent("what day is it today", t, sizeof t) == INTENT_DATE);
+    CHECK(story_intent("what is the date", t, sizeof t) == INTENT_DATE);
+    CHECK(story_intent("what month is it", t, sizeof t) == INTENT_DATE);
+    CHECK(story_intent("what comes after tuesday", t, sizeof t) == INTENT_CHAT);   // a fact, not the clock
+    CHECK(story_intent("how many days are in a week", t, sizeof t) == INTENT_CHAT);
+    CHECK(story_intent("what time do owls wake up", t, sizeof t) == INTENT_CHAT);
+    CHECK(story_intent("tell me a story about time travel", t, sizeof t) == INTENT_STORY);
     printf("test_intent OK\n");
     return 0;
 }
