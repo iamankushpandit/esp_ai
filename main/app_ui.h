@@ -63,8 +63,9 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that p
 bool app_ui_restart_hit(int x, int y);
 void app_ui_restart_state(app_btn_state_t st);   // IDLE, PRESSED, ACTIVE (armed), BUSY
 
-// Battery percentage in the header (0..100; -1 = unknown). Redraws only on change.
-void app_ui_battery(int pct);
+// Battery percentage in the header (0..100; -1 = unknown) with a bolt while
+// charging. Redraws only on change.
+void app_ui_battery(int pct, bool charging);
 // Busy (session running): Ask shows busy, /model and /about are disabled and
 // the chat page is shown.
 void app_ui_busy(bool busy);

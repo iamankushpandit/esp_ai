@@ -85,13 +85,15 @@ int main(int argc, char **argv)
     s_dir = argc > 1 ? argv[1] : ".";
     STEP("splash", app_ui_splash());
     dump();
-    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN); app_ui_battery(87));
+    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN); app_ui_battery(87, false));
     dump();
 
     STEP("restart armed", app_ui_restart_state(BTN_ACTIVE));
     dump();
     STEP("restart idle", app_ui_restart_state(BTN_IDLE));
-    STEP("battery low", app_ui_battery(12));
+    STEP("battery low", app_ui_battery(12, false));
+    dump();
+    STEP("charging", app_ui_battery(64, true));
     STEP("/model page", app_ui_page(PAGE_MODELS));
     dump();
     STEP("select model 0", models_select(0); app_ui_refresh_page());

@@ -170,7 +170,11 @@ static void touch_task(void *arg)
         }
         down = t;
         restart_expire();
-        battery_poll(app_ui_is_busy());
+        if (battery_poll(app_ui_is_busy())) {               // charger connected: wake up
+            if (!s_screen) screen_on();
+            else s_activity = story_time_us();
+            if (!app_ui_is_busy()) app_ui_status("Charging", UI_GREEN);
+        }
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }

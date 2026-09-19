@@ -187,7 +187,7 @@ static void dispatch(const char *line)
         printf("OK\n");
     } else if (!strcmp(line, "bat")) {
         int mv = board_battery_mv();
-        printf("BAT %d mV -> %d %%\n", mv, battery_pct_from_mv(mv));
+        printf("BAT %d mV -> %d %%%s\n", mv, battery_pct_from_mv(mv), battery_charging() ? ", charging" : "");
         printf("OK\n");
     } else if (!strcmp(line, "restart")) {
         printf("OK\n");

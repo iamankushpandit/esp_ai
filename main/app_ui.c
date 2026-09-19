@@ -652,39 +652,70 @@ void app_ui_restart_state(app_btn_state_t st)
 }
 
 // ---------------------------------------------------------------- battery
-// "87% [|||| ]" on the title row, right-aligned just left of the restart button.
-#define BAT_ICON_W 20
+// "87% ⚡[|||| ]" on the title row, right-aligned just left of the restart
+// button. The bolt slot is blank unless charging.
+#define BAT_BODY_W 20                                   // 18 px body + 2 px nub
 #define BAT_ICON_H 10
+#define BAT_BOLT_W 9                                    // 7 px bolt + 2 px gap
+#define BAT_ICON_W (BAT_BOLT_W + BAT_BODY_W)
 #define BAT_ICON_X (RST_X - 6 - BAT_ICON_W)
 #define BAT_TEXT_CH 4                                   // "100%"
 #define BAT_TEXT_X (BAT_ICON_X - 3 - BAT_TEXT_CH * UI_FONT_W)
+#define UI_BOLT RGB565(255, 214, 70)
 static int s_bat_pct = -2;                              // -2: never drawn, -1: unknown
+static bool s_bat_chg;
+
+// Lightning bolt: a zig-zag polygon in a 7x12 box (even-odd point test).
+static bool bolt_hit(float x, float y)
+{
+    static const float P[][2] = {{2.6f, 0.0f}, {7.0f, 0.0f}, {4.4f, 4.6f}, {7.0f, 4.6f},
+                                 {1.0f, 12.2f}, {2.8f, 6.8f}, {0.0f, 6.8f}};
+    const int n = sizeof P / sizeof P[0];
+    bool in = false;
+    for (int i = 0, j = n - 1; i < n; j = i++)
+        if ((P[i][1] > y) != (P[j][1] > y) &&
+            x < (P[j][0] - P[i][0]) * (y - P[i][1]) / (P[j][1] - P[i][1]) + P[i][0])
+            in = !in;
+    return in;
+}
 
 static void draw_battery(int pct)
 {
+    const bool chg = s_bat_chg;
     char txt[16];
     if (pct >= 0) snprintf(txt, sizeof txt, "%3d%%", pct);
     else snprintf(txt, sizeof txt, "  --");
-    uint16_t lvl = pct < 0 ? RGB565(95, 95, 95) : pct <= 15 ? UI_RED : pct <= 35 ? UI_ACCENT : UI_GREEN;
-    ui_draw_row(BAT_TEXT_X, ROW_Y(1), BAT_TEXT_CH * UI_FONT_W, txt, pct <= 15 && pct >= 0 ? UI_RED : UI_DIM,
-                UI_BLACK);
+    const bool low = pct >= 0 && pct <= 15 && !chg;
+    uint16_t lvl = pct < 0 ? RGB565(95, 95, 95) : chg ? UI_GREEN : low ? UI_RED : pct <= 35 ? UI_ACCENT : UI_GREEN;
+    ui_draw_row(BAT_TEXT_X, ROW_Y(1), BAT_TEXT_CH * UI_FONT_W, txt, low ? UI_RED : UI_DIM, UI_BLACK);
 
-    // Icon: 18x10 body with 1 px outline and clipped corners, 2x4 nub on the right.
+    // Bolt (anti-aliased) then an 18x10 body with 1 px outline and clipped
+    // corners, 2x4 nub on the right.
     const int H = UI_ROW_H, y0 = (UI_ROW_H - BAT_ICON_H) / 2;
     const uint16_t edge = RGB565(170, 170, 170);
     const int fill_w = pct <= 0 ? 0 : (14 * pct + 50) / 100 < 1 ? 1 : (14 * pct + 50) / 100;
     uint16_t *px = s_btn_px;
     for (int y = 0; y < H; y++)
         for (int x = 0; x < BAT_ICON_W; x++) {
-            int by = y - y0;
             uint16_t c = UI_BLACK;
-            bool in_body = by >= 0 && by < BAT_ICON_H && x < 18;
-            bool corner = (x == 0 || x == 17) && (by == 0 || by == BAT_ICON_H - 1);
+            if (x < BAT_BOLT_W) {
+                if (chg) {
+                    float cov = 0;
+                    for (int s = 0; s < 16; s++)              // 4x4 supersampling
+                        cov += bolt_hit(x + ((s & 3) + 0.5f) * 0.25f, y - 1 + ((s >> 2) + 0.5f) * 0.25f);
+                    c = mix565(UI_BLACK, UI_BOLT, cov / 16.0f);
+                }
+                px[y * BAT_ICON_W + x] = c;
+                continue;
+            }
+            int bx = x - BAT_BOLT_W, by = y - y0;
+            bool in_body = by >= 0 && by < BAT_ICON_H && bx < 18;
+            bool corner = (bx == 0 || bx == 17) && (by == 0 || by == BAT_ICON_H - 1);
             if (in_body && !corner) {
-                bool border = x == 0 || x == 17 || by == 0 || by == BAT_ICON_H - 1;
+                bool border = bx == 0 || bx == 17 || by == 0 || by == BAT_ICON_H - 1;
                 if (border) c = edge;
-                else if (x >= 2 && x < 2 + fill_w && by >= 2 && by < BAT_ICON_H - 2) c = lvl;
-            } else if (x >= 18 && by >= 3 && by < BAT_ICON_H - 3) {
+                else if (bx >= 2 && bx < 2 + fill_w && by >= 2 && by < BAT_ICON_H - 2) c = lvl;
+            } else if (bx >= 18 && by >= 3 && by < BAT_ICON_H - 3) {
                 c = edge;                                // nub
             }
             px[y * BAT_ICON_W + x] = c;
@@ -696,12 +727,13 @@ static void draw_battery(int pct)
     board_lcd_stream_end();
 }
 
-void app_ui_battery(int pct)
+void app_ui_battery(int pct, bool charging)
 {
     if (pct > 100) pct = 100;
     UI_LOCK();
-    if (pct != s_bat_pct) {                              // dirty-region: only on change
+    if (pct != s_bat_pct || charging != s_bat_chg) {     // dirty-region: only on change
         s_bat_pct = pct;
+        s_bat_chg = charging;
         if (s_btn_px) draw_battery(pct);                 // before init: drawn with the header
     }
     UI_UNLOCK();
