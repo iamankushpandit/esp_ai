@@ -1,28 +1,67 @@
-// Story assistant — entry point. Currently: Milestone 1 hardware bring-up.
+// Story assistant — entry point.
 #include "board.h"
 #include "ui.h"
-#include "story_mem.h"
+#include "app_ui.h"
+#include "phase.h"
+#include "think.h"
 #include "console.h"
 #include "hwtest.h"
+#include "upload.h"
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 
 static const char *TAG = "main";
 
-static ui_box_t s_status, s_body;
+#define FAST_ARENA_BYTES (264 * 1024)
+#define BULK_ARENA_BYTES (7 * 1024 * 1024)
 
-static void status(const char *s, uint16_t color)
+static void ui_stream(void *u, const char *text) { app_ui_story(text); }
+
+static void cmd_ask(const char *q)
 {
-    ui_box_set_color(&s_status, color);
-    ui_box_set(&s_status, s);
+    static llm_history_t hist;   // test: independent questions
+    llm_history_clear(&hist);
+    char ans[LLM_ANSWER_CHARS + 1];
+    llm_stats_t st;
+    app_ui_clear_turn();
+    app_ui_you(q);
+    app_ui_status("Thinking...", UI_YELLOW);
+    if (think_answer(&hist, q, ans, sizeof ans, ui_stream, NULL, &st)) {
+        printf("ANSWER: %s\n", ans);
+        app_ui_status("Ready", UI_GREEN);
+    } else {
+        app_ui_story("I can't answer that right now.");
+        app_ui_status("LLM error", UI_RED);
+        printf("ANSWER ERROR\n");
+    }
+}
+
+static void dispatch(const char *line)
+{
+    if (!strncmp(line, "put ", 4)) {
+        char path[160];
+        unsigned size = 0, crc = 0;
+        if (sscanf(line + 4, "%159s %u %x", path, &size, &crc) == 3) upload_file(path, size, crc);
+        else printf("usage: put <path> <size> <crc32hex>\n");
+        printf("OK\n");
+    } else if (!strncmp(line, "ask ", 4)) {
+        cmd_ask(line + 4);
+        printf("OK\n");
+    } else {
+        hwtest_command(line);
+    }
 }
 
 void app_main(void)
 {
-    console_init();
+    // Reserve the phase arenas before any driver fragments internal RAM.
     story_mem_log("boot");
+    bool arenas = phase_arenas_init(FAST_ARENA_BYTES, BULK_ARENA_BYTES);
+    console_init();
 
     esp_err_t lcd = board_lcd_init();
     esp_err_t tp = board_touch_init();
@@ -30,28 +69,16 @@ void app_main(void)
     esp_err_t sd = board_sd_mount(false);
     story_mem_log("drivers");
 
-    ui_draw_row(0, 0, BOARD_LCD_W, "STORY  hw test", UI_CYAN, UI_BLACK);
-    ui_box_init(&s_status, 0, UI_ROW_H * 2, BOARD_LCD_W, 1, UI_YELLOW, UI_BLACK);
-    ui_box_init(&s_body, 0, UI_ROW_H * 4, BOARD_LCD_W, 16, UI_WHITE, UI_BLACK);
+    app_ui_init();
     board_backlight(80);
+    if (!arenas) app_ui_status("MEMORY ERROR", UI_RED);
+    else if (sd != ESP_OK) app_ui_status("SD card error", UI_RED);
+    else app_ui_status("Ready", UI_GREEN);
+    ESP_LOGI(TAG, "READY lcd=%s touch=%s audio=%s sd=%s arenas=%d", esp_err_to_name(lcd),
+             esp_err_to_name(tp), esp_err_to_name(au), esp_err_to_name(sd), arenas);
 
-    char body[400];
-    snprintf(body, sizeof body,
-             "LCD   %s\nTouch %s\nAudio %s\nSD    %s\nBattery %d mV\n\n"
-             "Serial commands drive tests.",
-             esp_err_to_name(lcd), esp_err_to_name(tp), esp_err_to_name(au),
-             esp_err_to_name(sd), board_battery_mv());
-    ui_box_set(&s_body, body);
-    status("Ready", UI_GREEN);
-    ESP_LOGI(TAG, "HWTEST READY lcd=%s touch=%s audio=%s sd=%s", esp_err_to_name(lcd),
-             esp_err_to_name(tp), esp_err_to_name(au), esp_err_to_name(sd));
-
-    char line[160];
+    char line[200];
     while (1) {
-        if (console_readline(line, sizeof line, 0)) {
-            status(line, UI_YELLOW);
-            hwtest_command(line);
-            status("Ready", UI_GREEN);
-        }
+        if (console_readline(line, sizeof line, 0)) dispatch(line);
     }
 }
