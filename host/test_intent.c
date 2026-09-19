@@ -32,6 +32,21 @@ int main(void)
     CHECK(story_intent("how many days are in a week", t, sizeof t) == INTENT_CHAT);
     CHECK(story_intent("what time do owls wake up", t, sizeof t) == INTENT_CHAT);
     CHECK(story_intent("tell me a story about time travel", t, sizeof t) == INTENT_STORY);
+    CHECK(story_intent("set a timer for five minutes", t, sizeof t) == INTENT_TIMER_SET);
+    CHECK(story_duration_seconds("set a timer for five minutes") == 300);
+    CHECK(story_duration_seconds("ten second timer") == 10);
+    CHECK(story_duration_seconds("timer for one minute and thirty seconds") == 90);
+    CHECK(story_duration_seconds("set a timer for twenty five minutes") == 1500);
+    CHECK(story_duration_seconds("timer for a minute") == 60);
+    CHECK(story_duration_seconds("set a timer for half an hour") == 1800);
+    CHECK(story_duration_seconds("timer 90 seconds") == 90);
+    CHECK(story_duration_seconds("set a 5 min timer") == 300);
+    CHECK(story_duration_seconds("set a timer for 2 hours") == 7200);
+    CHECK(story_duration_seconds("what is the time") == -1);
+    CHECK(story_intent("cancel the timer", t, sizeof t) == INTENT_TIMER_CANCEL);
+    CHECK(story_intent("how much time is left on the timer", t, sizeof t) == INTENT_TIMER_QUERY);
+    CHECK(story_intent("how much time is left", t, sizeof t) == INTENT_TIMER_QUERY);
+    CHECK(story_intent("what time is it", t, sizeof t) == INTENT_TIME);
     printf("test_intent OK\n");
     return 0;
 }

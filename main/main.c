@@ -6,6 +6,8 @@
 #include "builtin.h"
 #include "net.h"
 #include "prefs.h"
+#include "timer.h"
+#include <math.h>
 #include "phase.h"
 #include "think.h"
 #include "speak.h"
@@ -60,6 +62,36 @@ static void cmd_ask(const char *q)
 }
 
 static void ui_status_cb(const char *s) { app_ui_status(s, UI_BUSY); }
+
+// Timer finished: say so, then beep in bursts until the screen is touched
+// (or a minute passes). WakeNet must be stopped by the caller (speaker).
+static void timer_ring(void)
+{
+    screen_on();
+    app_ui_status("Timer done! Tap to stop", UI_ERR);
+    speak_text("Your timer is done.", NULL, NULL);
+    const int64_t t0 = story_time_us(), touched0 = screen_last_activity_us();
+    static int16_t beep[16000 * 15 / 100];            // 150 ms of 880 Hz
+    static bool made;
+    if (!made) {
+        const int n = sizeof beep / sizeof beep[0];
+        for (int i = 0; i < n; i++) {
+            float env = i < 160 ? i / 160.0f : i > n - 160 ? (n - i) / 160.0f : 1.0f;   // no clicks
+            beep[i] = (int16_t)(12000 * env * sinf(6.2831853f * 880.0f * i / 16000.0f));
+        }
+        made = true;
+    }
+    board_spk_start();
+    while (story_time_us() - t0 < 60LL * 1000000 && screen_last_activity_us() == touched0) {
+        for (int k = 0; k < 3; k++) {
+            board_spk_write(beep, sizeof beep / sizeof beep[0], 1000);
+            vTaskDelay(pdMS_TO_TICKS(90));
+        }
+        for (int i = 0; i < 12 && screen_last_activity_us() == touched0; i++) vTaskDelay(pdMS_TO_TICKS(50));
+    }
+    board_spk_stop();
+    app_ui_status("Ready", UI_OK);
+}
 
 // Set the clock over Wi-Fi/NTP, showing progress on the status line.
 static void clock_sync_ui(void)
@@ -421,6 +453,28 @@ void app_main(void)
             wake_stop();
             clock_sync_ui();
             if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
+        }
+        if (!start && !app_ui_is_busy()) {
+            // Timer: ring when done; otherwise show the countdown once a second.
+            static int shown = -1;
+            if (timer_take_fired()) {
+                wake_stop();
+                timer_ring();
+                shown = -1;
+                if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
+            } else if (timer_active()) {
+                int left = timer_remaining_s();
+                if (left != shown) {
+                    char st[32];
+                    if (left >= 3600) snprintf(st, sizeof st, "Timer %d:%02d:%02d", left / 3600, left % 3600 / 60, left % 60);
+                    else snprintf(st, sizeof st, "Timer %d:%02d", left / 60, left % 60);
+                    app_ui_status(st, UI_OK);
+                    shown = left;
+                }
+            } else if (shown >= 0) {               // cancelled
+                app_ui_status("Ready", UI_OK);
+                shown = -1;
+            }
         }
         static char typed[128];
         if (!start && !app_ui_is_busy() && touch_ui_take_typed(typed, sizeof typed)) {

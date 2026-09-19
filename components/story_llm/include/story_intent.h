@@ -14,9 +14,16 @@ typedef enum {
     INTENT_BYE,        // short "bye / goodbye / that's all" -> end the session
     INTENT_TIME,       // "what time is it" -> device clock (no model)
     INTENT_DATE,       // "what day / date / month / year is it" -> device clock (no model)
+    INTENT_TIMER_SET,  // "set a timer for five minutes" (see story_duration_seconds)
+    INTENT_TIMER_CANCEL,
+    INTENT_TIMER_QUERY, // "how much time is left on the timer"
 } story_intent_t;
 
 #define INTENT_IDENTITY_ANSWER "My name is Ivy AI. I am a little talking robot. I like to chat and tell stories."
+
+// Duration in a spoken request, in seconds ("five minutes", "1 minute and
+// 30 seconds", "a minute", "half an hour", "ninety seconds"); -1 if none.
+int story_duration_seconds(const char *text);
 
 // Classify a (lower- or mixed-case) transcript. For INTENT_STORY, writes the
 // story topic (e.g. "a red robot") to `topic`.

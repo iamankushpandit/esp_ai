@@ -1,10 +1,11 @@
 #include "builtin.h"
 #include "story_intent.h"
+#include "timer.h"
 #include <stdio.h>
 #include <string.h>
 #include <time.h>
 
-#define NOT_SET_ANSWER "I don't know the time yet. Connect me to Wi-Fi on the about page so I can set my clock."
+#define NOT_SET_ANSWER "I don't know the time yet. Connect me to Wi-Fi in settings so I can set my clock."
 
 static const char *DAYS[] = {"Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"};
 static const char *MONTHS[] = {"January", "February", "March",     "April",   "May",      "June",
@@ -66,6 +67,35 @@ bool builtin_answer(const char *question, char *out, size_t cap, const char **so
     case INTENT_DATE:
         clock_say_date(out, cap);
         *source = "device clock";
+        return true;
+    case INTENT_TIMER_SET: {
+        int secs = story_duration_seconds(question);
+        char d[64];
+        if (secs > 24 * 3600) {
+            snprintf(out, cap, "I can only set timers up to 24 hours.");
+        } else {
+            timer_say_duration(secs, d, sizeof d);
+            bool replaced = timer_active();
+            timer_start(secs);
+            snprintf(out, cap, "%s for %s.", replaced ? "Okay, I changed your timer. It is now set" : "Timer set", d);
+        }
+        *source = "device timer";
+        return true;
+    }
+    case INTENT_TIMER_CANCEL:
+        snprintf(out, cap, timer_active() ? "Okay, I cancelled your timer." : "There is no timer running.");
+        timer_cancel();
+        *source = "device timer";
+        return true;
+    case INTENT_TIMER_QUERY:
+        if (timer_active()) {
+            char d[64];
+            timer_say_duration(timer_remaining_s(), d, sizeof d);
+            snprintf(out, cap, "There are %s left on your timer.", d);
+        } else {
+            snprintf(out, cap, "There is no timer running.");
+        }
+        *source = "device timer";
         return true;
     default:
         return false;
