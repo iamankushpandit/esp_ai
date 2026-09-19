@@ -1,0 +1,60 @@
+torch 2.8.0 mps True
+/Users/ankushpandit/esp_ai/training/story_kid_bundle/.venv/lib/python3.9/site-packages/urllib3/__init__.py:35: NotOpenSSLWarning: urllib3 v2 only supports OpenSSL 1.1.1+, currently the 'ssl' module is compiled with 'LibreSSL 2.8.3'. See: https://github.com/urllib3/urllib3/issues/3020
+  warnings.warn(
+The attention mask is not set and cannot be inferred from input because pad token is same as eos token. As a consequence, you may observe unexpected behavior. Please pass your input's `attention_mask` to obtain reliable results.
+[+] base /Users/ankushpandit/esp_ai/training/story_kid_bundle/.refs/cardputer-ai/data/chat_model_8m: 19.7M params, device mps
+[+] kid_train.txt: 19974 samples
+[+] gume_train.txt: 57114 samples
+[+] kid 77088 + replay 30000 samples -> 33491 blocks (4.29M tokens, 52% in loss)
+[+] before: held-out exact 0.0%  key 8.0% (100 q)
+    step 100/2096 loss 1.412 lr 1.5e-04 14.6K tok/s, eta 18.6 min
+    step 200/2096 loss 1.446 lr 3.0e-04 15.1K tok/s, eta 17.2 min
+    step 300/2096 loss 1.330 lr 3.0e-04 15.3K tok/s, eta 16.1 min
+    step 400/2096 loss 1.200 lr 2.9e-04 15.4K tok/s, eta 15.1 min
+    step 500/2096 loss 1.373 lr 2.8e-04 15.4K tok/s, eta 14.1 min
+[+] epoch 1: held-out exact 14.0%  key 29.0% (400 q)
+      XX  hey story what does three plus four make -> Three plus four is six.
+      XX  hey story what does fifteen minus five make -> Fifteen minus five is twelve.
+      XX  hey story what does eleven plus two make -> Eleven plus two is twelve.
+      OK  what number is one less than ninety one -> Ninety is bigger than one hundred and eighty-two.
+      XX  hey story what does sixteen minus five make -> Sixteen minus five is twelve.
+      OK  hey story what does two times five make -> Two times five is ten.
+    step 600/2096 loss 0.944 lr 2.7e-04 11.7K tok/s, eta 17.4 min
+    step 700/2096 loss 1.116 lr 2.5e-04 12.1K tok/s, eta 15.7 min
+    step 800/2096 loss 1.138 lr 2.3e-04 12.5K tok/s, eta 14.2 min
+    step 900/2096 loss 1.103 lr 2.1e-04 12.7K tok/s, eta 12.8 min
+    step 1000/2096 loss 1.047 lr 1.9e-04 13.0K tok/s, eta 11.5 min
+[+] epoch 2: held-out exact 32.2%  key 47.8% (400 q)
+      XX  hey story what does three plus four make -> Three plus four is six.
+      OK  hey story what does fifteen minus five make -> Fifteen minus five is ten.
+      OK  hey story what does eleven plus two make -> Eleven plus two is thirteen.
+      OK  what number is one less than ninety one -> Ninety is bigger than one.
+      XX  hey story what does sixteen minus five make -> Sixteen minus five is ten.
+      OK  hey story what does two times five make -> Two times five is ten.
+    step 1100/2096 loss 0.854 lr 1.7e-04 11.6K tok/s, eta 11.7 min
+    step 1200/2096 loss 0.853 lr 1.4e-04 11.9K tok/s, eta 10.3 min
+    step 1300/2096 loss 0.733 lr 1.2e-04 12.1K tok/s, eta 9.0 min
+    step 1400/2096 loss 0.768 lr 9.6e-05 12.3K tok/s, eta 7.7 min
+    step 1500/2096 loss 0.835 lr 7.5e-05 12.5K tok/s, eta 6.5 min
+[+] epoch 3: held-out exact 41.5%  key 56.8% (400 q)
+      OK  hey story what does three plus four make -> Three plus four is seven.
+      OK  hey story what does fifteen minus five make -> Fifteen minus five is ten.
+      OK  hey story what does eleven plus two make -> Eleven plus two is thirteen.
+      XX  what number is one less than ninety one -> One hundred and eighty-one in Roman numerals is CLXXI.
+      OK  hey story what does sixteen minus five make -> Sixteen minus five is eleven.
+      XX  hey story what does two times five make -> Two times five makes a whole.
+    step 1600/2096 loss 0.643 lr 5.6e-05 11.6K tok/s, eta 5.8 min
+    step 1700/2096 loss 0.590 lr 4.0e-05 11.8K tok/s, eta 4.6 min
+    step 1800/2096 loss 0.708 lr 2.7e-05 11.9K tok/s, eta 3.4 min
+    step 1900/2096 loss 0.606 lr 1.8e-05 12.1K tok/s, eta 2.2 min
+    step 2000/2096 loss 0.631 lr 1.2e-05 12.2K tok/s, eta 1.1 min
+[+] epoch 4: held-out exact 43.2%  key 58.0% (400 q)
+      OK  hey story what does three plus four make -> Three plus four is seven.
+      OK  hey story what does fifteen minus five make -> Fifteen minus five is ten.
+      OK  hey story what does eleven plus two make -> Eleven plus two is thirteen.
+      XX  what number is one less than ninety one -> One hundred and eighty-one in Roman numerals is CLXXI.
+      OK  hey story what does sixteen minus five make -> Sixteen minus five is eleven.
+      XX  hey story what does two times five make -> Two times five makes a whole.
+[+] saved models_out/kid/model_8m_kidgume
+
+Done. Copy models_out/kid/model_8m_kidgume/ and models_out/kid/train_mac_log.txt back.

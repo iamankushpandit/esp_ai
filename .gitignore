@@ -12,3 +12,6 @@ tools/.venv/
 build_log.txt
 .claude/
 tools/.venv-gpu/
+# Extracted training bundle working dir (venv + .refs + checkpoints); the
+# zip and the result artifacts under training/ are tracked instead.
+training/story_kid_bundle/
