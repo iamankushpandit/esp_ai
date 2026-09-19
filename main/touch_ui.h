@@ -6,6 +6,7 @@
 //   - drag in the conversation area: scrolls the transcript
 #pragma once
 #include <stdbool.h>
+#include <stddef.h>
 #include <stdint.h>
 
 void touch_ui_start(void);
@@ -25,6 +26,9 @@ void touch_ui_sim_tap(int x, int y);
 // True once, shortly after the last volume change in /settings: the main task
 // then speaks a short phrase at the new volume.
 bool touch_ui_take_volume_preview(void);
+
+// A question typed on the T9 keypad (Ask tapped), once.
+bool touch_ui_take_typed(char *out, size_t cap);
 
 // Screen power (backlight). Keeps state consistent between tasks.
 void screen_on(void);

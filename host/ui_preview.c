@@ -127,6 +127,11 @@ int main(int argc, char **argv)
         STEP("back to wifi", app_ui_page(PAGE_WIFI));
     }
     STEP("back to chat", app_ui_page(PAGE_CHAT));
+    dump();
+    STEP("t9 open", app_ui_t9_open());
+    STEP("t9: 4 4 (h -> i)", app_ui_t9_tap(5, 94 + 34 + 5); app_ui_t9_tap(5, 94 + 34 + 5));
+    dump();
+    STEP("t9 cancel", app_ui_t9_tap(230, 64));
     STEP("ask pressed", app_ui_button(BTN_PRESSED));
     dump();
     STEP("turn 1: listening", app_ui_busy(true); app_ui_clear_turn(); app_ui_status("Listening...", UI_BUSY));

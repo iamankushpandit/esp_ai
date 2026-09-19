@@ -87,7 +87,7 @@ static void bar_release_look(int b)
 {
     if (app_ui_is_busy()) { app_ui_bar_state((app_bar_t)b, BTN_BUSY); return; }
     app_page_t p = app_ui_page_get();
-    bool active = (b == BAR_MODEL && p == PAGE_MODELS) || (b == BAR_SETTINGS && p >= PAGE_SETTINGS);
+    bool active = (b == BAR_MODEL && p == PAGE_MODELS) || (b == BAR_SETTINGS && app_page_in_settings(p));
     app_ui_bar_state((app_bar_t)b, active ? BTN_ACTIVE : BTN_IDLE);
 }
 
@@ -157,6 +157,18 @@ bool touch_ui_take_volume_preview(void)
     return true;
 }
 
+// Typed question (T9 Ask), consumed by the main task.
+static char s_typed[128];
+static volatile bool s_typed_ready;
+
+bool touch_ui_take_typed(char *out, size_t cap)
+{
+    if (!s_typed_ready) return false;
+    snprintf(out, cap, "%s", s_typed);
+    s_typed_ready = false;
+    return true;
+}
+
 static void settings_tap(int tag, int col)
 {
     int dir = col >= SET_PLUS_COL_MIN ? 1 : (col >= SET_MINUS_COL_MIN && col <= SET_MINUS_COL_MAX) ? -1 : 0;
@@ -205,6 +217,16 @@ static void page_tap(int x, int y)
         if (app_ui_kb_tap(x, y) == 1) join(app_ui_kb_ssid(), app_ui_kb_text());
         return;
     }
+    if (page == PAGE_T9) {
+        int r = app_ui_t9_tap(x, y);
+        if (r == 1) {                        // Ask: hand the text to the main task
+            snprintf(s_typed, sizeof s_typed, "%s", app_ui_t9_text());
+            s_typed_ready = true;
+        } else if (r == 2) {
+            app_ui_page(PAGE_CHAT);
+        }
+        return;
+    }
     int tag = app_ui_convo_tap(x, y);
     ESP_LOGI(TAG, "tap (%d,%d) page %d tag %d", x, y, (int)page, tag);
     if (page == PAGE_SETTINGS) {
@@ -213,6 +235,10 @@ static void page_tap(int x, int y)
     }
     if (page == PAGE_WIFI) {
         if (tag >= 0) wifi_tap(tag);
+        return;
+    }
+    if (page == PAGE_CHAT && tag == TAG_TYPE && !app_ui_is_busy()) {
+        app_ui_t9_open();
         return;
     }
     if (app_ui_page_get() == PAGE_MODELS && tag >= 0 && !app_ui_is_busy() && tag != models_active()) {
@@ -256,7 +282,8 @@ static void touch_task(void *arg)
         } else if (t && down) {                             // move
             s_activity = story_time_us();
             int dy = y - y0;
-            if (g == G_PAGE_MAYBE && abs(dy) > DRAG_SLOP_PX && app_ui_page_get() != PAGE_KEYBOARD) g = G_SCROLL;
+            app_page_t pg = app_ui_page_get();
+            if (g == G_PAGE_MAYBE && abs(dy) > DRAG_SLOP_PX && pg != PAGE_KEYBOARD && pg != PAGE_T9) g = G_SCROLL;
             if (g == G_SCROLL) app_ui_scroll_drag(dy);
             if (g == G_BAR && app_ui_bar_hit(x, y) != bar) {  // slid off: cancel
                 bar_release_look(bar);

@@ -45,7 +45,12 @@ void app_ui_tick(void);
 float app_ui_last_tok_rate(void);
 
 // Pages shown in the scrollable area.
-typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_SETTINGS, PAGE_ABOUT, PAGE_WIFI, PAGE_KEYBOARD } app_page_t;
+typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_SETTINGS, PAGE_ABOUT, PAGE_WIFI, PAGE_KEYBOARD, PAGE_T9 } app_page_t;
+// Pages reached from /settings (its pill stays lit on them).
+static inline bool app_page_in_settings(app_page_t p)
+{
+    return p == PAGE_SETTINGS || p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD;
+}
 void app_ui_page(app_page_t p);            // switch page (re-renders the area)
 app_page_t app_ui_page_get(void);
 void app_ui_refresh_page(void);            // e.g. after the model list changed
@@ -61,6 +66,7 @@ void app_ui_refresh_page(void);            // e.g. after the model list changed
 #define TAG_SET_WAKE 113                   // tap toggles the wake word
 #define TAG_SET_ABOUT 114
 #define TAG_SET_GAIN 115                   // voice gain [-] / [+]
+#define TAG_TYPE 120                       // chat: "[ Type a question ]" -> T9 keypad
 // Settings rows "Label      [-] 70% [+]": columns 13..18 step down, 20.. step
 // up; a tap on the label does nothing.
 #define SET_MINUS_COL_MIN 13
@@ -81,6 +87,12 @@ void app_ui_kb_open(const char *ssid);
 int app_ui_kb_tap(int x, int y);
 const char *app_ui_kb_text(void);
 const char *app_ui_kb_ssid(void);
+
+// T9 keypad for typed questions. app_ui_t9_tap() returns 1 when Ask was
+// tapped (text in app_ui_t9_text()), 2 for cancel, 0 otherwise.
+void app_ui_t9_open(void);
+int app_ui_t9_tap(int x, int y);
+const char *app_ui_t9_text(void);
 
 // Scrolling (touch drag). While at the bottom the chat follows new text;
 // after scrolling up it stays put until dragged back or a new question.

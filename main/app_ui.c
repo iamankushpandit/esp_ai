@@ -58,6 +58,7 @@ static const struct { int x, w; const char *label; bool spark; } BAR[BAR_COUNT] 
     [BAR_SETTINGS] = {150, 86, "/settings", false},
 };
 #define BAR_MAX_W 86
+#define BTN_PX_MAX (80 * 32)             // pixel scratch: pills, keys, icons
 
 static ui_box_t s_status, s_convo, s_detail;
 static int s_spin;
@@ -163,6 +164,8 @@ static void build_chat(void)
         add_para(UI_G_ROWMARK "Say \"Hey Ivy\" or tap Ask.", -1);
         add_para("", -1);
         add_prose(UI_G_ROWMARK "Answers come from a small AI and may be wrong. See /settings > About.");
+        add_para("", -1);
+        add_para("  [ Type a question ]", TAG_TYPE);
         return;
     }
     char *buf = s_text;
@@ -176,6 +179,10 @@ static void build_chat(void)
                                   s_turns[i].builtin ? UI_G_DIAMOND : UI_G_BULLET, s_turns[i].a);
     }
     add_para(buf, -1);
+    if (!s_busy) {
+        add_para("", -1);
+        add_para("  [ Type a question ]", TAG_TYPE);
+    }
 }
 
 static void build_models(void)
@@ -472,9 +479,138 @@ int app_ui_kb_tap(int x, int y)
     return ret;
 }
 
+// ---------------------------------------------------------------- T9 keypad
+// Typed questions on a phone-style 3x4 keypad in the page area. Multi-tap:
+// tapping the same key again within T9_CYCLE_US cycles its letters (2: a b c 2),
+// otherwise a new character starts. 0 is space.
+#define T9_TITLE_Y CONVO_Y
+#define T9_FIELD_Y (CONVO_Y + UI_ROW_H)
+#define T9_KEYS_Y (CONVO_Y + 2 * UI_ROW_H + 4)
+#define T9_KEY_W 80
+#define T9_KEY_H 32
+#define T9_PITCH 34
+#define T9_CYCLE_US 900000
+#define T9_MAX 120
+enum { T9_DEL = 9, T9_SPACE = 10, T9_ASK = 11 };
+static const struct { const char *top, *sub, *cycle; } T9_KEYS[12] = {
+    {"1", ".,?!", ".,?!'1"}, {"2", "abc", "abc2"}, {"3", "def", "def3"},
+    {"4", "ghi", "ghi4"},    {"5", "jkl", "jkl5"}, {"6", "mno", "mno6"},
+    {"7", "pqrs", "pqrs7"},  {"8", "tuv", "tuv8"}, {"9", "wxyz", "wxyz9"},
+    {"del", "", NULL},       {"0", "space", NULL}, {"Ask", "", NULL},
+};
+static char s_t9_text[T9_MAX + 1];
+static int s_t9_len, s_t9_last = -1, s_t9_idx;
+static int64_t s_t9_last_us;
+
+static void draw_key2(int x, int y, int w, int h, const char *l1, const char *l2, bool pressed, bool accent)
+{
+    uint16_t bg = pressed ? UI_ACCENT : accent ? RGB565(70, 50, 56) : RGB565(40, 40, 40);
+    uint16_t fg = pressed ? UI_BLACK : UI_WHITE, fg2 = pressed ? UI_BLACK : UI_ACCENT;
+    uint16_t *px = s_btn_px;
+    for (int yy = 0; yy < h; yy++)
+        for (int xx = 0; xx < w; xx++) {
+            bool corner = (xx == 0 || xx == w - 2) && (yy == 0 || yy == h - 2);
+            bool gap = xx == w - 1 || yy == h - 1;           // 1 px gutter right/bottom
+            px[yy * w + xx] = corner || gap ? UI_BLACK : bg;
+        }
+    int w1 = (int)strlen(l1) * UI_FONT_W, w2 = (int)strlen(l2) * UI_FONT_W;
+    if (l2[0]) {
+        ui_text_into(px, w, h, (w - 1 - w1) / 2, 2, l1, fg);
+        ui_text_into(px, w, h, (w - 1 - w2) / 2, 16, l2, fg2);
+    } else {
+        ui_text_into(px, w, h, (w - 1 - w1) / 2, (h - 1 - UI_FONT_H) / 2, l1, fg);
+    }
+    board_lcd_window(x, y, w, h);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < w * h; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, (size_t)w * h);
+    board_lcd_stream_end();
+}
+
+static void t9_draw_key(int k, bool pressed)
+{
+    int r = k / 3, c = k % 3;
+    draw_key2(c * T9_KEY_W, T9_KEYS_Y + r * T9_PITCH, T9_KEY_W, T9_KEY_H, T9_KEYS[k].top, T9_KEYS[k].sub,
+              pressed, k == T9_ASK);
+}
+
+static void t9_draw_field(void)
+{
+    char row[UI_MAX_COLS + 1];
+    int shown = s_t9_len > 26 ? 26 : s_t9_len, n = 0;
+    row[n++] = '>';
+    row[n++] = ' ';
+    memcpy(row + n, s_t9_text + s_t9_len - shown, (size_t)shown);
+    n += shown;
+    row[n++] = '_';
+    row[n] = 0;
+    ui_draw_row(0, T9_FIELD_Y, BOARD_LCD_W, row, UI_WHITE, UI_BLACK);
+}
+
+static void t9_draw_all(void)
+{
+    ui_box_set_rows(&s_convo, NULL, 0);       // blank the text rows (dirty rows only)
+    ui_box_invalidate(&s_convo);              // text pages repaint over the keys later
+    s_total = 0;
+    draw_scrollbar();
+    ui_draw_row(0, T9_TITLE_Y, BOARD_LCD_W, "Type a question            [x]", UI_ACCENT, UI_BLACK);
+    t9_draw_field();
+    for (int k = 0; k < 12; k++) t9_draw_key(k, false);
+}
+
+void app_ui_t9_open(void)
+{
+    UI_LOCK();
+    s_t9_text[0] = 0;
+    s_t9_len = 0;
+    s_t9_last = -1;
+    app_ui_page(PAGE_T9);
+    UI_UNLOCK();
+}
+
+const char *app_ui_t9_text(void) { return s_t9_text; }
+
+int app_ui_t9_tap(int x, int y)
+{
+    if (s_page != PAGE_T9) return 0;
+    if (y < T9_FIELD_Y) return x >= 24 * UI_FONT_W ? 2 : 0;   // [x] on the title row: cancel
+    if (y < T9_KEYS_Y) return 0;
+    int r = (y - T9_KEYS_Y) / T9_PITCH, c = x / T9_KEY_W;
+    if (r > 3) return 0;
+    if (c > 2) c = 2;
+    int k = r * 3 + c, ret = 0;
+    int64_t now = story_time_us();
+    UI_LOCK();
+    t9_draw_key(k, true);
+    if (T9_KEYS[k].cycle) {
+        const char *cy = T9_KEYS[k].cycle;
+        if (k == s_t9_last && now - s_t9_last_us < T9_CYCLE_US && s_t9_len > 0) {
+            s_t9_idx = (s_t9_idx + 1) % (int)strlen(cy);       // same key again: next letter
+            s_t9_text[s_t9_len - 1] = cy[s_t9_idx];
+        } else if (s_t9_len < T9_MAX) {
+            s_t9_idx = 0;
+            s_t9_text[s_t9_len++] = cy[0];
+            s_t9_text[s_t9_len] = 0;
+        }
+        s_t9_last = k;
+        s_t9_last_us = now;
+    } else {
+        s_t9_last = -1;                                        // commits the letter being cycled
+        if (k == T9_DEL && s_t9_len > 0) s_t9_text[--s_t9_len] = 0;
+        else if (k == T9_SPACE && s_t9_len < T9_MAX) { s_t9_text[s_t9_len++] = ' '; s_t9_text[s_t9_len] = 0; }
+        else if (k == T9_ASK && s_t9_len > 0) ret = 1;
+    }
+    t9_draw_field();
+    kb_flash_pause();
+    t9_draw_key(k, false);
+    UI_UNLOCK();
+    return ret;
+}
+
 static void render_page(void)
 {
     if (s_page == PAGE_KEYBOARD) { kb_draw_all(); return; }
+    if (s_page == PAGE_T9) { t9_draw_all(); return; }
     s_total = 0;
     switch (s_page) {
     case PAGE_CHAT: build_chat(); break;
@@ -668,7 +804,7 @@ void app_ui_init(void)
         s_tags = UI_ALLOC(MAX_ROWS);
         s_tmp = UI_ALLOC(sizeof(*s_tmp) * MAX_ROWS);
         s_text = UI_ALLOC(TEXT_BYTES);
-        s_btn_px = UI_ALLOC(sizeof(uint16_t) * BAR_MAX_W * BAR_H);
+        s_btn_px = UI_ALLOC(sizeof(uint16_t) * BTN_PX_MAX);   // largest widget: T9 key
     }
     UI_LOCK();
     // The only full-screen fill: once at boot, before the backlight is on.
@@ -805,7 +941,7 @@ void app_ui_page(app_page_t p)
         s_follow = p == PAGE_CHAT;     // pages open at the top, chat at the bottom
         s_top = 0;
         render_page();
-        bool settings = p == PAGE_SETTINGS || p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD;
+        bool settings = app_page_in_settings(p);
         app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
         app_ui_bar_state(BAR_SETTINGS, settings ? BTN_ACTIVE : BTN_IDLE);
     }
@@ -817,7 +953,7 @@ app_page_t app_ui_page_get(void) { return s_page; }
 void app_ui_refresh_page(void)
 {
     UI_LOCK();
-    if (s_page != PAGE_KEYBOARD) render_page();   // don't redraw the keyboard under a finger
+    if (s_page != PAGE_KEYBOARD && s_page != PAGE_T9) render_page();   // don't redraw a keypad under a finger
     UI_UNLOCK();
 }
 
@@ -1139,7 +1275,8 @@ void app_ui_busy(bool busy)
 {
     UI_LOCK();
     s_busy = busy;
-    if (busy && s_page != PAGE_CHAT) app_ui_page(PAGE_CHAT);
+    if (busy && s_page != PAGE_CHAT) app_ui_page(PAGE_CHAT);   // keypads and pages close while answering
+    else if (s_page == PAGE_CHAT) render_page();               // show/hide the "Type a question" row
     app_ui_bar_state(BAR_ASK, busy ? BTN_BUSY : BTN_IDLE);
     app_ui_bar_state(BAR_MODEL, busy ? BTN_BUSY : BTN_IDLE);
     app_ui_bar_state(BAR_SETTINGS, busy ? BTN_BUSY : BTN_IDLE);

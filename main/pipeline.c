@@ -26,7 +26,9 @@ static void speak_error(const char *msg)
     speak_text(msg, NULL, NULL);
 }
 
-pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns)
+// typed != NULL: the question was typed on the T9 keypad; skip listening.
+static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns,
+                                   const char *typed)
 {
     bool followup = turn > 1;
     bool last = turn >= max_turns;
@@ -44,7 +46,9 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
     screen_on();
 
     // ---- LISTEN + TRANSCRIBE
-    hear_result_t hr = hear_listen(hp, question, sizeof question, status_cb, &hs);
+    hear_result_t hr = HEAR_OK;
+    if (typed) snprintf(question, sizeof question, "%s", typed);
+    else hr = hear_listen(hp, question, sizeof question, status_cb, &hs);
     int64_t t_hear = story_time_us();
     if (hr == HEAR_NO_SPEECH) {
         res = PIPE_NO_SPEECH;
@@ -124,6 +128,19 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
 done:
     story_mem_log("turn-end");
     return res;
+}
+
+pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns)
+{
+    return turn_impl(hp, hist, turn, max_turns, NULL);
+}
+
+pipeline_result_t pipeline_typed(const char *question)
+{
+    // One stand-alone turn: answer on screen and spoken, no follow-ups.
+    pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question);
+    app_ui_status("Ready", UI_OK);
+    return r;
 }
 
 // A session: first question + up to (max_turns - 1) follow-ups without the
