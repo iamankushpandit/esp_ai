@@ -20,7 +20,7 @@ static const char *TAG = "hear";
 hear_params_t hear_default_params(void)
 {
     hear_params_t p = {
-        .vad_min_abs = 250,
+        .vad_min_abs = 120,
         .vad_noise_mult = 3.0f,
         .eos_silent_chunks = 2,     // 720 ms
         .max_wait_ms = 8000,

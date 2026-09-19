@@ -1,6 +1,7 @@
 #include "app_ui.h"
 #include "board.h"
 #include "ui.h"
+#include <stdio.h>
 
 static ui_box_t s_status, s_you, s_story;
 
@@ -29,3 +30,17 @@ void app_ui_clear_turn(void)
     ui_box_set(&s_you, "");
     ui_box_set(&s_story, "");
 }
+
+static float s_last_rate;
+
+void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)
+{
+    char st[40];
+    if (tok_per_s > 0) snprintf(st, sizeof st, "Thinking  %d tok  %.1f tok/s", tokens, tok_per_s);
+    else snprintf(st, sizeof st, "Thinking  %d tok", tokens);
+    s_last_rate = tok_per_s;
+    app_ui_status(st, UI_YELLOW);
+    app_ui_story(text);
+}
+
+float app_ui_last_tok_rate(void) { return s_last_rate; }

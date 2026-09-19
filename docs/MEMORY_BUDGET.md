@@ -1,8 +1,8 @@
 # Memory and storage budget
 
-Status: **estimates** from the reference audits (`docs/refnotes/*.md`), not yet
-measured on the FNK0104B. Every row gets a *measured* column filled in as the
-subsystem is brought up. Numbers in bytes unless noted; KB = 1024 B.
+Status: estimates from the reference audits, **now measured on the FNK0104B for
+Stage E - see [STAGE_E_RESULTS.md](STAGE_E_RESULTS.md)** (measured values below
+are marked). Numbers in bytes unless noted; KB = 1024 B.
 
 ## Hardware envelope
 
@@ -35,8 +35,12 @@ cannot be starved by fragmentation:
 
 | Arena | Size | Region | Purpose |
 |---|---|---|---|
-| `g_psram_arena` | 7.0 MB (tunable) | PSRAM | per-phase working memory + model copies |
-| `g_int_arena` | 264 KB | internal, DMA-capable | STT hot operand buffer; LLM activations; SD DMA destination |
+| `g_bulk` | 7.0 MB | PSRAM | per-phase working memory + model copies |
+| `g_fast` | 264 KB | internal, DMA-capable | STT SRAM heap; LLM run state + KV; SD bounce buffer |
+
+Both are reserved as the very first thing in `app_main` (before drivers), since
+the USB console / LCD / I2S drivers otherwise fragment internal RAM below a
+contiguous 264 KB (measured: reserving after drivers failed).
 
 Phase peak PSRAM demand vs the 7.0 MB arena:
 
@@ -71,3 +75,20 @@ arena is therefore sized to leave ≥ 0.6 MB of general PSRAM heap for it.
 | PicoTTS lingware | 1.43 MB | **SD → PSRAM copy** at SPEAKING start | Phases don't overlap, so the PSRAM is free; ~0.1 s load. Frees flash. Fallback: flash partitions. |
 | WakeNet model | ~0.3 MB | flash `model` partition | Runs in ARMED_IDLE for hours; must not depend on SD being powered/mounted, and esp-sr's SD mode has a deinit crash. |
 | Font | 5 KB | linked into app | trivial |
+
+## Measured (Stage E)
+
+| Phase | fast arena peak | bulk arena peak |
+|---|---|---|
+| HEAR | 262,192 B | 5,537,312 B |
+| THINK (3M, kv 128) | 213,104 B | 2,416,304 B |
+| SPEAK | 32,768 B | 2,528,080 B |
+
+Outside the arenas between turns: internal free 50,412 B (largest 31,744 B,
+min-ever 17,952 B during HEAR); PSRAM free 1,040,112 B. Zero drift over 12 turns.
+
+SD (SDMMC 4-bit, 40 MHz, FAT, 128 GB card): 16.2 MB/s into internal DMA memory,
+7.6 MB/s straight into PSRAM, ~10 MB/s effective for model loads through a
+32 KB bounce buffer. stdio buffering must be disabled on the STT model FILE:
+newlib otherwise mallocs st_blksize (16 KB) of internal RAM per open FILE and
+fread silently returned 0 when that failed.

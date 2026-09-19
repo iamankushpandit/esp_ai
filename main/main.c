@@ -6,6 +6,8 @@
 #include "think.h"
 #include "speak.h"
 #include "hear.h"
+#include "pipeline.h"
+#include "driver/gpio.h"
 #include "console.h"
 #include "hwtest.h"
 #include "upload.h"
@@ -21,7 +23,7 @@ static const char *TAG = "main";
 #define FAST_ARENA_BYTES (264 * 1024)
 #define BULK_ARENA_BYTES (7 * 1024 * 1024)
 
-static void ui_stream(void *u, const char *text) { app_ui_story(text); }
+static void ui_stream(void *u, const char *text, int tok, float rate) { app_ui_llm_progress(text, tok, rate); }
 
 static void cmd_ask(const char *q)
 {
@@ -64,6 +66,38 @@ static void cmd_hear(const char *wav)
     printf("HEAR %s: \"%s\"\n", names[r], text);
 }
 
+// Test: play a WAV through the speaker while HEAR listens on the mic.
+typedef struct { char path[96]; int delay_ms; } play_args_t;
+static play_args_t s_play;
+
+static void wav_player_task(void *arg)
+{
+    play_args_t *a = (play_args_t *)arg;
+    vTaskDelay(pdMS_TO_TICKS(a->delay_ms));
+    FILE *f = fopen(a->path, "rb");
+    if (f) {
+        int16_t buf[256];
+        fseek(f, 44, SEEK_SET);
+        board_spk_start();
+        size_t n;
+        while ((n = fread(buf, 2, 256, f)) > 0) board_spk_write(buf, n, 1000);
+        board_spk_stop();
+        fclose(f);
+    }
+    vTaskDelete(NULL);
+}
+
+static void cmd_hearplay(const char *args)
+{
+    s_play.delay_ms = 1500;
+    int vol = 40;
+    if (sscanf(args, "%95s %d %d", s_play.path, &vol, &s_play.delay_ms) < 1) return;
+    board_audio_set_volume(vol);
+    xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
+    cmd_hear(NULL);
+    board_audio_set_volume(70);
+}
+
 static void dispatch(const char *line)
 {
     if (!strncmp(line, "put ", 4)) {
@@ -82,6 +116,9 @@ static void dispatch(const char *line)
     } else if (!strcmp(line, "hear")) {
         cmd_hear(NULL);
         printf("OK\n");
+    } else if (!strncmp(line, "hearplay ", 9)) {
+        cmd_hearplay(line + 9);
+        printf("OK\n");
     } else if (!strncmp(line, "sttwav ", 7)) {
         cmd_hear(line + 7);
         printf("OK\n");
@@ -91,6 +128,21 @@ static void dispatch(const char *line)
         printf("OK\n");
     } else if (!strncmp(line, "ask ", 4)) {
         cmd_ask(line + 4);
+        printf("OK\n");
+    } else if (!strcmp(line, "go")) {
+        pipeline_turn(&s_hear, NULL);
+        printf("OK\n");
+    } else if (!strncmp(line, "goplay ", 7)) {
+        // End-to-end loopback test: the question is played through the speaker.
+        s_play.delay_ms = 1500;
+        int vol = 30;
+        if (sscanf(line + 7, "%95s %d", s_play.path, &vol) >= 1) {
+            board_audio_set_volume(vol);
+            xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
+            vTaskDelay(pdMS_TO_TICKS(50));
+            pipeline_turn(&s_hear, NULL);
+            board_audio_set_volume(70);
+        }
         printf("OK\n");
     } else {
         hwtest_command(line);
@@ -119,8 +171,19 @@ void app_main(void)
     ESP_LOGI(TAG, "READY lcd=%s touch=%s audio=%s sd=%s arenas=%d", esp_err_to_name(lcd),
              esp_err_to_name(tp), esp_err_to_name(au), esp_err_to_name(sd), arenas);
 
+    // BOOT button (GPIO0, active low) starts a turn: the Stage E trigger until
+    // the wake word exists.
+    gpio_config_t btn = {.pin_bit_mask = 1ULL << BOARD_BOOT_BTN, .mode = GPIO_MODE_INPUT,
+                         .pull_up_en = GPIO_PULLUP_ENABLE};
+    gpio_config(&btn);
+    app_ui_you("Press BOOT and ask a question.");
+
     char line[200];
     while (1) {
-        if (console_readline(line, sizeof line, 0)) dispatch(line);
+        if (console_readline(line, sizeof line, 50)) dispatch(line);
+        if (gpio_get_level(BOARD_BOOT_BTN) == 0) {
+            while (gpio_get_level(BOARD_BOOT_BTN) == 0) vTaskDelay(pdMS_TO_TICKS(10));
+            pipeline_turn(&s_hear, NULL);
+        }
     }
 }

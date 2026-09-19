@@ -16,8 +16,15 @@ typedef struct {
     void *user;
     char buf[LLM_ANSWER_CHARS + 1];
     size_t len, flushed;
-    int64_t last_us;
+    int64_t last_us, first_us;
+    int tokens;
 } stream_t;
+
+static float rate(const stream_t *s, int64_t now)
+{
+    // Speed over the tokens after the first one (excludes prefill latency).
+    return (s->tokens > 1 && now > s->first_us) ? (s->tokens - 1) / ((now - s->first_us) / 1e6f) : 0.0f;
+}
 
 // Batch UI updates: flush at most every 150 ms or on sentence end.
 static bool on_piece(void *u, const char *p, int n)
@@ -28,9 +35,10 @@ static bool on_piece(void *u, const char *p, int n)
     s->len += n;
     s->buf[s->len] = 0;
     int64_t now = story_time_us();
+    if (s->tokens++ == 0) s->first_us = now;
     bool sentence = n > 0 && strchr(".!?", p[n - 1]);
     if (s->fn && (now - s->last_us > 150000 || sentence)) {
-        s->fn(s->user, s->buf);
+        s->fn(s->user, s->buf, s->tokens, rate(s, now));
         s->flushed = s->len;
         s->last_us = now;
     }
@@ -56,7 +64,8 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
             int64_t load_us = story_time_us() - t0;
             stream_t s = {.fn = fn, .user = user};
             ok = llm_answer(&llm, hist, question, answer, cap, on_piece, &s, st);
-            if (fn) fn(user, answer);   // final, trimmed text
+            if (fn) fn(user, answer, st ? st->gen_tokens : s.tokens,
+                       st && st->gen_us ? st->gen_tokens / (st->gen_us / 1e6f) : rate(&s, story_time_us()));
             if (st) st->load_us = load_us;
             llm_unload(&llm);
         }
