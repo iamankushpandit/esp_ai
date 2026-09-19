@@ -47,6 +47,19 @@ namespace tlib::heap
      */
     void Deinitialize(void);
 
+    /**
+     * story: SRAM requests that did not fit and were served from PSRAM instead
+     * (slower, but no crash). Counted since the last reset.
+     */
+    uint32_t SramFallbacks(void);
+    uint64_t SramFallbackBytes(void);
+    void ResetSramFallbacks(void);
+
+    /**
+     * story: largest single allocation the given heap can serve right now.
+     */
+    size_t LargestFree(const Type heap_type);
+
     /*
      * Allocates size bytes on the heap of the given type. The returned buffer
      * pointer is guaranteed to obey 16-byte alignment.

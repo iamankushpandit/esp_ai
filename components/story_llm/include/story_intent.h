@@ -14,7 +14,7 @@ typedef enum {
     INTENT_BYE,        // short "bye / goodbye / that's all" -> end the session
 } story_intent_t;
 
-#define INTENT_IDENTITY_ANSWER "I am Braino AI, a little talking robot. I like to chat and tell stories."
+#define INTENT_IDENTITY_ANSWER "I am AI Braino, a little talking robot. I like to chat and tell stories."
 
 // Classify a (lower- or mixed-case) transcript. For INTENT_STORY, writes the
 // story topic (e.g. "a red robot") to `topic`.

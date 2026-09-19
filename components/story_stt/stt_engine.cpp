@@ -130,10 +130,23 @@ extern "C" bool stt_open(const char *model_path, story_arena_t *fast, story_aren
 {
     if (open_) { SLOGE(TAG, "already open"); return false; }
     const int64_t t0 = story_time_us();
-    void *sram = story_arena_alloc(fast, STT_SRAM_BYTES, 64, "stt.sram_heap");
+    // The SRAM heap takes whatever the fast arena has, up to STT_SRAM_BYTES.
+    // A smaller heap still works: overflowing tensors fall back to PSRAM.
+    size_t sram_bytes = story_arena_free_bytes(fast);
+    sram_bytes = sram_bytes > 128 ? (sram_bytes - 128) & ~(size_t)63 : 0;
+    if (sram_bytes > STT_SRAM_BYTES) sram_bytes = STT_SRAM_BYTES;
+    if (sram_bytes < 64 * 1024) {
+        SLOGE(TAG, "internal arena too small for STT: %u B free", (unsigned)story_arena_free_bytes(fast));
+        return false;
+    }
+    if (sram_bytes < STT_SRAM_BYTES)
+        SLOGW(TAG, "STT SRAM heap %u B (< %u): some weights will run from PSRAM",
+              (unsigned)sram_bytes, (unsigned)STT_SRAM_BYTES);
+    void *sram = story_arena_alloc(fast, sram_bytes, 64, "stt.sram_heap");
     void *psram = story_arena_alloc(bulk, STT_PSRAM_WORK_BYTES, 64, "stt.psram_heap");
     if (!sram || !psram) return false;
-    tlib::heap::Initialize((uint8_t *)sram, STT_SRAM_BYTES, (uint8_t *)psram, STT_PSRAM_WORK_BYTES);
+    tlib::heap::Initialize((uint8_t *)sram, sram_bytes, (uint8_t *)psram, STT_PSRAM_WORK_BYTES);
+    tlib::heap::ResetSramFallbacks();
 
     bulk_ = bulk;
     auto alloc = [](size_t n) -> void * { return story_arena_alloc(bulk_, n, 16, "stt.model"); };
@@ -225,6 +238,9 @@ extern "C" bool stt_transcribe(char *out, size_t cap, stt_stats_t *st)
           n, n * 360, (t1 - t0) / 1000, (unsigned long long)io.bytes, (long long)(io.us / 1000),
           (unsigned)tlib::heap::MaxUsage(tlib::heap::Type::SRAM),
           (unsigned)tlib::heap::MaxUsage(tlib::heap::Type::PSRAM));
+    if (tlib::heap::SramFallbacks())
+        SLOGW(TAG, "%u SRAM allocations (%llu B) fell back to PSRAM (internal arena too small)",
+              (unsigned)tlib::heap::SramFallbacks(), (unsigned long long)tlib::heap::SramFallbackBytes());
     return true;
 }
 

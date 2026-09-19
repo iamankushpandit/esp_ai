@@ -17,7 +17,7 @@ static const char *TAG = "hear";
 volatile int g_hear_listen_count;
 
 #define STT_MODEL_PATH BOARD_SD_MOUNT "/story/stt/model.bin"
-#define RING_SLOTS 12
+#define RING_SLOTS 24
 
 hear_params_t hear_default_params(void)
 {

@@ -5,6 +5,7 @@
 #include "story_mem.h"
 #include "ui.h"
 #include "esp_log.h"
+#include "esp_system.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h"
 #include "freertos/task.h"
@@ -39,12 +40,45 @@ int64_t screen_last_activity_us(void) { return s_activity; }
 void screen_note_activity(void) { s_activity = story_time_us(); }
 void touch_ui_set_busy(bool busy) { app_ui_busy(busy); }
 
+void touch_ui_post_ask(void)
+{
+    if (s_ask) xSemaphoreGive(s_ask);
+}
+
 bool touch_ui_wait_ask(uint32_t timeout_ms)
 {
     return xSemaphoreTake(s_ask, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }
 
-typedef enum { G_NONE, G_WAKE, G_BAR, G_PAGE_MAYBE, G_SCROLL, G_OTHER } gesture_t;
+typedef enum { G_NONE, G_WAKE, G_BAR, G_RESTART, G_PAGE_MAYBE, G_SCROLL, G_OTHER } gesture_t;
+
+// Restart button: the first tap arms it (orange + prompt), a second tap
+// within 3 s restarts; otherwise it disarms on its own.
+#define RESTART_CONFIRM_US 3000000
+static int64_t s_restart_armed;
+
+static void restart_tap(void)
+{
+    int64_t now = story_time_us();
+    if (s_restart_armed && now - s_restart_armed < RESTART_CONFIRM_US) {
+        app_ui_status("Restarting...", UI_RED);
+        ESP_LOGW(TAG, "restart requested from the UI");
+        vTaskDelay(pdMS_TO_TICKS(300));
+        esp_restart();
+    }
+    s_restart_armed = now;
+    app_ui_restart_state(BTN_ACTIVE);
+    app_ui_status("Tap restart again to confirm", UI_ACCENT);
+}
+
+static void restart_expire(void)
+{
+    if (s_restart_armed && story_time_us() - s_restart_armed >= RESTART_CONFIRM_US) {
+        s_restart_armed = 0;
+        app_ui_restart_state(app_ui_is_busy() ? BTN_BUSY : BTN_IDLE);
+        if (!app_ui_is_busy()) app_ui_status("Ready", UI_GREEN);
+    }
+}
 
 // Restore a pill after a press: Ask -> idle, page pills -> active if open.
 static void bar_release_look(int b)
@@ -101,6 +135,9 @@ static void touch_task(void *arg)
             if (!s_screen) {
                 screen_on();
                 g = G_WAKE;                                 // this touch only wakes
+            } else if (app_ui_restart_hit(x, y)) {
+                g = app_ui_is_busy() ? G_OTHER : G_RESTART;  // ignored during a session
+                if (g == G_RESTART) app_ui_restart_state(BTN_PRESSED);
             } else if ((bar = app_ui_bar_hit(x, y)) >= 0) {
                 g = app_ui_is_busy() ? G_OTHER : G_BAR;     // bar is disabled while busy
                 if (g == G_BAR) app_ui_bar_state((app_bar_t)bar, BTN_PRESSED);
@@ -123,12 +160,15 @@ static void touch_task(void *arg)
             if (g == G_BAR) {
                 bar_release_look(bar);
                 bar_action(bar);
+            } else if (g == G_RESTART) {
+                restart_tap();
             } else if (g == G_PAGE_MAYBE) {
                 page_tap(x0, y0);                           // a tap, not a drag
             }
             g = G_NONE;
         }
         down = t;
+        restart_expire();
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }

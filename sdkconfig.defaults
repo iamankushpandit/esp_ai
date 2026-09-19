@@ -39,3 +39,9 @@ CONFIG_FREERTOS_HZ=1000
 
 # ---- Radio off: everything is offline
 CONFIG_BT_ENABLED=n
+
+# ---- Wake word: esp-sr WakeNet9 "Hey Ivy" (stock model, until a custom "Braino")
+CONFIG_MODEL_IN_FLASH=y
+CONFIG_SR_WN_WN9_HEYIVY_TTS2=y
+CONFIG_SR_MN_EN_NONE=y
+CONFIG_SR_MN_CN_NONE=y

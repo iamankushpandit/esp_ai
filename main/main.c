@@ -9,6 +9,7 @@
 #include "pipeline.h"
 #include "touch_ui.h"
 #include "models.h"
+#include "wake.h"
 #include "driver/gpio.h"
 #include "console.h"
 #include "hwtest.h"
@@ -183,6 +184,11 @@ static void dispatch(const char *line)
             board_audio_set_volume(70);
         }
         printf("OK\n");
+    } else if (!strcmp(line, "restart")) {
+        printf("OK\n");
+        app_ui_status("Restarting...", UI_RED);
+        vTaskDelay(pdMS_TO_TICKS(200));
+        esp_restart();
     } else if (!strcmp(line, "go")) {
         pipeline_session(&s_hear, SESSION_MAX_TURNS);
         printf("OK\n");
@@ -240,12 +246,31 @@ void app_main(void)
 
     touch_ui_start();   // wake / Ask pill / scroll, also during sessions
 
+    // Wake word (WakeNet): listens whenever no session runs. It owns the mic
+    // while idle, so it is stopped around sessions and serial test commands.
+    bool wake_ok = wake_init() && wake_start(touch_ui_post_ask);
+    if (!wake_ok) app_ui_status("Wake word unavailable", UI_RED);
+
     const int64_t SCREEN_TIMEOUT_US = 30LL * 1000000;
     char line[200];
     while (1) {
         bool start = touch_ui_wait_ask(10);
         if (console_readline(line, sizeof line, 20)) {
-            dispatch(line);
+            if (!strncmp(line, "wakeplay ", 9)) {
+                // Test: play a WAV through the speaker while WakeNet keeps
+                // listening (a detection starts a session like "Hey Ivy" would).
+                s_play.delay_ms = 300;
+                int vol = 30;
+                if (sscanf(line + 9, "%95s %d", s_play.path, &vol) >= 1) {
+                    board_audio_set_volume(vol);
+                    xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
+                }
+                printf("OK\n");
+            } else {
+                wake_stop();
+                dispatch(line);
+                if (wake_ok) wake_start(touch_ui_post_ask);
+            }
             screen_note_activity();
         }
         if (gpio_get_level(BOARD_BOOT_BTN) == 0) {
@@ -253,10 +278,12 @@ void app_main(void)
             start = true;
         }
         if (start) {
+            wake_stop();                                   // frees the mic + memory
             screen_on();
             app_ui_busy(true);
             pipeline_session(&s_hear, SESSION_MAX_TURNS);   // ends with the screen off
             app_ui_busy(false);
+            if (wake_ok) wake_start(touch_ui_post_ask);
         }
         if (screen_is_on() && story_time_us() - screen_last_activity_us() > SCREEN_TIMEOUT_US) {
             screen_off();

@@ -9,9 +9,34 @@ static const char *TAG = "phase";
 
 story_arena_t g_fast, g_bulk;
 
+// Internal RAM the rest of the system needs after the arena is reserved:
+// LCD/I2S/SD DMA buffers, task stacks, WakeNet (~21 KB while idle), FATFS.
+#define INTERNAL_RESERVE_BYTES (90 * 1024)
+#define FAST_MIN_BYTES (128 * 1024)
+
 bool phase_arenas_init(size_t fast_bytes, size_t bulk_bytes)
 {
-    void *f = heap_caps_aligned_alloc(16, fast_bytes, MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT);
+    // Size the internal arena to what this build/boot actually has, instead
+    // of demanding a fixed size: static RAM use changes with components
+    // (e.g. esp-sr adds ~23 KB). Engines degrade gracefully when it's smaller.
+    const uint32_t caps = MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA | MALLOC_CAP_8BIT;
+    size_t largest = heap_caps_get_largest_free_block(caps);
+    size_t total = heap_caps_get_free_size(caps);
+    size_t cap = largest > 64 ? largest - 64 : 0;
+    if (total > INTERNAL_RESERVE_BYTES && total - INTERNAL_RESERVE_BYTES < cap) cap = total - INTERNAL_RESERVE_BYTES;
+    if (fast_bytes > cap) {
+        ESP_LOGW(TAG, "internal arena %u B instead of %u B (largest block %u, free %u, reserve %u)",
+                 (unsigned)(cap & ~(size_t)15), (unsigned)fast_bytes, (unsigned)largest, (unsigned)total,
+                 (unsigned)INTERNAL_RESERVE_BYTES);
+        fast_bytes = cap & ~(size_t)15;
+    }
+    if (fast_bytes < FAST_MIN_BYTES) {
+        ESP_LOGE(TAG, "ARENA RESERVE FAILED: only %u B of internal RAM usable (need >= %u)",
+                 (unsigned)fast_bytes, (unsigned)FAST_MIN_BYTES);
+        story_mem_log("arena-fail");
+        return false;
+    }
+    void *f = heap_caps_aligned_alloc(16, fast_bytes, caps);
     void *b = heap_caps_aligned_alloc(64, bulk_bytes, MALLOC_CAP_SPIRAM);
     if (!f || !b) {
         ESP_LOGE(TAG, "ARENA RESERVE FAILED: fast %u B -> %p, bulk %u B -> %p",

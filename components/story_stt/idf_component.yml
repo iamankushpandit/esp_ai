@@ -2,4 +2,4 @@
 dependencies:
   idf:
     version: '>=6.1.0'
-  espressif/esp-dsp: ^1.8.2
+  espressif/esp-dsp: '>=1.8.0,<2.0.0'   # esp-sr pins 1.8.0; we only use the radix-4 FFT

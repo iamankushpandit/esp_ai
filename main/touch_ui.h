@@ -10,6 +10,9 @@
 
 void touch_ui_start(void);
 
+// Posts an "ask" event (e.g. from the wake word), same as tapping Ask.
+void touch_ui_post_ask(void);
+
 // Waits up to timeout_ms for an Ask tap. Returns true if one happened.
 bool touch_ui_wait_ask(uint32_t timeout_ms);
 

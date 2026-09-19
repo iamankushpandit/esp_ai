@@ -87,14 +87,28 @@ namespace tlib::heap
 
         size_t LiveBlocks(void) const { return active_blocks_.size(); }
 
-        void *Allocate(size_t size)
+        size_t LargestFree(void) const
+        {
+            if (!buffer_ || active_blocks_.size() >= kHeapMaxBlocks) return 0;
+            size_t best = 0;
+            auto prev = buffer_;
+            for (const auto &b : active_blocks_)
+            {
+                if (static_cast<size_t>(b.Buffer() - prev) > best) best = b.Buffer() - prev;
+                prev = b.BufferAfter();
+            }
+            if (static_cast<size_t>((buffer_ + buffer_size_) - prev) > best) best = (buffer_ + buffer_size_) - prev;
+            return best & ~(kHeapAlignment - 1);
+        }
+
+        void *Allocate(size_t size, bool quiet = false)
         {
             size = utils::AlignSize(size);
 
             // Is requested size larger than heap?
             if (size > buffer_size_)
             {
-                std::println("Heap {} OOM while trying to allocate {} bytes", name_, size);
+                if (!quiet) std::println("Heap {} OOM while trying to allocate {} bytes", name_, size);
                 return nullptr;
             }
 
@@ -138,7 +152,7 @@ namespace tlib::heap
             }
 
             // Not enough memory on heap left
-            std::println("Heap {} OOM while trying to allocate {} bytes", name_, size);
+            if (!quiet) std::println("Heap {} OOM while trying to allocate {} bytes", name_, size);
             return nullptr;
         }
 
@@ -221,16 +235,33 @@ namespace tlib::heap
         }
     }
 
+    // story: an SRAM request that doesn't fit falls back to PSRAM (slower
+    // matmul operand, but never a crash). Fallbacks are counted for the logs.
+    static uint32_t sram_fallbacks_{0};
+    static uint64_t sram_fallback_bytes_{0};
+
     void *Allocate(const Type heap_type, size_t size)
     {
         switch (heap_type)
         {
         case Type::SRAM:
-            return sram_.Allocate(size);
+            if (void *p = sram_.Allocate(size, /*quiet=*/true)) return p;
+            sram_fallbacks_++;
+            sram_fallback_bytes_ += size;
+            return psram_.Allocate(size);
         case Type::PSRAM:
         default:
             return psram_.Allocate(size);
         }
+    }
+
+    uint32_t SramFallbacks(void) { return sram_fallbacks_; }
+    uint64_t SramFallbackBytes(void) { return sram_fallback_bytes_; }
+    void ResetSramFallbacks(void) { sram_fallbacks_ = 0; sram_fallback_bytes_ = 0; }
+
+    size_t LargestFree(const Type heap_type)
+    {
+        return heap_type == Type::SRAM ? sram_.LargestFree() : psram_.LargestFree();
     }
 
     void Free(void *buffer)

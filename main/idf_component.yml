@@ -1,0 +1,5 @@
+## esp-sr: WakeNet wake word (Espressif license, ESP chips only).
+dependencies:
+  idf:
+    version: '>=6.1.0'
+  espressif/esp-sr: '~2.5.4'

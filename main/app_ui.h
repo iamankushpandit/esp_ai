@@ -1,7 +1,7 @@
 // The single assistant screen (portrait 240x320), styled like a CLI session:
 //
 //   ╭────────────────────────────╮
-//   │ [brain] Braino AI          │
+//   │ [brain] AI Braino          │
 //   │   (c) iamankushpandit      │
 //   ╰────────────────────────────╯
 //   > what color is a banana       ▐ <- scrollable page area: the session
@@ -19,7 +19,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Boot welcome screen: the Braino AI logo in orange + "(c) iamankushpandit".
+// Boot welcome screen: the AI Braino logo in orange + "(c) iamankushpandit".
 void app_ui_splash(void);
 void app_ui_init(void);
 // Status line. Busy states (any color other than UI_GREEN/UI_GREY) get an
@@ -50,6 +50,7 @@ void app_ui_scroll_begin(void);
 void app_ui_scroll_drag(int dy_px);          // dy since begin; + = finger moved down
 // A tap (not a drag) in the page area: returns the tag of the tapped row
 // (on the /model page: the model index), or -1.
+
 int app_ui_convo_tap(int x, int y);
 
 // Bottom bar: three pills.
@@ -57,6 +58,10 @@ typedef enum { BAR_MODEL = 0, BAR_ASK, BAR_ABOUT, BAR_COUNT } app_bar_t;
 typedef enum { BTN_IDLE = 0, BTN_PRESSED, BTN_BUSY, BTN_ACTIVE } app_btn_state_t;
 int app_ui_bar_hit(int x, int y);            // -> app_bar_t or -1
 void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that pill, only on change
+
+// Restart button (circular arrow, top-right of the header box).
+bool app_ui_restart_hit(int x, int y);
+void app_ui_restart_state(app_btn_state_t st);   // IDLE, PRESSED, ACTIVE (armed), BUSY
 // Busy (session running): Ask shows busy, /model and /about are disabled and
 // the chat page is shown.
 void app_ui_busy(bool busy);
