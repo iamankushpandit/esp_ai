@@ -4,6 +4,7 @@
 #include "board_lcd_stream.h"
 #include "models.h"
 #include "builtin.h"
+#include "prefs.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
@@ -51,11 +52,11 @@ static void ui_lock_take(void)
 #define BAR_H 26
 #define BAR_TOUCH_PAD_Y 12
 static const struct { int x, w; const char *label; bool spark; } BAR[BAR_COUNT] = {
-    [BAR_MODEL] = {4, 70, "/model", false},
-    [BAR_ASK] = {80, 80, "Ask", true},
-    [BAR_ABOUT] = {166, 70, "/about", false},
+    [BAR_MODEL] = {4, 66, "/model", false},
+    [BAR_ASK] = {74, 72, "Ask", true},
+    [BAR_SETTINGS] = {150, 86, "/settings", false},
 };
-#define BAR_MAX_W 80
+#define BAR_MAX_W 86
 
 static ui_box_t s_status, s_convo, s_detail;
 static int s_spin;
@@ -160,7 +161,7 @@ static void build_chat(void)
         add_para("Hi, I'm Ivy AI.", -1);
         add_para(UI_G_ROWMARK "Say \"Hey Ivy\" or tap Ask.", -1);
         add_para("", -1);
-        add_prose(UI_G_ROWMARK "Answers come from a small AI and may be wrong. See /about.");
+        add_prose(UI_G_ROWMARK "Answers come from a small AI and may be wrong. See /settings > About.");
         return;
     }
     char *buf = s_text;
@@ -206,13 +207,6 @@ static void build_about(void)
     add_prose("A voice assistant that listens, thinks and speaks entirely on this device. "
               "Wi-Fi is used only to set the clock.");
     add_para("", -1);
-    char clk[40];
-    clock_short(clk, sizeof clk);
-    add_para(UI_G_DIAMOND " Wi-Fi & clock  >", TAG_WIFI_SETUP);
-    snprintf(line, sizeof line, UI_G_ROWMARK "  %.12s " UI_G_MIDDOT " %s",
-             net_has_credentials() ? net_ssid() : "not set up", clk);
-    add_para(line, TAG_WIFI_SETUP);
-    add_para("", -1);
     add_prose(UI_G_ROWMARK "Wakes: \"Hey Ivy\" (Espressif WakeNet)");
     add_prose(UI_G_ROWMARK "Hears: conformer STT (NVIDIA, lspr98; CC-BY-4.0)");
     snprintf(line, sizeof line, UI_G_ROWMARK "Thinks: %s (TinyTalk, therezor)",
@@ -225,6 +219,39 @@ static void build_about(void)
               "silly or inappropriate. The authors are not responsible for any answers or "
               "behaviour of this device. Children should use it with adult supervision.");
 }
+
+// ---------------------------------------------------------------- settings
+// Rows are 29 columns: label, then "[-] value [+]" for stepped values.
+static void build_settings(void)
+{
+    char line[96], clk[40];
+    const prefs_t *p = prefs();
+    clock_short(clk, sizeof clk);
+    add_para(UI_G_DIAMOND " Wi-Fi & clock  >", TAG_WIFI_SETUP);
+    snprintf(line, sizeof line, UI_G_ROWMARK "  %.12s " UI_G_MIDDOT " %s",
+             net_has_credentials() ? net_ssid() : "not set up", clk);
+    add_para(line, TAG_WIFI_SETUP);
+    add_para("", -1);
+    snprintf(line, sizeof line, "  Volume     [-] %3d%% [+]", p->volume);
+    add_para(line, TAG_SET_VOLUME);
+    add_para("", -1);
+    snprintf(line, sizeof line, "  Brightness [-] %3d%% [+]", p->brightness);
+    add_para(line, TAG_SET_BRIGHT);
+    add_para("", -1);
+    char scr[16];
+    if (p->screen_s == 0) snprintf(scr, sizeof scr, "never");
+    else if (p->screen_s < 60) snprintf(scr, sizeof scr, "%u s", p->screen_s);
+    else snprintf(scr, sizeof scr, "%u min", p->screen_s / 60);
+    snprintf(line, sizeof line, "  Screen off  %s  >", scr);
+    add_para(line, TAG_SET_SCREEN);
+    add_para("", -1);
+    snprintf(line, sizeof line, "  Wake word   \"Hey Ivy\" %s", p->wake ? "On" : "Off");
+    add_para(line, TAG_SET_WAKE);
+    add_para("", -1);
+    add_para(UI_G_DIAMOND " About Ivy AI  >", TAG_SET_ABOUT);
+}
+
+int app_ui_tap_col(int x) { return x / UI_FONT_W; }
 
 // ---------------------------------------------------------------- Wi-Fi page
 static void render_page(void);
@@ -448,6 +475,7 @@ static void render_page(void)
     switch (s_page) {
     case PAGE_CHAT: build_chat(); break;
     case PAGE_MODELS: build_models(); break;
+    case PAGE_SETTINGS: build_settings(); break;
     case PAGE_ABOUT: build_about(); break;
     case PAGE_WIFI: build_wifi(); break;
     default: break;
@@ -558,7 +586,7 @@ void app_ui_init(void)
     ui_box_mark(&s_convo, 0, '>', UI_DIM);
     ui_box_mark(&s_convo, 1, UI_G_BULLET[0], UI_ACCENT);
     ui_box_mark_row(&s_convo, 2, UI_G_ROWMARK[0], UI_DIM);
-    ui_box_mark(&s_convo, 3, UI_G_DIAMOND[0], UI_CYAN);   // built-in (non-AI) answers
+    ui_box_mark(&s_convo, 3, UI_G_DIAMOND[0], UI_INFO);   // built-in (non-AI) answers
     ui_box_init(&s_detail, 0, ROW_Y(16) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
     ui_box_init(&s_status, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
     ui_box_style(&s_status, 1, UI_ACCENT, 0);
@@ -572,12 +600,12 @@ void app_ui_status(const char *s, uint16_t color)
 {
     UI_LOCK();
     char buf[64];
-    bool idle = color == UI_GREEN || color == UI_GREY;
+    bool idle = color == UI_OK || color == UI_GREY;
     char lead = idle ? UI_G_MIDDOT[0] : (char)(UI_G_SPIN0 + (s_spin++ % UI_SPIN_FRAMES));
     snprintf(buf, sizeof buf, "%c %s", lead, s);
     char *dots = strstr(buf, "...");
     if (dots) { dots[0] = UI_G_ELLIPSIS[0]; memmove(dots + 1, dots + 3, strlen(dots + 3) + 1); }
-    uint16_t fg = idle ? UI_DIM : (color == UI_RED ? UI_RED : UI_ACCENT);
+    uint16_t fg = idle ? UI_DIM : (color == UI_ERR ? UI_ERR : UI_ACCENT);
     if (fg != s_status.fg) {
         // Color change: restyle, then let the single set() below repaint once.
         ui_box_style(&s_status, 1, fg, 0);
@@ -679,9 +707,9 @@ void app_ui_page(app_page_t p)
         s_follow = p == PAGE_CHAT;     // pages open at the top, chat at the bottom
         s_top = 0;
         render_page();
-        bool about = p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD;   // /about is their parent
+        bool settings = p == PAGE_SETTINGS || p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD;
         app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
-        app_ui_bar_state(BAR_ABOUT, about ? BTN_ACTIVE : BTN_IDLE);
+        app_ui_bar_state(BAR_SETTINGS, settings ? BTN_ACTIVE : BTN_IDLE);
     }
     UI_UNLOCK();
 }
@@ -909,7 +937,7 @@ void app_ui_restart_state(app_btn_state_t st)
 #define BAT_ICON_X (RST_X - 6 - BAT_ICON_W)
 #define BAT_TEXT_CH 4                                   // "100%"
 #define BAT_TEXT_X (BAT_ICON_X - 3 - BAT_TEXT_CH * UI_FONT_W)
-#define UI_BOLT RGB565(255, 214, 70)
+#define UI_BOLT UI_ACCENT                               // same pink as the battery and logo
 static int s_bat_pct = -2;                              // -2: never drawn, -1: unknown
 static bool s_bat_chg;
 
@@ -934,13 +962,13 @@ static void draw_battery(int pct)
     if (pct >= 0) snprintf(txt, sizeof txt, "%3d%%", pct);
     else snprintf(txt, sizeof txt, "  --");
     const bool low = pct >= 0 && pct <= 15 && !chg;
-    uint16_t lvl = pct < 0 ? RGB565(95, 95, 95) : chg ? UI_GREEN : low ? UI_RED : pct <= 35 ? UI_ACCENT : UI_GREEN;
-    ui_draw_row(BAT_TEXT_X, ROW_Y(1), BAT_TEXT_CH * UI_FONT_W, txt, low ? UI_RED : UI_DIM, UI_BLACK);
+    uint16_t lvl = pct < 0 ? RGB565(95, 95, 95) : low ? UI_ERR : UI_ACCENT;
+    ui_draw_row(BAT_TEXT_X, ROW_Y(1), BAT_TEXT_CH * UI_FONT_W, txt, low ? UI_ERR : UI_ACCENT, UI_BLACK);
 
     // Bolt (anti-aliased) then an 18x10 body with 1 px outline and clipped
     // corners, 2x4 nub on the right.
     const int H = UI_ROW_H, y0 = (UI_ROW_H - BAT_ICON_H) / 2;
-    const uint16_t edge = RGB565(170, 170, 170);
+    const uint16_t edge = pct < 0 ? RGB565(95, 95, 95) : low ? UI_ERR : UI_ACCENT;
     const int fill_w = pct <= 0 ? 0 : (14 * pct + 50) / 100 < 1 ? 1 : (14 * pct + 50) / 100;
     uint16_t *px = s_btn_px;
     for (int y = 0; y < H; y++)
@@ -1008,7 +1036,7 @@ void app_ui_busy(bool busy)
     if (busy && s_page != PAGE_CHAT) app_ui_page(PAGE_CHAT);
     app_ui_bar_state(BAR_ASK, busy ? BTN_BUSY : BTN_IDLE);
     app_ui_bar_state(BAR_MODEL, busy ? BTN_BUSY : BTN_IDLE);
-    app_ui_bar_state(BAR_ABOUT, busy ? BTN_BUSY : BTN_IDLE);
+    app_ui_bar_state(BAR_SETTINGS, busy ? BTN_BUSY : BTN_IDLE);
     app_ui_restart_state(busy ? BTN_BUSY : BTN_IDLE);
     UI_UNLOCK();
 }

@@ -5,6 +5,7 @@
 #include "battery.h"
 #include "builtin.h"
 #include "net.h"
+#include "prefs.h"
 #include "phase.h"
 #include "think.h"
 #include "speak.h"
@@ -43,33 +44,33 @@ static void cmd_ask(const char *q)
     if (builtin_answer(q, ans, sizeof ans, &src)) {
         app_ui_builtin(ans, src);
         printf("ANSWER (%s): %s\n", src, ans);
-        app_ui_status("Ready", UI_GREEN);
+        app_ui_status("Ready", UI_OK);
         return;
     }
-    app_ui_status("Thinking...", UI_YELLOW);
+    app_ui_status("Thinking...", UI_BUSY);
     if (think_answer(&hist, q, ans, sizeof ans, ui_stream, NULL, &st)) {
         printf("ANSWER: %s\n", ans);
-        app_ui_status("Ready", UI_GREEN);
+        app_ui_status("Ready", UI_OK);
     } else {
         app_ui_story("I can't answer that right now.");
-        app_ui_status("LLM error", UI_RED);
+        app_ui_status("LLM error", UI_ERR);
         printf("ANSWER ERROR\n");
     }
 }
 
-static void ui_status_cb(const char *s) { app_ui_status(s, UI_YELLOW); }
+static void ui_status_cb(const char *s) { app_ui_status(s, UI_BUSY); }
 
 // Set the clock over Wi-Fi/NTP, showing progress on the status line.
 static void clock_sync_ui(void)
 {
     char msg[48];
-    app_ui_status("Setting clock (Wi-Fi)...", UI_CYAN);
+    app_ui_status("Setting clock (Wi-Fi)...", UI_INFO);
     // Wi-Fi borrows the idle internal arena for the few seconds it's on.
     bool lent = phase_fast_lend("NET");
     bool ok = net_sync_time(msg, sizeof msg);
-    if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_RED);
+    if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_ERR);
     printf("TIMESYNC %s: %s\n", ok ? "ok" : "failed", msg);
-    app_ui_status(ok ? "Ready" : msg, ok ? UI_GREEN : UI_RED);
+    app_ui_status(ok ? "Ready" : msg, ok ? UI_OK : UI_ERR);
     app_ui_refresh_page();
 }
 
@@ -110,7 +111,7 @@ static void cmd_hear(const char *wav)
     case HEAR_TOO_SHORT: app_ui_you("I didn't catch that."); break;
     default: app_ui_you("Speech recognition error."); break;
     }
-    app_ui_status("Ready", UI_GREEN);
+    app_ui_status("Ready", UI_OK);
     printf("HEAR %s: \"%s\"\n", names[r], text);
 }
 
@@ -143,7 +144,7 @@ static void cmd_hearplay(const char *args)
     board_audio_set_volume(vol);
     xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
     cmd_hear(NULL);
-    board_audio_set_volume(70);
+    board_audio_set_volume(prefs()->volume);
 }
 
 // Test: a whole session with pre-recorded questions. Each WAV is played
@@ -183,10 +184,10 @@ static void dispatch(const char *line)
         printf("OK\n");
     } else if (!strncmp(line, "say ", 4)) {
         speak_stats_t st;
-        app_ui_status("Speaking...", UI_CYAN);
+        app_ui_status("Speaking...", UI_INFO);
         app_ui_story(line + 4);
         printf("SAY %s\n", speak_text(line + 4, NULL, &st) ? "done" : "FAILED");
-        app_ui_status("Ready", UI_GREEN);
+        app_ui_status("Ready", UI_OK);
         printf("OK\n");
     } else if (!strcmp(line, "hear")) {
         cmd_hear(NULL);
@@ -226,7 +227,7 @@ static void dispatch(const char *line)
         if (s_sess.n > 0) {
             xTaskCreatePinnedToCore(session_player_task, "sessplay", 4096, &s_sess, 5, NULL, 1);
             pipeline_session(&s_hear, SESSION_MAX_TURNS);
-            board_audio_set_volume(70);
+            board_audio_set_volume(prefs()->volume);
         }
         printf("OK\n");
     } else if (!strncmp(line, "wifi ", 5)) {
@@ -270,7 +271,7 @@ static void dispatch(const char *line)
         printf("OK\n");
     } else if (!strcmp(line, "restart")) {
         printf("OK\n");
-        app_ui_status("Restarting...", UI_RED);
+        app_ui_status("Restarting...", UI_ERR);
         vTaskDelay(pdMS_TO_TICKS(200));
         esp_restart();
     } else if (!strcmp(line, "go")) {
@@ -285,7 +286,7 @@ static void dispatch(const char *line)
             xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
             vTaskDelay(pdMS_TO_TICKS(50));
             pipeline_turn(&s_hear, NULL, 1, 2);   // single turn, no sign-off
-            board_audio_set_volume(70);
+            board_audio_set_volume(prefs()->volume);
         }
         printf("OK\n");
     } else {
@@ -298,6 +299,7 @@ void app_main(void)
     // Reserve the phase arenas before any driver fragments internal RAM.
     story_mem_log("boot");
     net_warmup();   // Wi-Fi's permanent first-start allocations go below the arena
+    prefs_load();   // volume, brightness, screen timeout, wake word (NVS is up now)
     bool arenas = phase_arenas_init(FAST_ARENA_BYTES, BULK_ARENA_BYTES);
     console_init();
 
@@ -308,6 +310,7 @@ void app_main(void)
     screen_on();
     esp_err_t tp = board_touch_init();
     esp_err_t au = board_audio_init();
+    board_audio_set_volume(prefs()->volume);
     esp_err_t sd = board_sd_mount(false);
     if (sd == ESP_OK) models_scan();    // selectable LLMs on the SD card + saved choice
     net_init();                         // Wi-Fi credentials + time zone (clock via NTP)
@@ -318,9 +321,9 @@ void app_main(void)
     if (shown < SPLASH_MIN_US) vTaskDelay(pdMS_TO_TICKS((SPLASH_MIN_US - shown) / 1000));
 
     app_ui_init();
-    if (!arenas) app_ui_status("MEMORY ERROR", UI_RED);
-    else if (sd != ESP_OK) app_ui_status("SD card error", UI_RED);
-    else app_ui_status("Ready", UI_GREEN);
+    if (!arenas) app_ui_status("MEMORY ERROR", UI_ERR);
+    else if (sd != ESP_OK) app_ui_status("SD card error", UI_ERR);
+    else app_ui_status("Ready", UI_OK);
     ESP_LOGI(TAG, "READY lcd=%s touch=%s audio=%s sd=%s arenas=%d", esp_err_to_name(lcd),
              esp_err_to_name(tp), esp_err_to_name(au), esp_err_to_name(sd), arenas);
 
@@ -334,10 +337,9 @@ void app_main(void)
 
     // Wake word (WakeNet): listens whenever no session runs. It owns the mic
     // while idle, so it is stopped around sessions and serial test commands.
-    bool wake_ok = wake_init() && wake_start(touch_ui_post_ask);
-    if (!wake_ok) app_ui_status("Wake word unavailable", UI_RED);
+    bool wake_ok = wake_init() && (!prefs()->wake || wake_start(touch_ui_post_ask));
+    if (!wake_ok) app_ui_status("Wake word unavailable", UI_ERR);
 
-    const int64_t SCREEN_TIMEOUT_US = 30LL * 1000000;
     char line[200];
     while (1) {
         bool start = touch_ui_wait_ask(10);
@@ -355,7 +357,7 @@ void app_main(void)
             } else {
                 wake_stop();
                 dispatch(line);
-                if (wake_ok) wake_start(touch_ui_post_ask);
+                if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
             }
             screen_note_activity();
         }
@@ -369,25 +371,31 @@ void app_main(void)
             app_ui_busy(true);
             pipeline_session(&s_hear, SESSION_MAX_TURNS);   // ends with the screen off
             app_ui_busy(false);
-            if (wake_ok) wake_start(touch_ui_post_ask);
+            if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
         }
         if (!start && !app_ui_is_busy() && net_take_scan_request()) {
             static net_ap_t aps[12];
             wake_stop();
             bool lent = phase_fast_lend("NET");
             int n = net_scan(aps, 12);
-            if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_RED);
+            if (lent && !phase_fast_reclaim()) app_ui_status("MEMORY ERROR", UI_ERR);
             app_ui_wifi_results(aps, n);
-            if (wake_ok) wake_start(touch_ui_post_ask);
+            if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
         }
         if (!start && !app_ui_is_busy() && net_sync_due()) {
             // Clock: at boot, then once per hour. The radio is on only for
             // this; WakeNet pauses so Wi-Fi gets its internal RAM.
             wake_stop();
             clock_sync_ui();
-            if (wake_ok) wake_start(touch_ui_post_ask);
+            if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
         }
-        if (screen_is_on() && story_time_us() - screen_last_activity_us() > SCREEN_TIMEOUT_US) {
+        if (wake_ok && !app_ui_is_busy() && prefs()->wake != wake_running()) {
+            // Settings toggled the wake word.
+            if (prefs()->wake) wake_start(touch_ui_post_ask);
+            else wake_stop();
+        }
+        const int64_t screen_us = (int64_t)prefs()->screen_s * 1000000;   // 0 = never
+        if (screen_us && screen_is_on() && story_time_us() - screen_last_activity_us() > screen_us) {
             screen_off();
         }
     }

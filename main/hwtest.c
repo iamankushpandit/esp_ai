@@ -175,7 +175,7 @@ static void touch_test(int secs)
         if (board_touch_read(&x, &y)) {
             if (x != lx || y != ly) {
                 printf("TOUCH %d %d\n", x, y);
-                board_lcd_fill(x - 2, y - 2, 5, 5, UI_YELLOW);
+                board_lcd_fill(x - 2, y - 2, 5, 5, UI_BUSY);
                 lx = x; ly = y;
             }
         }

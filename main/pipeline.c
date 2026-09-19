@@ -17,7 +17,7 @@
 
 static const char *TAG = "turn";
 
-static void status_cb(const char *s) { app_ui_status(s, UI_YELLOW); }
+static void status_cb(const char *s) { app_ui_status(s, UI_BUSY); }
 static void stream_cb(void *u, const char *t, int tok, float rate) { app_ui_llm_progress(t, tok, rate); }
 
 static void speak_error(const char *msg)
@@ -54,7 +54,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
         goto done;
     }
     if (hr != HEAR_OK || question[0] == 0) {
-        app_ui_status(hr == HEAR_ERROR ? "STT error" : "Didn't catch that", UI_RED);
+        app_ui_status(hr == HEAR_ERROR ? "STT error" : "Didn't catch that", UI_ERR);
         app_ui_you(question[0] ? question : "...");
         speak_error("I didn't catch that.");
         res = hr == HEAR_ERROR ? PIPE_ERROR : PIPE_NOT_UNDERSTOOD;
@@ -79,9 +79,9 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
 
     // ---- THINK
     int64_t t_think0 = story_time_us();
-    if (!builtin) app_ui_status("Thinking...", UI_YELLOW);
+    if (!builtin) app_ui_status("Thinking...", UI_BUSY);
     if (!builtin && (!think_answer(hist, question, answer, sizeof answer, stream_cb, NULL, &ls) || !answer[0])) {
-        app_ui_status("LLM error", UI_RED);
+        app_ui_status("LLM error", UI_ERR);
         speak_error("I can't answer that right now.");
         res = PIPE_ERROR;
         goto done;
@@ -99,7 +99,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
     app_ui_status("Speaking...", UI_ACCENT);   // detail line keeps the tok/s
     int64_t t_speak0 = story_time_us();
     if (!speak_text(answer, NULL, &ss)) {
-        app_ui_status("TTS error (answer shown)", UI_RED);   // answer stays on screen
+        app_ui_status("TTS error (answer shown)", UI_ERR);   // answer stays on screen
         res = PIPE_ERROR;
     }
     int64_t t_speak = story_time_us() - t_speak0;
@@ -152,6 +152,6 @@ void pipeline_session(const hear_params_t *hp, int max_turns)
     app_ui_status("Session ended", UI_GREY);
     screen_off();                       // screen off; a tap wakes it
     app_ui_clear_turn();                // cleared while dark, so the next session starts clean
-    app_ui_status("Ready", UI_GREEN);
+    app_ui_status("Ready", UI_OK);
     story_mem_log("session-end");
 }

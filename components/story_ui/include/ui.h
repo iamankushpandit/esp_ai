@@ -20,10 +20,12 @@ extern "C" {
 #define UI_WHITE RGB565(255, 255, 255)
 #define UI_GREY RGB565(140, 140, 140)
 #define UI_DIM RGB565(110, 110, 110)
-#define UI_CYAN RGB565(80, 220, 255)
-#define UI_YELLOW RGB565(255, 220, 60)
-#define UI_GREEN RGB565(90, 230, 120)
-#define UI_RED RGB565(255, 80, 80)
+// Palette: shades of pink, white and black only. Semantic names; the values
+// must stay distinct (the status line compares them to pick idle vs busy).
+#define UI_INFO RGB565(255, 238, 242)    // near-white pink: built-in answers, info
+#define UI_BUSY RGB565(236, 160, 180)    // medium pink: thinking / listening
+#define UI_OK RGB565(252, 226, 230)      // pale pink: ready / done
+#define UI_ERR RGB565(255, 92, 141)      // hot pink: errors, low battery
 #define UI_ACCENT RGB565(244, 194, 194)  // baby pink accent (#F4C2C2)
 
 // Extra glyphs (byte codes, see tools/gen_font.py). Use as separate string

@@ -7,7 +7,7 @@ The SVG is rasterised by a headless Chrome/Edge at 4x, composited on black
   logo_full : leaf + "Ivy AI" wordmark, for the boot welcome screen
   logo_icon : just the leaf symbol, for the header
 
-The wordmark's dark "Ivy" is recoloured light so it reads on black.
+Recoloured to the UI palette (pink, white, black); see PINK below.
 """
 import os
 import re
@@ -21,7 +21,6 @@ from PIL import Image
 FULL_H = 230        # welcome screen logo height (px)
 ICON_H = 28         # header icon height (px): exactly two text rows
 SCALE = 4           # render oversampling
-IVY_ON_BLACK = "#f3e6de"
 
 BROWSERS = [
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
@@ -37,8 +36,28 @@ def browser():
     sys.exit("gen_logo: need Chrome or Edge to rasterise the SVG")
 
 
+# The device UI uses only pink, white and black; the logo uses the same baby
+# pink (#F4C2C2) as the accent, battery and charging bolt. The leaf is a
+# narrow gradient around it, and the circuit is black so it reads on the
+# light leaf. "Ivy" is white on the black screen, "AI" the exact accent.
+PINK = {
+    "#f2aa83": "#f8d2d2",   # leaf gradient: light
+    "#df7e5e": "#f4c2c2",   #                mid (= UI accent)
+    "#bd563d": "#e6abb0",   #                dark
+    "#a94632": "#c98b94",   # stem
+    "#d97757": "#f4c2c2",   # "AI"
+    "#b5523c": "#f4c2c2",   # TM
+    "#fff0e7": "#000000",   # circuit lines
+    "#fffaf6": "#000000",
+}
+IVY_ON_BLACK = "#ffffff"
+
+
 def variant(svg, symbol_only):
     s = svg.replace("fill:#3b2520", "fill:" + IVY_ON_BLACK)
+    for old, new in PINK.items():
+        s = s.replace(old, new)
+    s = re.sub(r'fill="#ffffff"(\s+id="g48")', r'fill="#000000"\1', s)   # circuit nodes
     if symbol_only:
         s = re.sub(r'<g\s+id="wordmark".*(?=</svg>)', "", s, flags=re.S)   # wordmark is the last group
     w, h = 520 * SCALE, 620 * SCALE

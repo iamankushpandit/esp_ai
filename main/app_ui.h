@@ -6,12 +6,12 @@
 //   ╰────────────────────────────╯
 //   > what color is a banana       ▐ <- scrollable page area: the session
 //   ● The banana is yellow.        ▐    transcript (chat), the /model list,
-//                                  ▐    or /about. Thin scrollbar on the right.
+//                                  ▐    or /settings. Thin scrollbar on the right.
 //   > how many legs does a dog have
 //   ● A dog has four legs.
 //   ⎿  8 tok · 6.2 tok/s              <- dim detail line
 //   ✻ Thinking…                      <- status / spinner
-//   ( /model ) (  ✻ Ask  ) ( /about ) <- bottom bar (tap)
+//   ( /model ) ( ✻ Ask ) ( /settings ) <- bottom bar (tap)
 //
 // Every region is a dirty-row box: only rows whose text changed are redrawn,
 // in place (no clears). Scrolling rewrites the rows that shifted.
@@ -22,7 +22,7 @@
 // Boot welcome screen: the Ivy AI logo + "(c) iamankushpandit".
 void app_ui_splash(void);
 void app_ui_init(void);
-// Status line. Busy states (any color other than UI_GREEN/UI_GREY) get an
+// Status line. Busy states (any color other than UI_OK/UI_GREY) get an
 // advancing spinner glyph; "..." is shown as an ellipsis.
 void app_ui_status(const char *s, uint16_t color);
 // Starts a new turn in the transcript with the recognized question.
@@ -30,7 +30,7 @@ void app_ui_you(const char *text);
 // Sets (or streams) the answer of the latest turn.
 void app_ui_story(const char *text);
 // Answer produced by plain C code (clock, name), not the model: drawn with a
-// cyan diamond instead of the pink bullet, detail line "<source> . no AI".
+// white diamond instead of the pink bullet, detail line "<source> . no AI".
 void app_ui_builtin(const char *text, const char *source);
 void app_ui_detail(const char *text);
 // Clears the whole transcript (new session).
@@ -41,16 +41,27 @@ void app_ui_llm_progress(const char *text, int tokens, float tok_per_s);
 float app_ui_last_tok_rate(void);
 
 // Pages shown in the scrollable area.
-typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_ABOUT, PAGE_WIFI, PAGE_KEYBOARD } app_page_t;
+typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_SETTINGS, PAGE_ABOUT, PAGE_WIFI, PAGE_KEYBOARD } app_page_t;
 void app_ui_page(app_page_t p);            // switch page (re-renders the area)
 app_page_t app_ui_page_get(void);
 void app_ui_refresh_page(void);            // e.g. after the model list changed
 
-// Row tags on the /about and Wi-Fi pages (network rows use their index 0..).
-#define TAG_WIFI_SETUP 100                 // /about: "Wi-Fi & clock" row
+// Row tags on /settings and its sub-pages (network rows use their index 0..).
+#define TAG_WIFI_SETUP 100                 // /settings: "Wi-Fi & clock" row
 #define TAG_WIFI_SYNC 101
 #define TAG_WIFI_FORGET 102
 #define TAG_WIFI_RESCAN 103
+#define TAG_SET_VOLUME 110                 // [-] / [+] by tap column, see app_ui_tap_col()
+#define TAG_SET_BRIGHT 111
+#define TAG_SET_SCREEN 112                 // tap cycles the screen-off time
+#define TAG_SET_WAKE 113                   // tap toggles the wake word
+#define TAG_SET_ABOUT 114
+// Settings rows "Label      [-] 70% [+]": columns 13..18 step down, 20.. step
+// up; a tap on the label does nothing.
+#define SET_MINUS_COL_MIN 13
+#define SET_MINUS_COL_MAX 18
+#define SET_PLUS_COL_MIN 20
+int app_ui_tap_col(int x);                 // text column under x
 
 // Wi-Fi page: scan state and results (copied).
 #include "net.h"
@@ -77,7 +88,7 @@ void app_ui_scroll_drag(int dy_px);          // dy since begin; + = finger moved
 int app_ui_convo_tap(int x, int y);
 
 // Bottom bar: three pills.
-typedef enum { BAR_MODEL = 0, BAR_ASK, BAR_ABOUT, BAR_COUNT } app_bar_t;
+typedef enum { BAR_MODEL = 0, BAR_ASK, BAR_SETTINGS, BAR_COUNT } app_bar_t;
 typedef enum { BTN_IDLE = 0, BTN_PRESSED, BTN_BUSY, BTN_ACTIVE } app_btn_state_t;
 int app_ui_bar_hit(int x, int y);            // -> app_bar_t or -1
 void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that pill, only on change
@@ -89,7 +100,7 @@ void app_ui_restart_state(app_btn_state_t st);   // IDLE, PRESSED, ACTIVE (armed
 // Battery percentage in the header (0..100; -1 = unknown) with a bolt while
 // charging. Redraws only on change.
 void app_ui_battery(int pct, bool charging);
-// Busy (session running): Ask shows busy, /model and /about are disabled and
+// Busy (session running): Ask shows busy, /model and /settings are disabled and
 // the chat page is shown.
 void app_ui_busy(bool busy);
 bool app_ui_is_busy(void);

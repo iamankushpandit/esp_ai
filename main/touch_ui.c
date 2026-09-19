@@ -4,6 +4,7 @@
 #include "board.h"
 #include "models.h"
 #include "net.h"
+#include "prefs.h"
 #include "story_mem.h"
 #include "ui.h"
 #include "esp_log.h"
@@ -18,7 +19,6 @@ static const char *TAG = "touch";
 
 #define POLL_MS 20
 #define DRAG_SLOP_PX 8          // movement before a touch counts as a scroll
-#define BACKLIGHT_PCT 80
 
 static SemaphoreHandle_t s_ask;
 static volatile bool s_screen = true;
@@ -26,7 +26,7 @@ static volatile int64_t s_activity;
 
 void screen_on(void)
 {
-    board_backlight(BACKLIGHT_PCT);
+    board_backlight(prefs()->brightness);
     s_screen = true;
     s_activity = story_time_us();
 }
@@ -63,7 +63,7 @@ static void restart_tap(void)
 {
     int64_t now = story_time_us();
     if (s_restart_armed && now - s_restart_armed < RESTART_CONFIRM_US) {
-        app_ui_status("Restarting...", UI_RED);
+        app_ui_status("Restarting...", UI_ERR);
         ESP_LOGW(TAG, "restart requested from the UI");
         vTaskDelay(pdMS_TO_TICKS(300));
         esp_restart();
@@ -78,7 +78,7 @@ static void restart_expire(void)
     if (s_restart_armed && story_time_us() - s_restart_armed >= RESTART_CONFIRM_US) {
         s_restart_armed = 0;
         app_ui_restart_state(app_ui_is_busy() ? BTN_BUSY : BTN_IDLE);
-        if (!app_ui_is_busy()) app_ui_status("Ready", UI_GREEN);
+        if (!app_ui_is_busy()) app_ui_status("Ready", UI_OK);
     }
 }
 
@@ -87,8 +87,7 @@ static void bar_release_look(int b)
 {
     if (app_ui_is_busy()) { app_ui_bar_state((app_bar_t)b, BTN_BUSY); return; }
     app_page_t p = app_ui_page_get();
-    bool active = (b == BAR_MODEL && p == PAGE_MODELS) ||
-                  (b == BAR_ABOUT && (p == PAGE_ABOUT || p == PAGE_WIFI || p == PAGE_KEYBOARD));
+    bool active = (b == BAR_MODEL && p == PAGE_MODELS) || (b == BAR_SETTINGS && p >= PAGE_SETTINGS);
     app_ui_bar_state((app_bar_t)b, active ? BTN_ACTIVE : BTN_IDLE);
 }
 
@@ -103,10 +102,10 @@ static void bar_action(int b)
         if (app_ui_page_get() != PAGE_MODELS) models_scan();   // pick up newly copied models
         app_ui_page(app_ui_page_get() == PAGE_MODELS ? PAGE_CHAT : PAGE_MODELS);
         break;
-    case BAR_ABOUT: {
-        // /about closes itself; from Wi-Fi or the keyboard it goes back one level.
+    case BAR_SETTINGS: {
+        // /settings closes itself; from a sub-page it goes back one level.
         app_page_t p = app_ui_page_get();
-        app_ui_page(p == PAGE_ABOUT ? PAGE_CHAT : p == PAGE_KEYBOARD ? PAGE_WIFI : PAGE_ABOUT);
+        app_ui_page(p == PAGE_SETTINGS ? PAGE_CHAT : p == PAGE_KEYBOARD ? PAGE_WIFI : PAGE_SETTINGS);
         break;
     }
     }
@@ -116,11 +115,11 @@ static void join(const char *ssid, const char *pass)
 {
     char st[48];
     if (!net_set_credentials(ssid, pass)) {
-        app_ui_status("Network name or password too long", UI_RED);
+        app_ui_status("Network name or password too long", UI_ERR);
         return;
     }
     snprintf(st, sizeof st, "Joining %.30s", ssid);
-    app_ui_status(st, UI_CYAN);
+    app_ui_status(st, UI_INFO);
     net_request_sync();                  // the main task connects and sets the clock
     app_ui_page(PAGE_WIFI);
 }
@@ -134,15 +133,49 @@ static void wifi_tap(int tag)
         else app_ui_kb_open(ap->ssid);
     } else if (tag == TAG_WIFI_SYNC) {
         net_request_sync();
-        app_ui_status("Setting clock" UI_G_ELLIPSIS, UI_CYAN);
+        app_ui_status("Setting clock" UI_G_ELLIPSIS, UI_INFO);
     } else if (tag == TAG_WIFI_FORGET) {
         net_clear_credentials();
-        app_ui_status("Wi-Fi forgotten", UI_GREEN);
+        app_ui_status("Wi-Fi forgotten", UI_OK);
         app_ui_refresh_page();
     } else if (tag == TAG_WIFI_RESCAN) {
         net_request_scan();
         app_ui_wifi_scanning();
     }
+}
+
+static void settings_tap(int tag, int col)
+{
+    int dir = col >= SET_PLUS_COL_MIN ? 1 : (col >= SET_MINUS_COL_MIN && col <= SET_MINUS_COL_MAX) ? -1 : 0;
+    switch (tag) {
+    case TAG_WIFI_SETUP:
+        app_ui_page(PAGE_WIFI);
+        if (!app_ui_wifi_scanned()) {       // first visit: look for networks
+            net_request_scan();
+            app_ui_wifi_scanning();
+        }
+        return;
+    case TAG_SET_VOLUME:
+        if (!dir) return;
+        board_audio_set_volume(prefs_step_volume(dir));
+        break;
+    case TAG_SET_BRIGHT:
+        if (!dir) return;
+        board_backlight(prefs_step_brightness(dir));
+        break;
+    case TAG_SET_SCREEN:
+        prefs_cycle_screen();
+        break;
+    case TAG_SET_WAKE:
+        prefs_toggle_wake();                // the main loop starts/stops WakeNet
+        break;
+    case TAG_SET_ABOUT:
+        app_ui_page(PAGE_ABOUT);
+        return;
+    default:
+        return;
+    }
+    app_ui_refresh_page();                  // dirty rows only: just the changed value
 }
 
 static void page_tap(int x, int y)
@@ -153,12 +186,8 @@ static void page_tap(int x, int y)
         return;
     }
     int tag = app_ui_convo_tap(x, y);
-    if (page == PAGE_ABOUT && tag == TAG_WIFI_SETUP) {
-        app_ui_page(PAGE_WIFI);
-        if (!app_ui_wifi_scanned()) {       // first visit: look for networks
-            net_request_scan();
-            app_ui_wifi_scanning();
-        }
+    if (page == PAGE_SETTINGS) {
+        settings_tap(tag, app_ui_tap_col(x));
         return;
     }
     if (page == PAGE_WIFI) {
@@ -169,7 +198,7 @@ static void page_tap(int x, int y)
         if (models_select(tag)) {
             char st[48];
             snprintf(st, sizeof st, "Model: %s", models_get(tag)->name);
-            app_ui_status(st, UI_GREEN);
+            app_ui_status(st, UI_OK);
             app_ui_refresh_page();
         }
     }
@@ -228,7 +257,7 @@ static void touch_task(void *arg)
         if (battery_poll(app_ui_is_busy())) {               // charger connected: wake up
             if (!s_screen) screen_on();
             else s_activity = story_time_us();
-            if (!app_ui_is_busy()) app_ui_status("Charging", UI_GREEN);
+            if (!app_ui_is_busy()) app_ui_status("Charging", UI_OK);
         }
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }

@@ -30,6 +30,9 @@ static bool s_wifi_set = true;
 bool net_has_credentials(void) { return s_wifi_set; }
 const char *net_ssid(void) { return "HomeNet"; }
 const char *net_last_msg(void) { return "Clock set"; }
+#include "prefs.h"
+static prefs_t s_prefs = {.volume = 70, .brightness = 80, .screen_s = 30, .wake = true};
+prefs_t *prefs(void) { return &s_prefs; }
 
 static uint16_t fb[BOARD_LCD_H][BOARD_LCD_W];
 static uint16_t dma[BOARD_LCD_STREAM_PX];
@@ -94,7 +97,7 @@ int main(int argc, char **argv)
     s_dir = argc > 1 ? argv[1] : ".";
     STEP("splash", app_ui_splash());
     dump();
-    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN); app_ui_battery(87, false));
+    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_OK); app_ui_battery(87, false));
     dump();
 
     STEP("restart armed", app_ui_restart_state(BTN_ACTIVE));
@@ -106,7 +109,10 @@ int main(int argc, char **argv)
     STEP("/model page", app_ui_page(PAGE_MODELS));
     dump();
     STEP("select model 0", models_select(0); app_ui_refresh_page());
-    STEP("/about page", app_ui_page(PAGE_ABOUT));
+    STEP("/settings page", app_ui_page(PAGE_SETTINGS));
+    dump();
+    STEP("volume +", s_prefs.volume = 80; app_ui_refresh_page());
+    STEP("about page", app_ui_page(PAGE_ABOUT));
     dump();
     {
         static const net_ap_t aps[] = {{"HomeNet", -52, false}, {"Neighbors 5G", -68, false},
