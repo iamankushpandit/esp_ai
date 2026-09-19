@@ -266,6 +266,9 @@ void app_ui_splash(void)
 // ╰──────────────────────────╯
 #define HDR_TEXT_COL 5                   // text starts right of the icon
 
+static int s_bat_pct;
+static void draw_battery(int pct);
+
 static void header_row(int r, const char *text, uint16_t text_fg)
 {
     char row[COLS + 1];
@@ -298,6 +301,7 @@ static void draw_header(void)
     blit_rgb(logo_icon, LOGO_ICON_W, LOGO_ICON_H,
              UI_FONT_W + ((HDR_TEXT_COL - 1) * UI_FONT_W - LOGO_ICON_W) / 2,   // centered in cols 1..4
              ROW_Y(1));
+    if (s_bat_pct != -2) draw_battery(s_bat_pct);
 
     row[0] = UI_G_BL[0];
     memset(row + 1, UI_G_H[0], COLS - 2);
@@ -644,6 +648,62 @@ void app_ui_restart_state(app_btn_state_t st)
     for (int i = 0; i < RST_S * RST_S; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
     board_lcd_stream_push(buf, RST_S * RST_S);
     board_lcd_stream_end();
+    UI_UNLOCK();
+}
+
+// ---------------------------------------------------------------- battery
+// "87% [|||| ]" on the title row, right-aligned just left of the restart button.
+#define BAT_ICON_W 20
+#define BAT_ICON_H 10
+#define BAT_ICON_X (RST_X - 6 - BAT_ICON_W)
+#define BAT_TEXT_CH 4                                   // "100%"
+#define BAT_TEXT_X (BAT_ICON_X - 3 - BAT_TEXT_CH * UI_FONT_W)
+static int s_bat_pct = -2;                              // -2: never drawn, -1: unknown
+
+static void draw_battery(int pct)
+{
+    char txt[16];
+    if (pct >= 0) snprintf(txt, sizeof txt, "%3d%%", pct);
+    else snprintf(txt, sizeof txt, "  --");
+    uint16_t lvl = pct < 0 ? RGB565(95, 95, 95) : pct <= 15 ? UI_RED : pct <= 35 ? UI_ACCENT : UI_GREEN;
+    ui_draw_row(BAT_TEXT_X, ROW_Y(1), BAT_TEXT_CH * UI_FONT_W, txt, pct <= 15 && pct >= 0 ? UI_RED : UI_DIM,
+                UI_BLACK);
+
+    // Icon: 18x10 body with 1 px outline and clipped corners, 2x4 nub on the right.
+    const int H = UI_ROW_H, y0 = (UI_ROW_H - BAT_ICON_H) / 2;
+    const uint16_t edge = RGB565(170, 170, 170);
+    const int fill_w = pct <= 0 ? 0 : (14 * pct + 50) / 100 < 1 ? 1 : (14 * pct + 50) / 100;
+    uint16_t *px = s_btn_px;
+    for (int y = 0; y < H; y++)
+        for (int x = 0; x < BAT_ICON_W; x++) {
+            int by = y - y0;
+            uint16_t c = UI_BLACK;
+            bool in_body = by >= 0 && by < BAT_ICON_H && x < 18;
+            bool corner = (x == 0 || x == 17) && (by == 0 || by == BAT_ICON_H - 1);
+            if (in_body && !corner) {
+                bool border = x == 0 || x == 17 || by == 0 || by == BAT_ICON_H - 1;
+                if (border) c = edge;
+                else if (x >= 2 && x < 2 + fill_w && by >= 2 && by < BAT_ICON_H - 2) c = lvl;
+            } else if (x >= 18 && by >= 3 && by < BAT_ICON_H - 3) {
+                c = edge;                                // nub
+            }
+            px[y * BAT_ICON_W + x] = c;
+        }
+    board_lcd_window(BAT_ICON_X, ROW_Y(1), BAT_ICON_W, H);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < BAT_ICON_W * H; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, (size_t)BAT_ICON_W * H);
+    board_lcd_stream_end();
+}
+
+void app_ui_battery(int pct)
+{
+    if (pct > 100) pct = 100;
+    UI_LOCK();
+    if (pct != s_bat_pct) {                              // dirty-region: only on change
+        s_bat_pct = pct;
+        if (s_btn_px) draw_battery(pct);                 // before init: drawn with the header
+    }
     UI_UNLOCK();
 }
 

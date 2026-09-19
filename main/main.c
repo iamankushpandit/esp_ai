@@ -2,6 +2,7 @@
 #include "board.h"
 #include "ui.h"
 #include "app_ui.h"
+#include "battery.h"
 #include "phase.h"
 #include "think.h"
 #include "speak.h"
@@ -183,6 +184,10 @@ static void dispatch(const char *line)
             pipeline_session(&s_hear, SESSION_MAX_TURNS);
             board_audio_set_volume(70);
         }
+        printf("OK\n");
+    } else if (!strcmp(line, "bat")) {
+        int mv = board_battery_mv();
+        printf("BAT %d mV -> %d %%\n", mv, battery_pct_from_mv(mv));
         printf("OK\n");
     } else if (!strcmp(line, "restart")) {
         printf("OK\n");

@@ -1,5 +1,6 @@
 #include "touch_ui.h"
 #include "app_ui.h"
+#include "battery.h"
 #include "board.h"
 #include "models.h"
 #include "story_mem.h"
@@ -169,6 +170,7 @@ static void touch_task(void *arg)
         }
         down = t;
         restart_expire();
+        battery_poll(app_ui_is_busy());
         vTaskDelay(pdMS_TO_TICKS(POLL_MS));
     }
 }
