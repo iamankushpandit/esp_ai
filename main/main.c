@@ -5,6 +5,7 @@
 #include "phase.h"
 #include "think.h"
 #include "speak.h"
+#include "hear.h"
 #include "console.h"
 #include "hwtest.h"
 #include "upload.h"
@@ -41,6 +42,28 @@ static void cmd_ask(const char *q)
     }
 }
 
+static void ui_status_cb(const char *s) { app_ui_status(s, UI_YELLOW); }
+
+static hear_params_t s_hear;
+
+static void cmd_hear(const char *wav)
+{
+    static const char *names[] = {"ok", "no speech", "too short", "error"};
+    char text[256];
+    hear_stats_t st;
+    app_ui_clear_turn();
+    hear_result_t r = wav ? hear_wav(wav, text, sizeof text, &st)
+                          : hear_listen(&s_hear, text, sizeof text, ui_status_cb, &st);
+    switch (r) {
+    case HEAR_OK: app_ui_you(text[0] ? text : "(nothing recognized)"); break;
+    case HEAR_NO_SPEECH: app_ui_you("I didn't hear anything."); break;
+    case HEAR_TOO_SHORT: app_ui_you("I didn't catch that."); break;
+    default: app_ui_you("Speech recognition error."); break;
+    }
+    app_ui_status("Ready", UI_GREEN);
+    printf("HEAR %s: \"%s\"\n", names[r], text);
+}
+
 static void dispatch(const char *line)
 {
     if (!strncmp(line, "put ", 4)) {
@@ -55,6 +78,16 @@ static void dispatch(const char *line)
         app_ui_story(line + 4);
         printf("SAY %s\n", speak_text(line + 4, NULL, &st) ? "done" : "FAILED");
         app_ui_status("Ready", UI_GREEN);
+        printf("OK\n");
+    } else if (!strcmp(line, "hear")) {
+        cmd_hear(NULL);
+        printf("OK\n");
+    } else if (!strncmp(line, "sttwav ", 7)) {
+        cmd_hear(line + 7);
+        printf("OK\n");
+    } else if (!strncmp(line, "vad ", 4)) {
+        sscanf(line + 4, "%d %f %d", &s_hear.vad_min_abs, &s_hear.vad_noise_mult, &s_hear.eos_silent_chunks);
+        printf("VAD min_abs=%d mult=%.1f eos=%d\n", s_hear.vad_min_abs, s_hear.vad_noise_mult, s_hear.eos_silent_chunks);
         printf("OK\n");
     } else if (!strncmp(line, "ask ", 4)) {
         cmd_ask(line + 4);
@@ -76,6 +109,7 @@ void app_main(void)
     esp_err_t au = board_audio_init();
     esp_err_t sd = board_sd_mount(false);
     story_mem_log("drivers");
+    s_hear = hear_default_params();
 
     app_ui_init();
     board_backlight(80);

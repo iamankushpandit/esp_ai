@@ -219,6 +219,19 @@ void hwtest_command(const char *line)
         char dir[128] = BOARD_SD_MOUNT;
         sscanf(line, "%*s %127s", dir);
         sd_ls(dir);
+    } else if (!strcmp(cmd, "head")) {
+        char path[128] = {0};
+        long off = 0;
+        sscanf(line, "%*s %127s %ld", path, &off);
+        FILE *f = fopen(path, "rb");
+        uint8_t b[16] = {0};
+        int sk = f ? fseek(f, off, SEEK_SET) : -1;
+        size_t r = f ? fread(b, 1, 16, f) : 0;
+        printf("HEAD %s @%ld: open=%d seek=%d read=%u errno=%d ferror=%d:", path, off, f != NULL, sk,
+               (unsigned)r, errno, f ? ferror(f) : -1);
+        for (int i = 0; i < 16; i++) printf(" %02x", b[i]);
+        printf("\n");
+        if (f) fclose(f);
     } else if (!strcmp(cmd, "touch")) {
         touch_test(arg > 0 ? (int)arg : 10);
     } else if (!strcmp(cmd, "bl")) {
