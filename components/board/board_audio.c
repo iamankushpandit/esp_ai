@@ -79,10 +79,13 @@ void board_amp(bool on)
 void board_audio_set_volume(int pct)
 {
     if (pct > 100) pct = 100;
-    int eff = pct * VOLUME_CAP_PCT / 100;
+    // Perceptual curve: 0..100 % maps linearly in dB onto -30 dB..0 dB below
+    // the product ceiling, so each 10 % step is an audible 3 dB. The DAC
+    // volume register is 0.5 dB per step with 0xBF = 0 dB.
     uint8_t reg = 0;
-    if (eff > 0) {
-        int r = (int)lroundf(0xBF + 2.0f * 20.0f * log10f(eff / 100.0f));
+    if (pct > 0) {
+        float db = 20.0f * log10f(VOLUME_CAP_PCT / 100.0f) - 30.0f * (1.0f - pct / 100.0f);
+        int r = (int)lroundf(0xBF + 2.0f * db);
         reg = (uint8_t)(r < 1 ? 1 : r > 0xBF ? 0xBF : r);
     }
     wr(0x32, reg);

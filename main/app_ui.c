@@ -759,6 +759,14 @@ int app_ui_convo_tap(int x, int y)
     UI_LOCK();
     int row = s_top + (y - CONVO_Y) / UI_ROW_H;
     int tag = (row >= 0 && row < s_total) ? s_tags[row] : -1;
+    if (tag < 0 && row >= 0 && row < s_total && s_rows[row][0] == 0) {
+        // Blank spacer row: fingers land a few px off, so give the tap to
+        // the nearer neighbouring row that has a tag.
+        bool upper = (y - CONVO_Y) % UI_ROW_H < UI_ROW_H / 2;
+        int first = upper ? row - 1 : row + 1, second = upper ? row + 1 : row - 1;
+        if (first >= 0 && first < s_total && s_tags[first] >= 0) tag = s_tags[first];
+        else if (second >= 0 && second < s_total && s_tags[second] >= 0) tag = s_tags[second];
+    }
     UI_UNLOCK();
     return tag;
 }

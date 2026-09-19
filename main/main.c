@@ -265,6 +265,22 @@ static void dispatch(const char *line)
         clock_say_date(d, sizeof d);
         printf("TIME %s %s (tz %s)\n", t, d, net_tz()[0] ? net_tz() : "UTC");
         printf("OK\n");
+    } else if (!strncmp(line, "ui ", 3)) {
+        // ui chat|model|settings|about|wifi : open a page (tests)
+        static const char *names[] = {"chat", "model", "settings", "about", "wifi"};
+        for (int i = 0; i < 5; i++)
+            if (!strcmp(line + 3, names[i])) app_ui_page((app_page_t)i);
+        printf("OK\n");
+    } else if (!strcmp(line, "screen off") || !strcmp(line, "screen on")) {
+        if (line[8] == 'f') screen_off();
+        else screen_on();
+        printf("OK\n");
+    } else if (!strncmp(line, "tap ", 4)) {
+        int x = 0, y = 0;
+        if (sscanf(line + 4, "%d %d", &x, &y) == 2) touch_ui_sim_tap(x, y);
+        printf("PREFS vol %d bright %d screen %u wake %d\n", prefs()->volume, prefs()->brightness,
+               prefs()->screen_s, prefs()->wake);
+        printf("OK\n");
     } else if (!strcmp(line, "bat")) {
         int mv = board_battery_mv();
         printf("BAT %d mV -> %d %%%s\n", mv, battery_pct_from_mv(mv), battery_charging() ? ", charging" : "");
@@ -387,6 +403,14 @@ void app_main(void)
             // this; WakeNet pauses so Wi-Fi gets its internal RAM.
             wake_stop();
             clock_sync_ui();
+            if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
+        }
+        if (!start && !app_ui_is_busy() && touch_ui_take_volume_preview()) {
+            // Volume changed in /settings: say something at the new level.
+            wake_stop();                                   // speaker + memory
+            app_ui_status("Speaking...", UI_BUSY);
+            speak_text("Hi there.", NULL, NULL);
+            app_ui_status("Ready", UI_OK);
             if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
         }
         if (wake_ok && !app_ui_is_busy() && prefs()->wake != wake_running()) {

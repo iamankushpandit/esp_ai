@@ -3,7 +3,7 @@
 #include "nvs.h"
 
 static const char *TAG = "prefs";
-static prefs_t s_p = {.volume = 70, .brightness = 80, .screen_s = 30, .wake = true};
+static prefs_t s_p = {.volume = 90, .brightness = 90, .screen_s = 30, .wake = true};
 
 static const uint16_t SCREEN_STEPS[] = {15, 30, 60, 120, 300, 0};
 

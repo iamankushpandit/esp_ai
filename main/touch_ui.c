@@ -144,9 +144,23 @@ static void wifi_tap(int tag)
     }
 }
 
+// Volume preview: set on every volume step, consumed by the main loop once
+// the taps have stopped for VOLUME_PREVIEW_US (one "Hi there", not one per tap).
+#define VOLUME_PREVIEW_US 600000
+static volatile int64_t s_volume_changed;
+
+bool touch_ui_take_volume_preview(void)
+{
+    int64_t t = s_volume_changed;
+    if (!t || story_time_us() - t < VOLUME_PREVIEW_US) return false;
+    s_volume_changed = 0;
+    return true;
+}
+
 static void settings_tap(int tag, int col)
 {
     int dir = col >= SET_PLUS_COL_MIN ? 1 : (col >= SET_MINUS_COL_MIN && col <= SET_MINUS_COL_MAX) ? -1 : 0;
+    ESP_LOGI(TAG, "settings tap: tag %d col %d dir %d", tag, col, dir);
     switch (tag) {
     case TAG_WIFI_SETUP:
         app_ui_page(PAGE_WIFI);
@@ -158,6 +172,7 @@ static void settings_tap(int tag, int col)
     case TAG_SET_VOLUME:
         if (!dir) return;
         board_audio_set_volume(prefs_step_volume(dir));
+        s_volume_changed = story_time_us();  // main loop says "Hi there" at the new level
         break;
     case TAG_SET_BRIGHT:
         if (!dir) return;
@@ -186,6 +201,7 @@ static void page_tap(int x, int y)
         return;
     }
     int tag = app_ui_convo_tap(x, y);
+    ESP_LOGI(TAG, "tap (%d,%d) page %d tag %d", x, y, (int)page, tag);
     if (page == PAGE_SETTINGS) {
         settings_tap(tag, app_ui_tap_col(x));
         return;
@@ -270,3 +286,5 @@ void touch_ui_start(void)
     // Core 0 (the STT/LLM co-workers use the other core); modest priority.
     xTaskCreatePinnedToCore(touch_task, "touch_ui", 4096, NULL, 4, NULL, 0);
 }
+
+void touch_ui_sim_tap(int x, int y) { page_tap(x, y); }

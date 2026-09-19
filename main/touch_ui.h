@@ -19,6 +19,13 @@ bool touch_ui_wait_ask(uint32_t timeout_ms);
 // While busy, Ask taps are ignored (scrolling still works).
 void touch_ui_set_busy(bool busy);
 
+// Test hook (serial "tap x y"): behave as if the page area was tapped at (x, y).
+void touch_ui_sim_tap(int x, int y);
+
+// True once, shortly after the last volume change in /settings: the main task
+// then speaks a short phrase at the new volume.
+bool touch_ui_take_volume_preview(void);
+
 // Screen power (backlight). Keeps state consistent between tasks.
 void screen_on(void);
 void screen_off(void);

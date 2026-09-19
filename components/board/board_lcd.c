@@ -4,6 +4,7 @@
 // (docs/refnotes/hardware.md §2). BGR + inversion ON, measured on hardware.
 // Never read from the panel (it corrupts state on this board).
 #include "board.h"
+#include <math.h>
 #include "board_lcd_stream.h"
 #include "driver/spi_master.h"
 #include "driver/ledc.h"
@@ -124,7 +125,10 @@ esp_err_t board_lcd_init(void)
 void board_backlight(uint8_t pct)
 {
     if (pct > 100) pct = 100;
-    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, (uint32_t)pct * 255 / 100);
+    // Gamma 2.2: the eye is far more sensitive at the dim end, so a linear
+    // duty makes 60..100 % look the same. 0 stays fully off.
+    uint32_t duty = pct ? (uint32_t)lroundf(powf(pct / 100.0f, 2.2f) * 255.0f) : 0;
+    ledc_set_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0, duty ? duty : (pct ? 1 : 0));
     ledc_update_duty(LEDC_LOW_SPEED_MODE, LEDC_CHANNEL_0);
 }
 
