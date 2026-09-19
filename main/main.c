@@ -21,6 +21,7 @@
 #include "hwtest.h"
 #include "upload.h"
 #include "esp_log.h"
+#include "esp_heap_caps.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/timers.h"
@@ -71,20 +72,19 @@ static void timer_ring(void)
     app_ui_status("Timer done! Tap to stop", UI_ERR);
     speak_text("Your timer is done.", NULL, NULL);
     const int64_t t0 = story_time_us(), touched0 = screen_last_activity_us();
-    static int16_t beep[16000 * 15 / 100];            // 150 ms of 880 Hz
-    static bool made;
-    if (!made) {
-        const int n = sizeof beep / sizeof beep[0];
-        for (int i = 0; i < n; i++) {
-            float env = i < 160 ? i / 160.0f : i > n - 160 ? (n - i) / 160.0f : 1.0f;   // no clicks
+    enum { BEEP_N = 16000 * 15 / 100 };                // 150 ms of 880 Hz
+    static int16_t *beep;                             // PSRAM: internal RAM is for the arenas
+    if (!beep && (beep = heap_caps_malloc(BEEP_N * sizeof(int16_t), MALLOC_CAP_SPIRAM))) {
+        for (int i = 0; i < BEEP_N; i++) {
+            float env = i < 160 ? i / 160.0f : i > BEEP_N - 160 ? (BEEP_N - i) / 160.0f : 1.0f;   // no clicks
             beep[i] = (int16_t)(12000 * env * sinf(6.2831853f * 880.0f * i / 16000.0f));
         }
-        made = true;
     }
+    if (!beep) return;
     board_spk_start();
     while (story_time_us() - t0 < 60LL * 1000000 && screen_last_activity_us() == touched0) {
         for (int k = 0; k < 3; k++) {
-            board_spk_write(beep, sizeof beep / sizeof beep[0], 1000);
+            board_spk_write(beep, BEEP_N, 1000);
             vTaskDelay(pdMS_TO_TICKS(90));
         }
         for (int i = 0; i < 12 && screen_last_activity_us() == touched0; i++) vTaskDelay(pdMS_TO_TICKS(50));
