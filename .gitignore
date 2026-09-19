@@ -11,3 +11,4 @@ __pycache__/
 tools/.venv/
 build_log.txt
 .claude/
+tools/.venv-gpu/

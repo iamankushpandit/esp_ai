@@ -108,6 +108,7 @@ def norm_a(a: str) -> str:
     a = ascii_fold(a)
     a = numbers_to_words(a)
     a = re.sub(r"\s+", " ", a).strip()
+    a = a.replace("..", ".")
     return a
 
 
@@ -312,22 +313,22 @@ def elements_game(a):
         category = catword.get(cats[cat], cats[cat].lower())
         S.add(G, [f"what is the chemical symbol for {n}", f"what's the symbol for {n}",
                   f"what is the symbol for {n}", f"how do you write {n} on the periodic table"],
-              f"The symbol for {name} is {sym}.", [f"what letters stand for {n}"])
+              f"The symbol for {n} is {sym}.", [f"what letters stand for {n}"])
         S.add(G, [f"which element is {sp}", f"what element has the symbol {sp}",
                   f"what does {sp} stand for on the periodic table"],
-              f"{sym} is the symbol for {name}.", [f"what element uses the letters {sp}"])
+              f"{sym} is the symbol for {n}.", [f"what element uses the letters {sp}"])
         pr = "proton" if z == 1 else "protons"
         S.add(G, [f"how many protons does {n} have", f"what is the atomic number of {n}",
                   f"what number element is {n}", f"how many protons are in {n}"],
               f"{name} has {w(z)} {pr}, so its atomic number is {w(z)}.", [f"what's {n}'s atomic number"])
         S.add(G, [f"which element is number {spoken(z)}", f"what is element number {spoken(z)}",
                   f"what element has {spoken(z)} {pr}"],
-              f"Element number {w(z)} is {name}.", [f"which element has atomic number {spoken(z)}"])
+              f"Element number {w(z)} is {n}.", [f"which element has atomic number {spoken(z)}"])
         fl = fact.rstrip(".")
         S.add(G, [f"tell me about {n}", f"what is {n}", f"tell me a fact about {n}"],
               f"{name} is {art(category)} {category}. {fact}", [f"what do you know about {n}"])
         S.add(G, [f"what element is this {fl}", f"guess the element {fl}", f"{fl} which element is it"],
-              f"That is {name}.", [f"which element matches this clue {fl}"])
+              f"That is {n}.", [f"which element matches this clue {fl}"])
         S.add(G, [f"what kind of element is {n}", f"what type of element is {n}",
                   f"what group does {n} belong to"],
               f"{name} is {art(category)} {category}.", [f"is {n} a metal or not"])

@@ -80,7 +80,7 @@ def norm(s):
 
 @torch.no_grad()
 def answer(model, tok, q, max_new=40):
-    ids = tok(f"User: {q}\nBot:", return_tensors="pt").input_ids
+    ids = tok(f"User: {q}\nBot:", return_tensors="pt").input_ids.to(model.device)
     out = model.generate(ids, max_new_tokens=max_new, do_sample=False,
                          pad_token_id=tok.eos_token_id, eos_token_id=tok.eos_token_id)
     return tok.decode(out[0][ids.shape[1]:], skip_special_tokens=True).split("\n")[0].strip()
@@ -105,8 +105,8 @@ def score(model, tok, evals):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--kid", default=str(ROOT / "models_out/kid/kid_train.txt"))
-    ap.add_argument("--eval", default=str(ROOT / "models_out/kid/kid_eval.jsonl"))
+    ap.add_argument("--train", nargs="+", default=[str(ROOT / "models_out/kid/kid_train.txt")])
+    ap.add_argument("--eval", nargs="+", default=[str(ROOT / "models_out/kid/kid_eval.jsonl")])
     ap.add_argument("--replay", type=int, default=20000, help="original chat/story samples mixed in")
     ap.add_argument("--base", default=str(REF / "data/chat_model_8m"))
     ap.add_argument("--out", default=str(ROOT / "models_out/kid/model_8m_kid"))
@@ -121,13 +121,18 @@ def main():
     from transformers import GPT2TokenizerFast, GPTNeoForCausalLM
     torch.manual_seed(a.seed)
     rng = random.Random(a.seed)
+    dev = "cuda" if torch.cuda.is_available() else ("mps" if torch.backends.mps.is_available() else "cpu")
     tok = GPT2TokenizerFast.from_pretrained(a.base)
-    model = GPTNeoForCausalLM.from_pretrained(a.base)
+    model = GPTNeoForCausalLM.from_pretrained(a.base).to(dev)
     model.train()
     print(f"[+] base {a.base}: {sum(p.numel() for p in model.parameters())/1e6:.1f}M params, "
-          f"{torch.get_num_threads()} threads")
+          f"device {dev}")
 
-    kid = [s for s in Path(a.kid).read_text(encoding="utf-8").split("\n\n") if s.strip()]
+    kid = []
+    for f in a.train:
+        part = [s for s in Path(f).read_text(encoding="utf-8").split("\n\n") if s.strip()]
+        print(f"[+] {Path(f).name}: {len(part)} samples")
+        kid += part
     orig = [s for s in (REF / "data/chat_train.txt").read_text(encoding="utf-8").split("\n\n") if s.strip()]
     replay = rng.sample(orig, min(a.replay, len(orig)))
     mix = kid + replay
@@ -136,8 +141,10 @@ def main():
     print(f"[+] kid {len(kid)} + replay {len(replay)} samples -> {len(x)} blocks "
           f"({len(x)*a.seq_len/1e6:.2f}M tokens, {(y != -100).float().mean()*100:.0f}% in loss)")
 
-    evals_all = [json.loads(l) for l in Path(a.eval).read_text(encoding="utf-8").splitlines() if l.strip()]
-    evals = rng.sample(evals_all, min(a.eval_n, len(evals_all)))
+    evals = []
+    for f in a.eval:   # equal share per eval file so small sets are represented
+        rows = [json.loads(l) for l in Path(f).read_text(encoding="utf-8").splitlines() if l.strip()]
+        evals += rng.sample(rows, min(a.eval_n // len(a.eval), len(rows)))
     ex, ky, _ = score(model, tok, evals[:100])
     print(f"[+] before: held-out exact {ex*100:.1f}%  key {ky*100:.1f}% (100 q)")
 
@@ -152,7 +159,9 @@ def main():
                 1e-5 + 0.5 * (a.lr - 1e-5) * (1 + math.cos(math.pi * (step - warm) / max(1, total - warm)))
             for g in opt.param_groups:
                 g["lr"] = lr
-            loss = model(bx, labels=by).loss
+            bx, by = bx.to(dev), by.to(dev)
+            with torch.autocast(device_type=dev, dtype=torch.float16, enabled=dev == "cuda"):
+                loss = model(bx, labels=by).loss
             opt.zero_grad(set_to_none=True)
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
@@ -169,7 +178,7 @@ def main():
             print(f"      {'OK ' if k else 'XX '} {q} -> {got}")
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    model.save_pretrained(out)
+    model.cpu().save_pretrained(out)
     tok.save_pretrained(out)
     print(f"[+] saved {out}")
 
