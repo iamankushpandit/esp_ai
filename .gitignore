@@ -1,0 +1,13 @@
+.refs/
+build/
+host/build/
+sdkconfig
+sdkconfig.old
+managed_components/
+dependencies.lock
+models_out/
+__pycache__/
+*.pyc
+tools/.venv/
+build_log.txt
+.claude/
