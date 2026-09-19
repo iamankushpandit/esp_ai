@@ -10,7 +10,7 @@
 static const char *TAG = "think";
 
 // Model directory holds model.bin + tok.bin; swap models without rebuilding.
-static char s_dir[64] = BOARD_SD_MOUNT "/story/llm8m_kid";   // kid + Gume fine-tune
+static char s_dir[64] = BOARD_SD_MOUNT "/story/llm8m_v4";    // v4 kid + Gume fine-tune (Mac)
 
 void think_set_model_dir(const char *dir) { snprintf(s_dir, sizeof s_dir, "%s", dir); }
 const char *think_model_dir(void) { return s_dir; }

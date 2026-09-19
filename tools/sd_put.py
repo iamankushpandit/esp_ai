@@ -15,6 +15,9 @@ import serial
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = [
+    ("models_out/llm8m_v4/embed/model_neo_q4.bin", "/sd/story/llm8m_v4/model.bin"),
+    ("models_out/llm8m_v4/embed/tok_neo.bin", "/sd/story/llm8m_v4/tok.bin"),
+    ("models_out/llm8m_v4/embed/name.txt", "/sd/story/llm8m_v4/name.txt"),
     ("models_out/llm8m_kid/embed/model_neo_q4.bin", "/sd/story/llm8m_kid/model.bin"),
     ("models_out/llm8m_kid/embed/tok_neo.bin", "/sd/story/llm8m_kid/tok.bin"),
     ("models_out/llm8m_kid/embed/name.txt", "/sd/story/llm8m_kid/name.txt"),
