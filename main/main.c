@@ -4,6 +4,7 @@
 #include "app_ui.h"
 #include "phase.h"
 #include "think.h"
+#include "speak.h"
 #include "console.h"
 #include "hwtest.h"
 #include "upload.h"
@@ -47,6 +48,13 @@ static void dispatch(const char *line)
         unsigned size = 0, crc = 0;
         if (sscanf(line + 4, "%159s %u %x", path, &size, &crc) == 3) upload_file(path, size, crc);
         else printf("usage: put <path> <size> <crc32hex>\n");
+        printf("OK\n");
+    } else if (!strncmp(line, "say ", 4)) {
+        speak_stats_t st;
+        app_ui_status("Speaking...", UI_CYAN);
+        app_ui_story(line + 4);
+        printf("SAY %s\n", speak_text(line + 4, NULL, &st) ? "done" : "FAILED");
+        app_ui_status("Ready", UI_GREEN);
         printf("OK\n");
     } else if (!strncmp(line, "ask ", 4)) {
         cmd_ask(line + 4);
