@@ -42,6 +42,21 @@ int main(void)
     CHECK(strcmp(r[2], "") == 0);
     CHECK(strcmp(r[3], "> next") == 0);
 
+    // large ring (> UI_MAX_ROWS) keeps the tail in order
+    static char big[40][UI_MAX_COLS + 1];
+    char text[400] = "";
+    for (int i = 0; i < 50; i++) { char w[8]; snprintf(w, sizeof w, "w%02d\n", i); strcat(text, w); }
+    n = ui_wrap_ex(text, 10, 0, big, 40);
+    CHECK(n == 50);
+    CHECK(strcmp(big[0], "w10") == 0 && strcmp(big[39], "w49") == 0);
+
+    // row marker carries onto continuation rows of its own line only
+    n = ui_wrap_ex(UI_G_ROWMARK "dim text that wraps\nplain", 12, 2, r, 6);
+    CHECK(n == 3);
+    CHECK(r[0][0] == UI_G_ROWMARK[0] && r[1][0] == UI_G_ROWMARK[0]);
+    CHECK(strcmp(r[1] + 1, "that wraps") == 0);   // aligned with line 1
+    CHECK(strcmp(r[2], "plain") == 0);
+
     // UI glyph bytes pass through; other high bytes don't
     n = ui_wrap("\x86 ok \xff", 10, r, 2);
     CHECK((unsigned char)r[0][0] == 0x86 && r[0][5] == '?');

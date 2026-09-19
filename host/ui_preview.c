@@ -5,8 +5,22 @@
 #include "board_lcd_stream.h"
 #include "app_ui.h"
 #include "ui.h"
+#include "models.h"
 #include <stdio.h>
 #include <string.h>
+
+// Model registry stubs (the real one scans the SD card).
+static model_info_t s_m[3] = {
+    {"/sd/story/llm", "TinyTalk 3M", 2363073},
+    {"/sd/story/llm8m", "TinyTalk 2 8M", 5953257},
+    {"/sd/story/llm8m_kid", "TinyTalk 2 8M (kid+Gume)", 6710021},
+};
+static int s_act = 2;
+int models_count(void) { return 3; }
+const model_info_t *models_get(int i) { return &s_m[i]; }
+int models_active(void) { return s_act; }
+bool models_select(int i) { s_act = i; return true; }
+int models_scan(void) { return 3; }
 
 static uint16_t fb[BOARD_LCD_H][BOARD_LCD_W];
 static uint16_t dma[BOARD_LCD_STREAM_PX];
@@ -72,9 +86,15 @@ int main(int argc, char **argv)
     STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN));
     dump();
 
-    STEP("button pressed", app_ui_button(BTN_PRESSED));
+    STEP("/model page", app_ui_page(PAGE_MODELS));
     dump();
-    STEP("turn 1: listening", app_ui_button(BTN_BUSY); app_ui_clear_turn(); app_ui_status("Listening...", UI_ACCENT));
+    STEP("select model 0", models_select(0); app_ui_refresh_page());
+    STEP("/about page", app_ui_page(PAGE_ABOUT));
+    dump();
+    STEP("back to chat", app_ui_page(PAGE_CHAT));
+    STEP("ask pressed", app_ui_button(BTN_PRESSED));
+    dump();
+    STEP("turn 1: listening", app_ui_busy(true); app_ui_clear_turn(); app_ui_status("Listening...", UI_ACCENT));
     STEP("turn 1: transcribing", app_ui_status("Transcribing...", UI_ACCENT));
     STEP("turn 1: transcript", app_ui_you("what color is a banana"));
     stream("I know! The banana is yellow.", 8, 6.1f);
@@ -90,6 +110,11 @@ int main(int argc, char **argv)
            "They became good friends. Bye bye.", 34, 6.4f);
     STEP("turn 3: speaking", app_ui_status("Speaking...", UI_ACCENT));
     dump();
-    STEP("session end", app_ui_status("Session ended", UI_GREY); app_ui_button(BTN_IDLE));
+    STEP("scroll: drag down 3 rows", app_ui_scroll_begin(); app_ui_scroll_drag(3 * UI_ROW_H));
+    STEP("scroll: drag further (to top)", app_ui_scroll_drag(20 * UI_ROW_H));
+    dump();
+    STEP("new text while scrolled (no jump)", app_ui_llm_progress("Once upon a time, there was a big, strong cat. The cat saw a little mouse. They became good friends. Bye bye!", 35, 6.4f));
+    STEP("scroll back to bottom", app_ui_scroll_begin(); app_ui_scroll_drag(-40 * UI_ROW_H));
+    STEP("session end", app_ui_status("Session ended", UI_GREY); app_ui_busy(false));
     return 0;
 }

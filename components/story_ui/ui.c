@@ -94,10 +94,17 @@ void ui_box_invalidate(ui_box_t *b)
 
 void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg)
 {
-    if (k < 0 || k > 1) return;
+    if (k < 0 || k > 2) return;
     b->mark_ch[k] = ch;
     b->mark_fg[k] = fg;
+    b->mark_row[k] = false;
     if (b->nmarks < k + 1) b->nmarks = (uint8_t)(k + 1);
+}
+
+void ui_box_mark_row(ui_box_t *b, int k, char ch, uint16_t fg)
+{
+    ui_box_mark(b, k, ch, fg);
+    if (k >= 0 && k <= 2) b->mark_row[k] = true;
 }
 
 static void paint(ui_box_t *b, int i, const char *s)
@@ -113,6 +120,7 @@ static void paint(ui_box_t *b, int i, const char *s)
     for (int k = 0; k < b->nmarks; k++) {
         if (s[0] && s[0] == b->mark_ch[k]) {
             uint8_t attr[UI_MAX_COLS] = {1};
+            if (b->mark_row[k]) memset(attr, 1, sizeof attr);
             uint16_t pal[2] = {b->fg, b->mark_fg[k]};
             ui_draw_row_attr(b->x, y, b->w, s, attr, pal, b->bg);
             return;
@@ -126,10 +134,15 @@ int ui_box_set(ui_box_t *b, const char *text)
     char next[UI_MAX_ROWS][UI_MAX_COLS + 1];
     memset(next, 0, sizeof next);
     int need = ui_wrap_ex(text, b->cols, b->hang, next, b->rows);
-    int used = need < b->rows ? need : b->rows;
+    return ui_box_set_rows(b, (const char (*)[UI_MAX_COLS + 1])next, need < b->rows ? need : b->rows);
+}
+
+int ui_box_set_rows(ui_box_t *b, const char (*rows)[UI_MAX_COLS + 1], int n)
+{
+    int used = n < b->rows ? n : b->rows;
     int painted = 0;
     for (int i = 0; i < b->rows; i++) {
-        const char *want = i < used ? next[i] : "";
+        const char *want = i < used ? rows[i] : "";
         if (strcmp(want, b->shown[i]) != 0) {
             paint(b, i, want);
             strcpy(b->shown[i], want);

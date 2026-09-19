@@ -4,14 +4,14 @@
 //   │ ✻ Braino AI                │
 //   │   (c) iamankushpandit      │
 //   ╰────────────────────────────╯
-//   > what color is a banana         <- session transcript: every turn of
-//   ● The banana is yellow.             the current session, newest at the
-//                                       bottom, scrolling like a terminal
+//   > what color is a banana       ▐ <- scrollable page area: the session
+//   ● The banana is yellow.        ▐    transcript (chat), the /model list,
+//                                  ▐    or /about. Thin scrollbar on the right.
 //   > how many legs does a dog have
 //   ● A dog has four legs.
 //   ⎿  8 tok · 6.2 tok/s              <- dim detail line
 //   ✻ Thinking…                      <- status / spinner
-//              ( ✻ Ask )           <- ask button (tap to talk)
+//   ( /model ) (  ✻ Ask  ) ( /about ) <- bottom bar (tap)
 //
 // Every region is a dirty-row box: only rows whose text changed are redrawn,
 // in place (no clears). Scrolling rewrites the rows that shifted.
@@ -28,7 +28,6 @@ void app_ui_you(const char *text);
 // Sets (or streams) the answer of the latest turn.
 void app_ui_story(const char *text);
 void app_ui_detail(const char *text);
-
 // Clears the whole transcript (new session).
 void app_ui_clear_turn(void);
 // Streaming answer + live generation speed on the detail line.
@@ -36,7 +35,30 @@ void app_ui_llm_progress(const char *text, int tokens, float tok_per_s);
 // Last generation speed shown (for keeping it visible while speaking).
 float app_ui_last_tok_rate(void);
 
-// Ask button: slim outlined pill with a small spark and "Ask", bottom center.
-typedef enum { BTN_IDLE = 0, BTN_PRESSED, BTN_BUSY } app_btn_state_t;
-void app_ui_button(app_btn_state_t st);     // redraws only the button tile, only on change
-bool app_ui_button_hit(int x, int y);       // touch coordinates -> inside the button?
+// Pages shown in the scrollable area.
+typedef enum { PAGE_CHAT = 0, PAGE_MODELS, PAGE_ABOUT } app_page_t;
+void app_ui_page(app_page_t p);            // switch page (re-renders the area)
+app_page_t app_ui_page_get(void);
+void app_ui_refresh_page(void);            // e.g. after the model list changed
+
+// Scrolling (touch drag). While at the bottom the chat follows new text;
+// after scrolling up it stays put until dragged back or a new question.
+bool app_ui_convo_hit(int x, int y);
+void app_ui_scroll_begin(void);
+void app_ui_scroll_drag(int dy_px);          // dy since begin; + = finger moved down
+// A tap (not a drag) in the page area: returns the tag of the tapped row
+// (on the /model page: the model index), or -1.
+int app_ui_convo_tap(int x, int y);
+
+// Bottom bar: three pills.
+typedef enum { BAR_MODEL = 0, BAR_ASK, BAR_ABOUT, BAR_COUNT } app_bar_t;
+typedef enum { BTN_IDLE = 0, BTN_PRESSED, BTN_BUSY, BTN_ACTIVE } app_btn_state_t;
+int app_ui_bar_hit(int x, int y);            // -> app_bar_t or -1
+void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that pill, only on change
+// Busy (session running): Ask shows busy, /model and /about are disabled and
+// the chat page is shown.
+void app_ui_busy(bool busy);
+bool app_ui_is_busy(void);
+
+// Back-compat helpers for the Ask pill.
+static inline void app_ui_button(app_btn_state_t st) { app_ui_bar_state(BAR_ASK, st); }

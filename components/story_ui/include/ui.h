@@ -40,6 +40,9 @@ extern "C" {
 #define UI_G_ELLIPSIS "\x89"
 #define UI_G_SPIN0 0x8A              // spinner frames 0x8A..0x8D
 #define UI_SPIN_FRAMES 4
+// Invisible row marker: a line starting with it can be drawn entirely in a
+// marker color (see ui_box_mark_row); wrapped continuation rows keep it.
+#define UI_G_ROWMARK "\x8E"
 
 typedef struct {
     int16_t x, y, w;
@@ -49,8 +52,9 @@ typedef struct {
     uint16_t lead_fg;
     uint8_t hang;            // continuation rows are indented by this many cols
     uint8_t nmarks;          // rows starting with mark_ch[k] draw that char in mark_fg[k]
-    char mark_ch[2];
-    uint16_t mark_fg[2];
+    char mark_ch[3];
+    uint16_t mark_fg[3];
+    bool mark_row[3];        // true: the whole row uses mark_fg[k]
     char shown[UI_MAX_ROWS][UI_MAX_COLS + 1];
 } ui_box_t;
 
@@ -67,8 +71,13 @@ void ui_box_init(ui_box_t *b, int x, int y, int w, int rows, uint16_t fg, uint16
 void ui_box_style(ui_box_t *b, uint8_t lead_n, uint16_t lead_fg, uint8_t hang);
 // Per-row marker coloring (e.g. '>' dim, bullet accent) for transcript boxes.
 void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg);
+// Rows starting with `ch` are drawn entirely in `fg` (k = 0..2).
+void ui_box_mark_row(ui_box_t *b, int k, char ch, uint16_t fg);
 // Returns number of rows repainted.
 int ui_box_set(ui_box_t *b, const char *text);
+// Show exactly these pre-wrapped rows (n <= b->rows; the rest become empty).
+// Same dirty-row diffing as ui_box_set. Used for scrollable views.
+int ui_box_set_rows(ui_box_t *b, const char (*rows)[UI_MAX_COLS + 1], int n);
 void ui_box_set_color(ui_box_t *b, uint16_t fg);  // repaints non-empty rows
 void ui_box_invalidate(ui_box_t *b);               // next set() repaints all rows
 

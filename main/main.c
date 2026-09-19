@@ -7,6 +7,8 @@
 #include "speak.h"
 #include "hear.h"
 #include "pipeline.h"
+#include "touch_ui.h"
+#include "models.h"
 #include "driver/gpio.h"
 #include "console.h"
 #include "hwtest.h"
@@ -156,6 +158,15 @@ static void dispatch(const char *line)
     } else if (!strncmp(line, "ask ", 4)) {
         cmd_ask(line + 4);
         printf("OK\n");
+    } else if (!strcmp(line, "models") || !strncmp(line, "model ", 6)) {
+        // "models" lists; "model <n>" selects (same as tapping it on /model).
+        models_scan();
+        if (line[5] == ' ') models_select(atoi(line + 6));
+        for (int i = 0; i < models_count(); i++)
+            printf("MODEL %d %c %s (%s)\n", i, i == models_active() ? '*' : ' ', models_get(i)->name,
+                   models_get(i)->dir);
+        app_ui_refresh_page();
+        printf("OK\n");
     } else if (!strncmp(line, "llmdir ", 7)) {
         think_set_model_dir(line + 7);
         printf("LLM dir %s\n", think_model_dir());
@@ -203,11 +214,12 @@ void app_main(void)
     esp_err_t tp = board_touch_init();
     esp_err_t au = board_audio_init();
     esp_err_t sd = board_sd_mount(false);
+    if (sd == ESP_OK) models_scan();    // selectable LLMs on the SD card + saved choice
     story_mem_log("drivers");
     s_hear = hear_default_params();
 
     app_ui_init();
-    board_backlight(80);
+    screen_on();
     if (!arenas) app_ui_status("MEMORY ERROR", UI_RED);
     else if (sd != ESP_OK) app_ui_status("SD card error", UI_RED);
     else app_ui_status("Ready", UI_GREEN);
@@ -220,50 +232,28 @@ void app_main(void)
                          .pull_up_en = GPIO_PULLUP_ENABLE};
     gpio_config(&btn);
 
+    touch_ui_start();   // wake / Ask pill / scroll, also during sessions
+
     const int64_t SCREEN_TIMEOUT_US = 30LL * 1000000;
-    bool screen_on = true, touching = false, armed_press = false;
-    int64_t last_activity = story_time_us();
     char line[200];
     while (1) {
-        bool start = false;
-        if (console_readline(line, sizeof line, 30)) {
+        bool start = touch_ui_wait_ask(10);
+        if (console_readline(line, sizeof line, 20)) {
             dispatch(line);
-            last_activity = story_time_us();
+            screen_note_activity();
         }
-
-        int tx = 0, ty = 0;
-        bool t = board_touch_read(&tx, &ty);
-        if (t && !touching) {                          // touch down
-            ESP_LOGI(TAG, "touch down %d,%d", tx, ty);
-            if (!screen_on) {                          // first tap only wakes the screen
-                board_backlight(80);
-                screen_on = true;
-            } else if (app_ui_button_hit(tx, ty)) {
-                armed_press = true;
-                app_ui_button(BTN_PRESSED);
-            }
-            last_activity = story_time_us();
-        } else if (!t && touching && armed_press) {     // release: act like a real button
-            armed_press = false;
-            start = true;
-        }
-        touching = t;
-
         if (gpio_get_level(BOARD_BOOT_BTN) == 0) {
             while (gpio_get_level(BOARD_BOOT_BTN) == 0) vTaskDelay(pdMS_TO_TICKS(10));
             start = true;
         }
         if (start) {
-            board_backlight(80);
-            app_ui_button(BTN_BUSY);
+            screen_on();
+            app_ui_busy(true);
             pipeline_session(&s_hear, SESSION_MAX_TURNS);   // ends with the screen off
-            app_ui_button(BTN_IDLE);
-            screen_on = false;
-            last_activity = story_time_us();
+            app_ui_busy(false);
         }
-        if (screen_on && story_time_us() - last_activity > SCREEN_TIMEOUT_US) {
-            board_backlight(0);
-            screen_on = false;
+        if (screen_is_on() && story_time_us() - screen_last_activity_us() > SCREEN_TIMEOUT_US) {
+            screen_off();
         }
     }
 }

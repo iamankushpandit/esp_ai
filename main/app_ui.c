@@ -2,9 +2,27 @@
 #include "board.h"
 #include "ui.h"
 #include "board_lcd_stream.h"
+#include "models.h"
 #include <math.h>
 #include <stdio.h>
 #include <string.h>
+
+#ifdef STORY_HOST
+#include <stdlib.h>
+#define UI_LOCK() ((void)0)
+#define UI_UNLOCK() ((void)0)
+#define UI_ALLOC(n) calloc(1, (n))
+#else
+#include "esp_heap_caps.h"
+#define UI_ALLOC(n) heap_caps_calloc(1, (n), MALLOC_CAP_SPIRAM)
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+// The UI is driven from the app task AND the touch task (scrolling, bar), so
+// every public entry point takes this recursive lock: LCD writes never interleave.
+static SemaphoreHandle_t s_lock;
+#define UI_LOCK() xSemaphoreTakeRecursive(s_lock, portMAX_DELAY)
+#define UI_UNLOCK() xSemaphoreGiveRecursive(s_lock)
+#endif
 
 #define ROW_Y(r) (2 + (r) * UI_ROW_H)
 #define COLS (BOARD_LCD_W / UI_FONT_W)   // 30
@@ -13,16 +31,53 @@
 #define Q_CHARS 160
 #define A_CHARS 480
 
+// Page area: a window of VIS rows onto the wrapped page content.
+#define CONVO_Y (ROW_Y(4) + 4)
+#define VIS 12
+#define CONVO_W (BOARD_LCD_W - 8)        // 29 text columns + scrollbar gutter
+#define SB_X (BOARD_LCD_W - 5)
+#define SB_W 3
+#define MAX_ROWS 96
+
+// Bottom bar geometry.
+#define BAR_Y 280
+#define BAR_H 26
+#define BAR_TOUCH_PAD_Y 12
+static const struct { int x, w; const char *label; bool spark; } BAR[BAR_COUNT] = {
+    [BAR_MODEL] = {4, 70, "/model", false},
+    [BAR_ASK] = {80, 80, "Ask", true},
+    [BAR_ABOUT] = {166, 70, "/about", false},
+};
+#define BAR_MAX_W 80
+
 static ui_box_t s_status, s_convo, s_detail;
 static int s_spin;
 static float s_last_rate;
 
 // Session transcript (bounded: at most MAX_TURNS turns, oldest dropped).
-static struct {
+// All larger UI buffers live in PSRAM (allocated in app_ui_init): internal
+// RAM must keep a contiguous 264 KB block free for the phase arena.
+typedef struct {
     char q[Q_CHARS];
     char a[A_CHARS];
-} s_turns[MAX_TURNS];
+} turn_t;
+static turn_t *s_turns;
 static int s_nturns;
+
+static char (*s_rows)[UI_MAX_COLS + 1];            // [MAX_ROWS] wrapped page rows
+static signed char *s_tags;                         // [MAX_ROWS] row -> tag (-1 none)
+static char (*s_tmp)[UI_MAX_COLS + 1];             // [MAX_ROWS] wrap scratch
+static char *s_text;                                // scratch for building pages
+#define TEXT_BYTES (MAX_TURNS * (Q_CHARS + A_CHARS + 8) + 256)
+static uint16_t *s_btn_px;                          // pill pixels
+static int s_total;              // wrapped rows available
+static int s_top;                // first visible row
+static bool s_follow = true;     // chat: stick to the bottom as text arrives
+static int s_drag_top0;
+static int s_sb_top = -1, s_sb_len = -1;
+static app_page_t s_page = PAGE_CHAT;
+static bool s_busy;
+static int s_bar_state[BAR_COUNT] = {-1, -1, -1};
 
 // Copy model/STT text, keeping plain ASCII only (UI glyph codes live above
 // 0x7F, so stray UTF-8 bytes must never reach the renderer).
@@ -36,21 +91,135 @@ static void sanitize(char *dst, size_t cap, const char *src)
     dst[n] = 0;
 }
 
-static void render_convo(void)
+// ---------------------------------------------------------------- page area
+// Thin scrollbar in the right gutter; hidden when everything fits. Redrawn
+// only when the thumb moves or resizes.
+static void draw_scrollbar(void)
 {
-    static char buf[MAX_TURNS * (Q_CHARS + A_CHARS + 8)];
-    size_t n = 0;
-    buf[0] = 0;
-    for (int i = 0; i < s_nturns; i++) {
-        if (i > 0) n += (size_t)snprintf(buf + n, sizeof buf - n, "\n\n");   // blank line between turns
-        if (s_turns[i].q[0]) n += (size_t)snprintf(buf + n, sizeof buf - n, "> %s", s_turns[i].q);
-        if (s_turns[i].a[0])
-            n += (size_t)snprintf(buf + n, sizeof buf - n, "%s" UI_G_BULLET " %s",
-                                  s_turns[i].q[0] ? "\n" : "", s_turns[i].a);
+    const int H = VIS * UI_ROW_H;
+    int len = 0, top = 0;
+    if (s_total > VIS) {
+        len = H * VIS / s_total;
+        if (len < 10) len = 10;
+        top = (H - len) * s_top / (s_total - VIS);
     }
-    ui_box_set(&s_convo, buf);
+    if (len == s_sb_len && top == s_sb_top) return;
+    s_sb_len = len;
+    s_sb_top = top;
+    const uint16_t track = RGB565(28, 28, 28), thumb = RGB565(120, 120, 120);
+    board_lcd_window(SB_X, CONVO_Y, SB_W, H);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int y = 0; y < H; y++) {
+        uint16_t c = len == 0 ? UI_BLACK : (y >= top && y < top + len) ? thumb : track;
+        uint16_t sc = (uint16_t)((c >> 8) | (c << 8));
+        for (int x = 0; x < SB_W; x++) buf[y * SB_W + x] = sc;
+    }
+    board_lcd_stream_push(buf, (size_t)SB_W * H);
+    board_lcd_stream_end();
 }
 
+static void show_window(void)
+{
+    int max_top = s_total > VIS ? s_total - VIS : 0;
+    if (s_follow) s_top = max_top;
+    if (s_top > max_top) s_top = max_top;
+    if (s_top < 0) s_top = 0;
+    ui_box_set_rows(&s_convo, (const char (*)[UI_MAX_COLS + 1])s_rows + s_top,
+                    s_total - s_top < VIS ? s_total - s_top : VIS);
+    draw_scrollbar();
+}
+
+// Append a wrapped paragraph to the page rows, tagging its rows. Chat and
+// list entries use a 2-column hanging indent; prose uses none.
+static void add_para_h(const char *text, int tag, int hang)
+{
+    if (s_total >= MAX_ROWS) return;
+    char (*tmp)[UI_MAX_COLS + 1] = s_tmp;
+    int n = ui_wrap_ex(text, s_convo.cols, hang, tmp, MAX_ROWS);
+    if (n > MAX_ROWS) n = MAX_ROWS;
+    for (int i = 0; i < n && s_total < MAX_ROWS; i++, s_total++) {
+        memcpy(s_rows[s_total], tmp[i], UI_MAX_COLS + 1);
+        s_tags[s_total] = (signed char)tag;
+    }
+}
+
+static void add_para(const char *text, int tag) { add_para_h(text, tag, 2); }
+static void add_prose(const char *text) { add_para_h(text, -1, 0); }
+
+static void build_chat(void)
+{
+    if (s_nturns == 0) {
+        add_para(UI_G_ROWMARK "Tap Ask and ask a question.", -1);
+        add_para("", -1);
+        add_prose(UI_G_ROWMARK "Answers come from a small AI and may be wrong. See /about.");
+        return;
+    }
+    char *buf = s_text;
+    size_t n = 0, cap = TEXT_BYTES;
+    buf[0] = 0;
+    for (int i = 0; i < s_nturns; i++) {
+        if (i > 0) n += (size_t)snprintf(buf + n, cap - n, "\n\n");   // blank line between turns
+        if (s_turns[i].q[0]) n += (size_t)snprintf(buf + n, cap - n, "> %s", s_turns[i].q);
+        if (s_turns[i].a[0])
+            n += (size_t)snprintf(buf + n, cap - n, "%s" UI_G_BULLET " %s",
+                                  s_turns[i].q[0] ? "\n" : "", s_turns[i].a);
+    }
+    add_para(buf, -1);
+}
+
+static void build_models(void)
+{
+    char line[96];
+    add_prose(UI_G_ROWMARK "Tap a model to use it:");
+    add_para("", -1);
+    int n = models_count();
+    if (n == 0) add_para(UI_G_ROWMARK "No models found on the SD card.", -1);
+    for (int i = 0; i < n; i++) {
+        const model_info_t *m = models_get(i);
+        const char *dir = strrchr(m->dir, '/');
+        snprintf(line, sizeof line, "%s %s", i == models_active() ? UI_G_BULLET : " ", m->name);
+        add_para(line, i);
+        snprintf(line, sizeof line, UI_G_ROWMARK "  %.2f MB " UI_G_MIDDOT " %s", m->bytes / 1048576.0,
+                 dir ? dir + 1 : m->dir);
+        add_para(line, i);
+        add_para("", -1);
+    }
+    add_prose(UI_G_ROWMARK "Add models as SD folders /story/llm*/ with model.bin + tok.bin.");
+}
+
+static void build_about(void)
+{
+    char line[96];
+    int a = models_active();
+    add_para("Braino AI", -1);
+    add_para(UI_G_ROWMARK "(c) iamankushpandit", -1);
+    add_para("", -1);
+    add_prose("An offline voice assistant. Everything runs on this device: no internet, no cloud.");
+    add_para("", -1);
+    add_prose(UI_G_ROWMARK "Hears: conformer STT (NVIDIA, lspr98; CC-BY-4.0)");
+    snprintf(line, sizeof line, UI_G_ROWMARK "Thinks: %s (TinyTalk, therezor)",
+             a >= 0 ? models_get(a)->name : "no model");
+    add_prose(line);
+    add_prose(UI_G_ROWMARK "Speaks: SVOX Pico TTS (Apache-2.0)");
+    add_para("", -1);
+    add_para(UI_G_BULLET " Notice", -1);
+    add_prose("Answers are generated by a small AI model on this device. They can be wrong, "
+             "silly or inappropriate. The authors are not responsible for any answers or "
+             "behaviour of this device. Children should use it with adult supervision.");
+}
+
+static void render_page(void)
+{
+    s_total = 0;
+    switch (s_page) {
+    case PAGE_CHAT: build_chat(); break;
+    case PAGE_MODELS: build_models(); break;
+    case PAGE_ABOUT: build_about(); break;
+    }
+    show_window();
+}
+
+// ---------------------------------------------------------------- header
 static void header_row(int r, const char *text, int accent_at, int white_from, int white_n)
 {
     char row[COLS + 1];
@@ -88,21 +257,36 @@ static void draw_header(void)
 
 void app_ui_init(void)
 {
+#ifndef STORY_HOST
+    if (!s_lock) s_lock = xSemaphoreCreateRecursiveMutex();
+#endif
+    if (!s_turns) {
+        s_turns = UI_ALLOC(sizeof(turn_t) * MAX_TURNS);
+        s_rows = UI_ALLOC(sizeof(*s_rows) * MAX_ROWS);
+        s_tags = UI_ALLOC(MAX_ROWS);
+        s_tmp = UI_ALLOC(sizeof(*s_tmp) * MAX_ROWS);
+        s_text = UI_ALLOC(TEXT_BYTES);
+        s_btn_px = UI_ALLOC(sizeof(uint16_t) * BAR_MAX_W * BAR_H);
+    }
+    UI_LOCK();
     // The only full-screen fill: once at boot, before the backlight is on.
     board_lcd_fill(0, 0, BOARD_LCD_W, BOARD_LCD_H, UI_BLACK);
     draw_header();
-    ui_box_init(&s_convo, 0, ROW_Y(4) + 4, BOARD_LCD_W, 12, UI_WHITE, UI_BLACK);
-    ui_box_style(&s_convo, 0, UI_WHITE, 2);        // 2-col hanging indent
+    ui_box_init(&s_convo, 0, CONVO_Y, CONVO_W, VIS, UI_WHITE, UI_BLACK);
     ui_box_mark(&s_convo, 0, '>', UI_DIM);
     ui_box_mark(&s_convo, 1, UI_G_BULLET[0], UI_ACCENT);
+    ui_box_mark_row(&s_convo, 2, UI_G_ROWMARK[0], UI_DIM);
     ui_box_init(&s_detail, 0, ROW_Y(16) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
     ui_box_init(&s_status, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
     ui_box_style(&s_status, 1, UI_ACCENT, 0);
-    app_ui_button(BTN_IDLE);
+    for (int b = 0; b < BAR_COUNT; b++) app_ui_bar_state((app_bar_t)b, BTN_IDLE);
+    render_page();
+    UI_UNLOCK();
 }
 
 void app_ui_status(const char *s, uint16_t color)
 {
+    UI_LOCK();
     char buf[64];
     bool idle = color == UI_GREEN || color == UI_GREY;
     char lead = idle ? UI_G_MIDDOT[0] : (char)(UI_G_SPIN0 + (s_spin++ % UI_SPIN_FRAMES));
@@ -117,10 +301,12 @@ void app_ui_status(const char *s, uint16_t color)
         ui_box_invalidate(&s_status);
     }
     ui_box_set(&s_status, buf);
+    UI_UNLOCK();
 }
 
 void app_ui_you(const char *text)
 {
+    UI_LOCK();
     if (s_nturns == MAX_TURNS) {   // drop the oldest turn
         memmove(&s_turns[0], &s_turns[1], sizeof s_turns[0] * (MAX_TURNS - 1));
         s_nturns--;
@@ -128,40 +314,128 @@ void app_ui_you(const char *text)
     sanitize(s_turns[s_nturns].q, Q_CHARS, text);
     s_turns[s_nturns].a[0] = 0;
     s_nturns++;
+    s_follow = true;               // a new question always jumps to the bottom
+    s_page = PAGE_CHAT;
     app_ui_detail("");
-    render_convo();
+    render_page();
+    UI_UNLOCK();
 }
 
 void app_ui_story(const char *text)
 {
+    UI_LOCK();
     if (s_nturns == 0) {           // an answer with no question (e.g. an error)
         s_turns[0].q[0] = 0;
         s_nturns = 1;
     }
     sanitize(s_turns[s_nturns - 1].a, A_CHARS, text);
-    render_convo();
+    if (s_page == PAGE_CHAT) render_page();
+    UI_UNLOCK();
 }
 
 void app_ui_detail(const char *text)
 {
+    UI_LOCK();
     char buf[48];
     if (text && text[0]) snprintf(buf, sizeof buf, "  " UI_G_RESULT "  %s", text);
     else buf[0] = 0;
     ui_box_set(&s_detail, buf);
+    UI_UNLOCK();
 }
 
-// ---------------------------------------------------------------- ask button
-// A slim outlined pill "✻ Ask" in the CLI style: 1 px border, small
-// symmetric spark, white label. Anti-aliased edges (4x4 supersampling for the
-// outline, 2x2 for the spark). Only this 84x26 rect is ever redrawn.
-#define BTN_W 84
-#define BTN_H 26
-#define BTN_X ((BOARD_LCD_W - BTN_W) / 2)
-#define BTN_Y 280
-#define BTN_TOUCH_PAD 14                 // touch target larger than the drawing
+void app_ui_clear_turn(void)
+{
+    UI_LOCK();
+    s_nturns = 0;
+    s_follow = true;
+    if (s_page == PAGE_CHAT) render_page();
+    app_ui_detail("");
+    UI_UNLOCK();
+}
 
-static int s_btn_state = -1;
+void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)
+{
+    UI_LOCK();
+    char d[40];
+    if (tok_per_s > 0) snprintf(d, sizeof d, "%d tok " UI_G_MIDDOT " %.1f tok/s", tokens, tok_per_s);
+    else snprintf(d, sizeof d, "%d tok", tokens);
+    s_last_rate = tok_per_s;
+    app_ui_status("Thinking...", UI_ACCENT);   // advances the spinner
+    app_ui_story(text);
+    app_ui_detail(d);
+    UI_UNLOCK();
+}
 
+float app_ui_last_tok_rate(void) { return s_last_rate; }
+
+// ---------------------------------------------------------------- pages
+void app_ui_page(app_page_t p)
+{
+    UI_LOCK();
+    if (p != s_page) {
+        s_page = p;
+        s_follow = p == PAGE_CHAT;     // pages open at the top, chat at the bottom
+        s_top = 0;
+        render_page();
+        app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
+        app_ui_bar_state(BAR_ABOUT, p == PAGE_ABOUT ? BTN_ACTIVE : BTN_IDLE);
+    }
+    UI_UNLOCK();
+}
+
+app_page_t app_ui_page_get(void) { return s_page; }
+
+void app_ui_refresh_page(void)
+{
+    UI_LOCK();
+    render_page();
+    UI_UNLOCK();
+}
+
+// ---------------------------------------------------------------- scrolling / taps
+bool app_ui_convo_hit(int x, int y)
+{
+    (void)x;
+    return y >= CONVO_Y && y < CONVO_Y + VIS * UI_ROW_H;
+}
+
+void app_ui_scroll_begin(void)
+{
+    UI_LOCK();
+    s_drag_top0 = s_top;
+    UI_UNLOCK();
+}
+
+void app_ui_scroll_drag(int dy_px)
+{
+    UI_LOCK();
+    int max_top = s_total > VIS ? s_total - VIS : 0;
+    int top = s_drag_top0 - dy_px / UI_ROW_H;     // drag down = see earlier rows
+    if (top < 0) top = 0;
+    if (top > max_top) top = max_top;
+    s_follow = s_page == PAGE_CHAT && top >= max_top;   // back at the bottom: follow again
+    if (top != s_top) {
+        s_top = top;
+        show_window();
+    }
+    UI_UNLOCK();
+}
+
+int app_ui_convo_tap(int x, int y)
+{
+    (void)x;
+    if (!app_ui_convo_hit(x, y)) return -1;
+    UI_LOCK();
+    int row = s_top + (y - CONVO_Y) / UI_ROW_H;
+    int tag = (row >= 0 && row < s_total) ? s_tags[row] : -1;
+    UI_UNLOCK();
+    return tag;
+}
+
+// ---------------------------------------------------------------- bottom bar
+// Slim outlined pills in the CLI style: 1 px anti-aliased border; the Ask pill
+// has a small symmetric spark. Each pill redraws only its own rect, only when
+// its state changes.
 static uint16_t mix565(uint16_t a, uint16_t b, float t)   // t: 0 -> a, 1 -> b
 {
     if (t <= 0) return a;
@@ -198,23 +472,27 @@ static float spark(float x, float y, float R)
     return 0.0f;
 }
 
-void app_ui_button(app_btn_state_t st)
+void app_ui_bar_state(app_bar_t b, app_btn_state_t st)
 {
-    if ((int)st == s_btn_state) return;                  // dirty-region: only on change
-    s_btn_state = (int)st;
+    if (b < 0 || b >= BAR_COUNT) return;
+    UI_LOCK();
+    if ((int)st == s_bar_state[b]) { UI_UNLOCK(); return; }   // dirty-region: only on change
+    s_bar_state[b] = (int)st;
+    const int W = BAR[b].w, H = BAR_H;
     const uint16_t bg = UI_BLACK;
+    bool dim = st == BTN_BUSY;
     uint16_t fill = st == BTN_PRESSED ? RGB565(48, 28, 22) : bg;
-    uint16_t edge = st == BTN_PRESSED ? UI_ACCENT : st == BTN_BUSY ? RGB565(60, 60, 60) : RGB565(95, 95, 95);
-    uint16_t icon = st == BTN_BUSY ? RGB565(110, 70, 58) : UI_ACCENT;
-    uint16_t text = st == BTN_BUSY ? RGB565(90, 90, 90) : UI_WHITE;
+    uint16_t edge = st == BTN_PRESSED || st == BTN_ACTIVE ? UI_ACCENT
+                  : dim ? RGB565(55, 55, 55) : RGB565(95, 95, 95);
+    uint16_t icon = dim ? RGB565(110, 70, 58) : UI_ACCENT;
+    uint16_t text = dim ? RGB565(85, 85, 85) : st == BTN_ACTIVE ? UI_ACCENT : UI_WHITE;
 
-    static uint16_t px[BTN_W * BTN_H];
-    const float cx = (BTN_W - 1) / 2.0f, cy = (BTN_H - 1) / 2.0f;
-    const float hx = BTN_W / 2.0f - 0.5f, hy = BTN_H / 2.0f - 0.5f, rad = hy;
-    for (int y = 0; y < BTN_H; y++) {
-        for (int x = 0; x < BTN_W; x++) {
-            // outline coverage: |distance| < 0.5 px band, supersampled
-            float ring = 0, inside = 0;
+    uint16_t *px = s_btn_px;
+    const float cx = (W - 1) / 2.0f, cy = (H - 1) / 2.0f;
+    const float hx = W / 2.0f - 0.5f, hy = H / 2.0f - 0.5f, rad = hy;
+    for (int y = 0; y < H; y++) {
+        for (int x = 0; x < W; x++) {
+            float ring = 0, inside = 0;          // 4x4 supersampled outline
             for (int s = 0; s < 16; s++) {
                 float sx = x - cx + ((s & 3) - 1.5f) * 0.25f, sy = y - cy + ((s >> 2) - 1.5f) * 0.25f;
                 float d = rrect(sx, sy, hx, hy, rad);
@@ -222,52 +500,49 @@ void app_ui_button(app_btn_state_t st)
                 else if (d < -1.0f) inside += 1;
             }
             uint16_t c = mix565(bg, fill, inside / 16.0f);
-            px[y * BTN_W + x] = mix565(c, edge, ring / 16.0f);
+            px[y * W + x] = mix565(c, edge, ring / 16.0f);
         }
     }
-    // Icon + label, centered as a group: [spark 11 px][gap 6][Ask 24 px]
-    const float R = 5.5f;
-    const int group = 11 + 6 + 3 * UI_FONT_W, gx = (BTN_W - group) / 2;
-    const float icx = gx + 5.0f, icy = cy;
-    for (int y = 0; y < BTN_H; y++) {
-        for (int x = gx - 1; x < gx + 12; x++) {
-            float cov = 0;
-            for (int s = 0; s < 4; s++)
-                cov += spark(x - icx + ((s & 1) ? 0.25f : -0.25f), y - icy + ((s & 2) ? 0.25f : -0.25f), R);
-            if (cov > 0) px[y * BTN_W + x] = mix565(px[y * BTN_W + x], icon, cov / 4.0f);
-        }
+    int label_w = (int)strlen(BAR[b].label) * UI_FONT_W;
+    int group = label_w + (BAR[b].spark ? 17 : 0), gx = (W - group) / 2;
+    if (BAR[b].spark) {
+        const float R = 5.5f, icx = gx + 5.0f, icy = cy;
+        for (int y = 0; y < H; y++)
+            for (int x = gx - 1; x < gx + 12; x++) {
+                float cov = 0;
+                for (int s = 0; s < 4; s++)
+                    cov += spark(x - icx + ((s & 1) ? 0.25f : -0.25f), y - icy + ((s & 2) ? 0.25f : -0.25f), R);
+                if (cov > 0) px[y * W + x] = mix565(px[y * W + x], icon, cov / 4.0f);
+            }
+        gx += 17;
     }
-    ui_text_into(px, BTN_W, BTN_H, gx + 17, (BTN_H - UI_FONT_H) / 2, "Ask", text);
+    ui_text_into(px, W, H, gx, (H - UI_FONT_H) / 2, BAR[b].label, text);
 
-    board_lcd_window(BTN_X, BTN_Y, BTN_W, BTN_H);
+    board_lcd_window(BAR[b].x, BAR_Y, W, H);
     uint16_t *buf = board_lcd_stream_buf();
-    for (int i = 0; i < BTN_W * BTN_H; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
-    board_lcd_stream_push(buf, BTN_W * BTN_H);
+    for (int i = 0; i < W * H; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, (size_t)W * H);
     board_lcd_stream_end();
+    UI_UNLOCK();
 }
 
-bool app_ui_button_hit(int x, int y)
+int app_ui_bar_hit(int x, int y)
 {
-    return x >= BTN_X - BTN_TOUCH_PAD && x < BTN_X + BTN_W + BTN_TOUCH_PAD &&
-           y >= BTN_Y - BTN_TOUCH_PAD && y < BTN_Y + BTN_H + BTN_TOUCH_PAD;
+    if (y < BAR_Y - BAR_TOUCH_PAD_Y || y >= BAR_Y + BAR_H + BAR_TOUCH_PAD_Y) return -1;
+    for (int b = 0; b < BAR_COUNT; b++)
+        if (x >= BAR[b].x - 2 && x < BAR[b].x + BAR[b].w + 2) return b;
+    return -1;
 }
 
-void app_ui_clear_turn(void)
+void app_ui_busy(bool busy)
 {
-    s_nturns = 0;
-    render_convo();
-    app_ui_detail("");
+    UI_LOCK();
+    s_busy = busy;
+    if (busy && s_page != PAGE_CHAT) app_ui_page(PAGE_CHAT);
+    app_ui_bar_state(BAR_ASK, busy ? BTN_BUSY : BTN_IDLE);
+    app_ui_bar_state(BAR_MODEL, busy ? BTN_BUSY : BTN_IDLE);
+    app_ui_bar_state(BAR_ABOUT, busy ? BTN_BUSY : BTN_IDLE);
+    UI_UNLOCK();
 }
 
-void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)
-{
-    char d[40];
-    if (tok_per_s > 0) snprintf(d, sizeof d, "%d tok " UI_G_MIDDOT " %.1f tok/s", tokens, tok_per_s);
-    else snprintf(d, sizeof d, "%d tok", tokens);
-    s_last_rate = tok_per_s;
-    app_ui_status("Thinking...", UI_ACCENT);   // advances the spinner
-    app_ui_story(text);
-    app_ui_detail(d);
-}
-
-float app_ui_last_tok_rate(void) { return s_last_rate; }
+bool app_ui_is_busy(void) { return s_busy; }

@@ -8,6 +8,7 @@
 #include "speak.h"
 #include "think.h"
 #include "story_intent.h"
+#include "touch_ui.h"
 #include "ui.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -39,7 +40,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, in
 
     // A session starts on a clean transcript; follow-ups append to it.
     if (!followup) app_ui_clear_turn();
-    board_backlight(80);
+    screen_on();
 
     // ---- LISTEN + TRANSCRIBE
     hear_result_t hr = hear_listen(hp, question, sizeof question, status_cb, &hs);
@@ -142,7 +143,7 @@ void pipeline_session(const hear_params_t *hp, int max_turns)
     printf("SESSION END turns=%d reason=%s\n", turn > max_turns ? max_turns : turn, reason);
     llm_history_clear(&hist);           // no conversation state survives the session
     app_ui_status("Session ended", UI_GREY);
-    board_backlight(0);                 // screen off; wake trigger turns it back on
+    screen_off();                       // screen off; a tap wakes it
     app_ui_clear_turn();                // cleared while dark, so the next session starts clean
     app_ui_status("Ready", UI_GREEN);
     story_mem_log("session-end");
