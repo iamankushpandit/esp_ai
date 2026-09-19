@@ -4,28 +4,51 @@
 #include "board_lcd_stream.h"
 #include <string.h>
 
-void ui_draw_row(int x, int y, int w, const char *s, uint16_t fg, uint16_t bg)
+static inline const uint8_t *glyph(unsigned char c, bool *extends)
+{
+    *extends = false;
+    if (c >= 0x20 && c < 0x7F) return font8x13[c - 0x20];
+    if (c >= FONT8X13_EXTRA_FIRST && c < FONT8X13_EXTRA_FIRST + FONT8X13_EXTRA_COUNT) {
+        *extends = true;   // box-drawing glyphs continue through the leading row
+        return font8x13_extra[c - FONT8X13_EXTRA_FIRST];
+    }
+    return NULL;
+}
+
+void ui_draw_row_attr(int x, int y, int w, const char *s, const uint8_t *attr,
+                      const uint16_t *palette, uint16_t bg)
 {
     // One row (w x UI_ROW_H px) fits in one DMA buffer (240*14 = 3360 < 4096).
-    uint16_t sfg = (uint16_t)((fg >> 8) | (fg << 8));
     uint16_t sbg = (uint16_t)((bg >> 8) | (bg << 8));
     int n = (int)strlen(s);
     board_lcd_window(x, y, w, UI_ROW_H);
     uint16_t *buf = board_lcd_stream_buf();
     uint16_t *p = buf;
     for (int r = 0; r < UI_ROW_H; r++) {
-        for (int px = 0; px < w; px++) {
-            int ci = px / UI_FONT_W;
+        for (int ci = 0; ci * UI_FONT_W < w; ci++) {
             uint8_t bits = 0;
-            if (ci < n && r < UI_FONT_H) {
-                unsigned char c = (unsigned char)s[ci];
-                if (c >= 0x20 && c < 0x7F) bits = font8x13[c - 0x20][r];
+            uint16_t fg = palette[0];
+            if (ci < n) {
+                bool ext;
+                const uint8_t *g = glyph((unsigned char)s[ci], &ext);
+                if (g) {
+                    if (r < UI_FONT_H) bits = g[r];
+                    else if (ext) bits = g[UI_FONT_H - 1];
+                }
+                if (attr) fg = palette[attr[ci]];
             }
-            *p++ = (bits & (0x80 >> (px % UI_FONT_W))) ? sfg : sbg;
+            uint16_t sfg = (uint16_t)((fg >> 8) | (fg << 8));
+            for (int b = 0; b < UI_FONT_W && ci * UI_FONT_W + b < w; b++)
+                *p++ = (bits & (0x80 >> b)) ? sfg : sbg;
         }
     }
     board_lcd_stream_push(buf, (size_t)w * UI_ROW_H);
     board_lcd_stream_end();
+}
+
+void ui_draw_row(int x, int y, int w, const char *s, uint16_t fg, uint16_t bg)
+{
+    ui_draw_row_attr(x, y, w, s, NULL, &fg, bg);
 }
 
 void ui_box_init(ui_box_t *b, int x, int y, int w, int rows, uint16_t fg, uint16_t bg)
@@ -40,22 +63,41 @@ void ui_box_init(ui_box_t *b, int x, int y, int w, int rows, uint16_t fg, uint16
     b->bg = bg;
 }
 
+void ui_box_style(ui_box_t *b, uint8_t lead_n, uint16_t lead_fg, uint8_t hang)
+{
+    b->lead_n = lead_n;
+    b->lead_fg = lead_fg;
+    b->hang = hang;
+}
+
 void ui_box_invalidate(ui_box_t *b)
 {
     for (int i = 0; i < b->rows; i++) b->shown[i][0] = '\x01';  // never equals real text
+}
+
+static void paint(ui_box_t *b, int i, const char *s)
+{
+    if (i == 0 && b->lead_n) {
+        uint8_t attr[UI_MAX_COLS] = {0};
+        for (int k = 0; k < b->lead_n && k < UI_MAX_COLS; k++) attr[k] = 1;
+        uint16_t pal[2] = {b->fg, b->lead_fg};
+        ui_draw_row_attr(b->x, b->y, b->w, s, attr, pal, b->bg);
+    } else {
+        ui_draw_row(b->x, b->y + i * UI_ROW_H, b->w, s, b->fg, b->bg);
+    }
 }
 
 int ui_box_set(ui_box_t *b, const char *text)
 {
     char next[UI_MAX_ROWS][UI_MAX_COLS + 1];
     memset(next, 0, sizeof next);
-    int need = ui_wrap(text, b->cols, next, b->rows);
+    int need = ui_wrap_ex(text, b->cols, b->hang, next, b->rows);
     int used = need < b->rows ? need : b->rows;
     int painted = 0;
     for (int i = 0; i < b->rows; i++) {
         const char *want = i < used ? next[i] : "";
         if (strcmp(want, b->shown[i]) != 0) {
-            ui_draw_row(b->x, b->y + i * UI_ROW_H, b->w, want, b->fg, b->bg);
+            paint(b, i, want);
             strcpy(b->shown[i], want);
             painted++;
         }
@@ -67,9 +109,6 @@ void ui_box_set_color(ui_box_t *b, uint16_t fg)
 {
     if (b->fg == fg) return;
     b->fg = fg;
-    for (int i = 0; i < b->rows; i++) {
-        if (b->shown[i][0]) {
-            ui_draw_row(b->x, b->y + i * UI_ROW_H, b->w, b->shown[i], b->fg, b->bg);
-        }
-    }
+    for (int i = 0; i < b->rows; i++)
+        if (b->shown[i][0]) paint(b, i, b->shown[i]);
 }

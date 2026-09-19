@@ -26,6 +26,17 @@ int main(void)
 
     n = ui_wrap("caf\xc3\xa9", 10, r, 2);                // non-ASCII -> '?'
     CHECK(strcmp(r[0], "caf??") == 0);
+    // hanging indent: continuation rows start with 2 spaces
+    n = ui_wrap_ex("> tell me a story about a cat", 12, 2, r, 5);
+    CHECK(n == 4);
+    CHECK(strcmp(r[0], "> tell me a") == 0);
+    CHECK(strcmp(r[1], "  story") == 0);
+    CHECK(strcmp(r[2], "  about a") == 0);
+    CHECK(strcmp(r[3], "  cat") == 0);
+
+    // UI glyph bytes pass through; other high bytes don't
+    n = ui_wrap("\x86 ok \xff", 10, r, 2);
+    CHECK((unsigned char)r[0][0] == 0x86 && r[0][5] == '?');
     printf("test_wrap OK\n");
     return 0;
 }

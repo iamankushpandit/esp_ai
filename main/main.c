@@ -180,7 +180,7 @@ void app_main(void)
     gpio_config_t btn = {.pin_bit_mask = 1ULL << BOARD_BOOT_BTN, .mode = GPIO_MODE_INPUT,
                          .pull_up_en = GPIO_PULLUP_ENABLE};
     gpio_config(&btn);
-    app_ui_you("Press BOOT and ask a question.");
+    app_ui_footer("BOOT to ask " UI_G_MIDDOT " offline");
 
     char line[200];
     while (1) {

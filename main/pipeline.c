@@ -70,9 +70,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
     if (hist) llm_history_push(hist, question, answer);
 
     // ---- SPEAK
-    char spk[40];
-    snprintf(spk, sizeof spk, "Speaking  (%.1f tok/s)", app_ui_last_tok_rate());
-    app_ui_status(spk, UI_CYAN);
+    app_ui_status("Speaking...", UI_ACCENT);   // detail line keeps the tok/s
     int64_t t_speak0 = story_time_us();
     if (!speak_text(answer, NULL, &ss)) {
         app_ui_status("TTS error (answer shown)", UI_RED);   // answer stays on screen
@@ -100,9 +98,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
 done:
     story_mem_log("turn-end");
     if (res == PIPE_OK) {
-        char d[40];
-        snprintf(d, sizeof d, "Done  (LLM %.1f tok/s)", app_ui_last_tok_rate());
-        app_ui_status(d, UI_GREEN);
+        app_ui_status("Done", UI_GREEN);
     } else {
         app_ui_status("Ready", UI_GREY);
     }
