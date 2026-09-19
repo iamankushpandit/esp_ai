@@ -12,7 +12,7 @@
 
 static const char *TAG = "gguf";
 
-enum { T_F32 = 0, T_F16 = 1, T_Q4_0 = 2, T_Q8_0 = 8 };
+enum { T_F32 = 0, T_F16 = 1, T_Q4_0 = 2, T_Q8_0 = 8, T_Q4P = 100 };
 enum { V_U8, V_I8, V_U16, V_I16, V_U32, V_I32, V_F32, V_BOOL, V_STR, V_ARR, V_U64, V_I64, V_F64 };
 #define QK 32
 
@@ -307,9 +307,38 @@ static void quantize_x(const float *x, int n, int8_t *q, float *s)
     }
 }
 
+#ifndef STORY_HOST
+// ESP32-S3 PIE kernel (dot_q4_pie.S): 16-aligned nibble plane + bf16 scales.
+extern float dot_q4q8_pie(const uint8_t *nib, const int8_t *xq, const uint8_t *scales, const float *xs, int nb);
+#endif
+
+static inline float bf16_to_f32(const uint8_t *p)
+{
+    uint32_t u = (uint32_t)(p[0] | p[1] << 8) << 16;
+    float f;
+    memcpy(&f, &u, 4);
+    return f;
+}
+
 static float dot_row(const gg_tensor_t *w, int row, const float *x, const int8_t *xq, const float *xs)
 {
     const int n = w->ne0;
+    if (w->type == T_Q4P) {
+        const int nb = n / QK;
+        const uint8_t *nib = w->data + (size_t)row * nb * 16, *sc = w->scales + (size_t)row * nb * 2;
+#ifndef STORY_HOST
+        return dot_q4q8_pie(nib, xq, sc, xs, nb);
+#else
+        float sum = 0;
+        for (int b = 0; b < nb; b++, nib += 16) {
+            int32_t acc = 0;
+            for (int i = 0; i < 16; i++)
+                acc += ((nib[i] & 0x0F) - 8) * xq[b * QK + i] + ((nib[i] >> 4) - 8) * xq[b * QK + i + 16];
+            sum += acc * bf16_to_f32(sc + 2 * b) * xs[b];
+        }
+        return sum;
+#endif
+    }
     const uint8_t *p = w->data + row_bytes(w->type, n) * (size_t)row;
     float sum = 0;
     switch (w->type) {
@@ -346,16 +375,131 @@ static float dot_row(const gg_tensor_t *w, int row, const float *x, const int8_t
     return sum;
 }
 
+typedef struct {
+    const gg_tensor_t *w;
+    const float *x;
+    const int8_t *xq;
+    const float *xs;
+    float *out;
+    int r0, r1;
+} mv_args_t;
+
+static void mv_rows(const mv_args_t *a)
+{
+    for (int r = a->r0; r < a->r1; r++) a->out[r] = dot_row(a->w, r, a->x, a->xq, a->xs);
+}
+
+#ifndef STORY_HOST
+#include "freertos/FreeRTOS.h"
+#include "freertos/semphr.h"
+#include "freertos/task.h"
+// Second-core worker: each matvec gives it the first half of the rows.
+typedef struct {
+    SemaphoreHandle_t go, done;
+    volatile bool quit;
+    mv_args_t args;
+} mv_worker_t;
+
+static void mv_worker_fn(void *p)
+{
+    mv_worker_t *w = (mv_worker_t *)p;
+    for (;;) {
+        xSemaphoreTake(w->go, portMAX_DELAY);
+        if (w->quit) break;
+        mv_rows(&w->args);
+        xSemaphoreGive(w->done);
+    }
+    xSemaphoreGive(w->done);
+    vTaskDelete(NULL);
+}
+
+static void *worker_start(story_arena_t *a)
+{
+    mv_worker_t *w = story_arena_alloc(a, sizeof *w, 4, "gguf.worker");
+    if (!w) return NULL;
+    memset(w, 0, sizeof *w);
+    w->go = xSemaphoreCreateBinary();
+    w->done = xSemaphoreCreateBinary();
+    int other = xPortGetCoreID() == 0 ? 1 : 0;
+    if (xTaskCreatePinnedToCore(mv_worker_fn, "gguf_mv", 3072, w, uxTaskPriorityGet(NULL), NULL, other) != pdPASS)
+        return NULL;
+    return w;
+}
+
+void gguf_llm_unload(gguf_llm_t *m)
+{
+    mv_worker_t *w = (mv_worker_t *)m->worker;
+    if (!w) return;
+    w->quit = true;
+    xSemaphoreGive(w->go);
+    xSemaphoreTake(w->done, portMAX_DELAY);
+    vSemaphoreDelete(w->go);
+    vSemaphoreDelete(w->done);
+    m->worker = NULL;
+}
+#else
+static void *worker_start(story_arena_t *a) { (void)a; return NULL; }
+void gguf_llm_unload(gguf_llm_t *m) { m->worker = NULL; }
+#endif
+
 static void matvec(gguf_llm_t *m, const gg_tensor_t *w, const float *x, float *out)
 {
-    bool q = w->type == T_Q4_0 || w->type == T_Q8_0;
+    bool q = w->type == T_Q4_0 || w->type == T_Q8_0 || w->type == T_Q4P;
     if (q) quantize_x(x, w->ne0, m->xq, m->xqs);
-    for (int r = 0; r < w->ne1; r++) out[r] = dot_row(w, r, x, m->xq, m->xqs);
+#ifndef STORY_HOST
+    mv_worker_t *wk = (mv_worker_t *)m->worker;
+    if (wk && w->ne1 >= 64) {
+        int split = w->ne1 / 2;
+        wk->args = (mv_args_t){w, x, m->xq, m->xqs, out, 0, split};
+        xSemaphoreGive(wk->go);
+        mv_args_t self = {w, x, m->xq, m->xqs, out, split, w->ne1};
+        mv_rows(&self);
+        xSemaphoreTake(wk->done, portMAX_DELAY);
+        return;
+    }
+#endif
+    mv_args_t all = {w, x, m->xq, m->xqs, out, 0, w->ne1};
+    mv_rows(&all);
+}
+
+// Q4_0 -> planar, in place: nibbles compacted to the front of the tensor
+// (16 B per block, so rows stay 16-aligned for the PIE kernel), then the
+// block scales (as bf16) moved into the freed tail. `tmp` holds one
+// tensor's scales meanwhile.
+static void repack_q4(gg_tensor_t *t, uint8_t *tmp)
+{
+    uint8_t *base = (uint8_t *)t->data;
+    const size_t nblk = (size_t)t->ne0 / QK * t->ne1;
+    for (size_t b = 0; b < nblk; b++) {
+        const uint8_t *src = base + b * 18;
+        float d = f16_to_f32(rd16(src));
+        uint32_t u;
+        memcpy(&u, &d, 4);
+        u += 0x7FFF + ((u >> 16) & 1);                  // round to nearest even bf16
+        tmp[2 * b] = (uint8_t)(u >> 16);
+        tmp[2 * b + 1] = (uint8_t)(u >> 24);
+        memmove(base + b * 16, src + 2, 16);             // write pos <= read pos: safe
+    }
+    memcpy(base + nblk * 16, tmp, nblk * 2);
+    t->scales = base + nblk * 16;
+    t->type = T_Q4P;
 }
 
 static void embed_row(const gg_tensor_t *w, int row, float *out)
 {
     const int n = w->ne0;
+    if (w->type == T_Q4P) {
+        const int nb = n / QK;
+        const uint8_t *nib = w->data + (size_t)row * nb * 16, *sc = w->scales + (size_t)row * nb * 2;
+        for (int b = 0; b < nb; b++, nib += 16) {
+            float d = bf16_to_f32(sc + 2 * b);
+            for (int i = 0; i < 16; i++) {
+                out[b * QK + i] = d * ((nib[i] & 0x0F) - 8);
+                out[b * QK + i + 16] = d * ((nib[i] >> 4) - 8);
+            }
+        }
+        return;
+    }
     const uint8_t *p = w->data + row_bytes(w->type, n) * (size_t)row;
     switch (w->type) {
     case T_F32: memcpy(out, p, (size_t)n * 4); break;
@@ -387,11 +531,22 @@ static void rmsnorm(float *o, const float *x, const gg_tensor_t *w, int n, float
     for (int i = 0; i < n; i++) o[i] = x[i] * ss * g[i];
 }
 
-static void rope(float *v, int heads, int hd, int pos, float base)
+// cos/sin for this position are computed once per token (rope_prepare).
+static void rope_prepare(gguf_llm_t *m, int pos)
 {
+    for (int i = 0; i < m->head_dim / 2; i++) {
+        float f = pos * m->rope_freq[i];
+        m->rope_cos[i] = cosf(f);
+        m->rope_sin[i] = sinf(f);
+    }
+}
+
+static void rope(const gguf_llm_t *m, float *v, int heads)
+{
+    const int hd = m->head_dim;
     for (int h = 0; h < heads; h++)
         for (int i = 0; i < hd; i += 2) {
-            float f = pos / powf(base, (float)i / hd), c = cosf(f), s = sinf(f);
+            float c = m->rope_cos[i / 2], s = m->rope_sin[i / 2];
             float *p = v + h * hd + i, a = p[0], b = p[1];
             p[0] = a * c - b * s;
             p[1] = a * s + b * c;
@@ -402,14 +557,15 @@ float *gguf_llm_forward(gguf_llm_t *m, int token, int pos)
 {
     const int d = m->dim, hd = m->head_dim, kvd = m->kv_dim, H = m->heads, grp = m->heads / m->kv_heads;
     embed_row(&m->tok_embd, token, m->x);
+    rope_prepare(m, pos);
     for (int l = 0; l < m->layers; l++) {
         gg_layer_t *L = &m->layer[l];
         rmsnorm(m->xb, m->x, &L->attn_norm, d, m->eps);
         matvec(m, &L->wq, m->xb, m->q);
         matvec(m, &L->wk, m->xb, m->hb);                   // k (kv_dim) into scratch
         matvec(m, &L->wv, m->xb, m->hb2);                  // v
-        rope(m->q, H, hd, pos, m->rope_base);
-        rope(m->hb, m->kv_heads, hd, pos, m->rope_base);
+        rope(m, m->q, H);
+        rope(m, m->hb, m->kv_heads);
         uint16_t *kc = m->kc + ((size_t)l * m->ctx + pos) * kvd, *vc = m->vc + ((size_t)l * m->ctx + pos) * kvd;
         for (int i = 0; i < kvd; i++) { kc[i] = f32_to_f16(m->hb[i]); vc[i] = f32_to_f16(m->hb2[i]); }
         const float scale = 1.0f / sqrtf((float)hd);
@@ -694,6 +850,44 @@ bool gguf_llm_load(gguf_llm_t *m, const uint8_t *file, size_t len, int ctx_req, 
     snprintf(m->pre, sizeof m->pre, "%.*s", (int)(q - tpl), tpl);
     snprintf(m->post, sizeof m->post, "%s", *q ? q + 3 : "");
 
+    // Repack Q4_0 weights to the planar layout the SIMD kernel reads. The
+    // file image is in RAM and ours, so this happens in place.
+    {
+        size_t max_blk = 0;
+        gg_tensor_t *all[4 + 9 * 64];
+        int na = 0;
+        all[na++] = &m->tok_embd;
+        all[na++] = &m->output;
+        for (int l = 0; l < m->layers && l < 64; l++) {
+            gg_layer_t *L = &m->layer[l];
+            gg_tensor_t *lt[9] = {&L->wq, &L->wk, &L->wv, &L->wo, &L->w_gate, &L->w_up, &L->w_down,
+                                  &L->attn_norm, &L->ffn_norm};
+            for (int i = 0; i < 9; i++) all[na++] = lt[i];
+        }
+        for (int i = 0; i < na; i++)
+            if (all[i]->data && all[i]->type == T_Q4_0) {
+                size_t nb = (size_t)all[i]->ne0 / QK * all[i]->ne1;
+                if (nb > max_blk) max_blk = nb;
+            }
+        if (max_blk) {
+            size_t mark = story_arena_mark(bulk);
+            uint8_t *tmp = ALLOC(bulk, max_blk * 2, "gguf.repack");
+            if (!tmp) { snprintf(err, errcap, "out of memory (repack %u KB)", (unsigned)(max_blk * 2 / 1024)); return false; }
+            int64_t t0 = story_time_us();
+            for (int i = 0; i < na; i++)
+                if (all[i]->data && all[i]->type == T_Q4_0) repack_q4(all[i], tmp);
+            story_arena_rewind(bulk, mark);
+            SLOGI(TAG, "repacked Q4_0 weights to planar in %lld ms", (story_time_us() - t0) / 1000);
+        }
+    }
+
+    // RoPE frequencies (per pair), cos/sin filled per token.
+    m->rope_freq = ALLOC(fast, sizeof(float) * (m->head_dim / 2), "gguf.rope");
+    m->rope_cos = ALLOC(fast, sizeof(float) * (m->head_dim / 2), "gguf.cos");
+    m->rope_sin = ALLOC(fast, sizeof(float) * (m->head_dim / 2), "gguf.sin");
+    if (!m->rope_freq || !m->rope_cos || !m->rope_sin) { snprintf(err, errcap, "out of memory (rope)"); return false; }
+    for (int i = 0; i < m->head_dim / 2; i++) m->rope_freq[i] = 1.0f / powf(m->rope_base, 2.0f * i / m->head_dim);
+
     // Run state: activations in fast (internal) RAM, KV cache in PSRAM.
     int big = m->hidden > m->dim ? m->hidden : m->dim;
     m->x = ALLOC(fast, sizeof(float) * m->dim, "gguf.x");
@@ -714,6 +908,7 @@ bool gguf_llm_load(gguf_llm_t *m, const uint8_t *file, size_t len, int ctx_req, 
         snprintf(err, errcap, "out of memory (KV cache %u KB)", (unsigned)(kvn * 4 / 1024));
         return false;
     }
+    m->worker = worker_start(fast);         // NULL on the host: single-threaded
     SLOGI(TAG, "%s: llama dim %d ffn %d layers %d heads %d/%d vocab %d ctx %d, template \"%s{q}%s\"", m->name,
           m->dim, m->hidden, m->layers, m->heads, m->kv_heads, m->vocab, m->ctx, m->pre, m->post);
     return true;

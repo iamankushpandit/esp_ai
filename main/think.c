@@ -100,6 +100,7 @@ static bool think_gguf(const char *question, char *answer, size_t cap, think_str
     if (fn) fn(user, answer, st->prompt_tokens, st->gen_tokens,
                st->gen_us ? st->gen_tokens / (st->gen_us / 1e6f) : rate(&s, story_time_us()));
     st->load_us = load_us;
+    gguf_llm_unload(&m);
     if (ok)
         ESP_LOGI(TAG, "GGUF %s: load %lld ms, prompt %d tok (prefill %lld ms), gen %d tok in %lld ms = %.1f tok/s, stop=%s",
                  m.name, load_us / 1000, st->prompt_tokens, st->prefill_us / 1000, st->gen_tokens,

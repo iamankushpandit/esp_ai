@@ -26,9 +26,11 @@ extern "C" {
 #endif
 
 typedef struct {
-    int type;                    // ggml type: 0 F32, 1 F16, 2 Q4_0, 8 Q8_0
+    int type;                    // ggml type: 0 F32, 1 F16, 2 Q4_0, 8 Q8_0;
+                                 // 100 = Q4_0 repacked planar at load (see below)
     int ne0, ne1;                // row length, rows
-    const uint8_t *data;
+    const uint8_t *data;         // planar: nibble plane, rows * ne0/2 bytes, 16-aligned rows
+    const uint8_t *scales;       // planar: bf16 block scales, rows * ne0/32 * 2 bytes
 } gg_tensor_t;
 
 typedef struct {
@@ -62,6 +64,8 @@ typedef struct {
     int8_t *xq;
     float *xqs;
     uint16_t *kc, *vc;           // [layers][ctx][kv_dim], f16
+    float *rope_freq, *rope_cos, *rope_sin;   // [head_dim/2]
+    void *worker;                // second-core matvec worker (device only)
     volatile bool stop;
 } gguf_llm_t;
 
@@ -70,6 +74,9 @@ typedef struct {
 // `bulk`. On failure writes a short human-readable reason to err.
 bool gguf_llm_load(gguf_llm_t *m, const uint8_t *file, size_t len, int ctx_req, story_arena_t *fast,
                    story_arena_t *bulk, char *err, size_t errcap);
+
+// Stops the second-core worker. Arena memory is released with the phase.
+void gguf_llm_unload(gguf_llm_t *m);
 
 // Bytes of PSRAM the run state needs beyond the file itself (for "too big"
 // checks before loading).
