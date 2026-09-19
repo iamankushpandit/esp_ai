@@ -211,15 +211,21 @@ void app_main(void)
     console_init();
 
     esp_err_t lcd = board_lcd_init();
+    // Welcome screen while the rest of the hardware and models come up.
+    int64_t t_splash = story_time_us();
+    app_ui_splash();
+    screen_on();
     esp_err_t tp = board_touch_init();
     esp_err_t au = board_audio_init();
     esp_err_t sd = board_sd_mount(false);
     if (sd == ESP_OK) models_scan();    // selectable LLMs on the SD card + saved choice
     story_mem_log("drivers");
     s_hear = hear_default_params();
+    const int64_t SPLASH_MIN_US = 2000000;
+    int64_t shown = story_time_us() - t_splash;
+    if (shown < SPLASH_MIN_US) vTaskDelay(pdMS_TO_TICKS((SPLASH_MIN_US - shown) / 1000));
 
     app_ui_init();
-    screen_on();
     if (!arenas) app_ui_status("MEMORY ERROR", UI_RED);
     else if (sd != ESP_OK) app_ui_status("SD card error", UI_RED);
     else app_ui_status("Ready", UI_GREEN);

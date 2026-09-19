@@ -1,7 +1,7 @@
 // The single assistant screen (portrait 240x320), styled like a CLI session:
 //
 //   ╭────────────────────────────╮
-//   │ ✻ Braino AI                │
+//   │ [brain] Braino AI          │
 //   │   (c) iamankushpandit      │
 //   ╰────────────────────────────╯
 //   > what color is a banana       ▐ <- scrollable page area: the session
@@ -19,6 +19,8 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+// Boot welcome screen: the Braino AI logo in orange + "(c) iamankushpandit".
+void app_ui_splash(void);
 void app_ui_init(void);
 // Status line. Busy states (any color other than UI_GREEN/UI_GREY) get an
 // advancing spinner glyph; "..." is shown as an ellipsis.

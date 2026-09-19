@@ -83,6 +83,8 @@ static void stream(const char *ans, int tok, float rate)
 int main(int argc, char **argv)
 {
     s_dir = argc > 1 ? argv[1] : ".";
+    STEP("splash", app_ui_splash());
+    dump();
     STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN));
     dump();
 
