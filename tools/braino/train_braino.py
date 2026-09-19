@@ -134,6 +134,10 @@ def main():
     # end in the 8M trainer. This file was written before that was found, so
     # it had the slow path: measured at step 300, evaluation was about 60% of
     # the whole run.
+    # Imported here because build_model() imports it in its own scope; at
+    # module level this name does not exist.
+    from transformers import GPTNeoForCausalLM
+
     eval_model = GPTNeoForCausalLM(model.config).to("cpu").eval()
 
     def cpu_state():

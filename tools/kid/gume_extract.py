@@ -1310,9 +1310,12 @@ def main():
 
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    (out / "gume_train.txt").write_text("\n\n".join(train) + "\n", encoding="utf-8", newline="\n")
-    (out / "gume_eval.jsonl").write_text("\n".join(json.dumps(e) for e in evals) + "\n",
-                                         encoding="utf-8", newline="\n")
+    # newline="\n" on write_text is Python 3.10+, and the training venv is 3.9.
+    # open(newline="\n") does the same job on both.
+    with (out / "gume_train.txt").open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n\n".join(train) + "\n")
+    with (out / "gume_eval.jsonl").open("w", encoding="utf-8", newline="\n") as fh:
+        fh.write("\n".join(json.dumps(e) for e in evals) + "\n")
     (out / "gume_sources.json").write_text(json.dumps(
         {g: {"sources": SOURCES.get(g, []), "facts": c[0], "train": c[1], "eval": c[2]}
          for g, c in per_game.items()}, indent=1), encoding="utf-8")

@@ -35,6 +35,7 @@ ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(ROOT))
 
 from tools.braino.facts import validate                      # noqa: E402
+from tools.braino.facts.outofscope import TOPIC as OOS_TOPIC  # noqa: E402
 from tools.kid.phrasing import pools_disjoint, variants      # noqa: E402
 
 
@@ -53,8 +54,17 @@ def load_facts():
     return facts, counts
 
 
-def expand(facts, per_fact, seed):
-    """-> (train_rows, eval_rows). Answers never vary; only the question does."""
+def expand(facts, per_fact, seed, refusal_per_fact=None):
+    """-> (train_rows, eval_rows). Answers never vary; only the question does.
+
+    refusal_per_fact overrides per_fact for the out-of-scope topic. It needs
+    its own number because refusal is a BEHAVIOUR rather than a fact: there
+    are only ~32 refusal subjects against ~20,000 real facts, so at the same
+    per-fact rate refusals are ~0.5% of the corpus and too dilute to stick.
+    Push it too far the other way and the model starts refusing things it
+    knows. The right value is found by measuring both directions with
+    tools/braino/eval_refusal.py, not by argument.
+    """
     rng = random.Random(seed)
     train, ev = [], []
 
@@ -74,17 +84,19 @@ def expand(facts, per_fact, seed):
 
     dropped = 0
     for f in facts:
+        target = (refusal_per_fact if (refusal_per_fact and f.topic == OOS_TOPIC)
+                  else per_fact)
         # Keep the hand-written wordings verbatim - they are the most natural
-        # ones - then top up to per_fact with generated surface forms.
+        # ones - then top up to target with generated surface forms.
         qs = list(dict.fromkeys(f.train))
-        need = max(0, per_fact - len(qs))
+        need = max(0, target - len(qs))
         if need:
             pool = []
             for base in f.train:
                 pool += variants(base, rng, need)
             have = {x.lower() for x in qs}
             for q in pool:
-                if len(qs) >= per_fact:
+                if len(qs) >= target:
                     break
                 if q.lower() in have:
                     continue
@@ -110,6 +122,10 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=str(ROOT / "models_out/braino/data"))
     ap.add_argument("--per-fact", type=int, default=14)
+    ap.add_argument("--refusal-per-fact", type=int, default=None,
+                    help="phrasings for the out-of-scope topic. Defaults to "
+                         "--per-fact, which leaves refusals at ~0.5%% of a "
+                         "full-parity corpus - usually too dilute to learn.")
     ap.add_argument("--seed", type=int, default=0)
     a = ap.parse_args()
 
@@ -134,7 +150,7 @@ def main():
         raise SystemExit("refusing to build a corpus that contradicts itself")
     print("combined validation: clean")
 
-    train, ev = expand(facts, a.per_fact, a.seed)
+    train, ev = expand(facts, a.per_fact, a.seed, a.refusal_per_fact)
 
     # The whole point of the two pools is that this number is zero. Check the
     # realized questions, not just the pool definitions - a hand-written evalq
