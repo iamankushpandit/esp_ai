@@ -1,99 +1,103 @@
-"""Convert the Braino AI logo (black line art on white) into 4-bit alpha masks.
+"""Render the Ivy AI logo (SVG) into RGB565 images for the display.
 
-  python tools/gen_logo.py assets/braino_logo.png main/logo_data.h
+  python tools/gen_logo.py assets/ivy_ai_logo.svg main/logo_data.h
 
-Outputs two masks (coverage 0..15, two pixels per byte, row-major):
-  logo_full  : the whole logo (bulb + brain + "Braino AI" wordmark), for the
-               boot welcome screen
-  logo_brain : just the brain (top part of the bulb, no "TM"), for the header
+The SVG is rasterised by a headless Chrome/Edge at 4x, composited on black
+(the screen background), then downscaled with Lanczos. Outputs:
+  logo_full : leaf + "Ivy AI" wordmark, for the boot welcome screen
+  logo_icon : just the leaf symbol, for the header
 
-The device tints them (Claude orange on black) with anti-aliased edges.
+The wordmark's dark "Ivy" is recoloured light so it reads on black.
 """
+import os
+import re
+import shutil
+import subprocess
 import sys
+import tempfile
 
-from PIL import Image, ImageOps
+from PIL import Image
 
 FULL_H = 230        # welcome screen logo height (px)
-BRAIN_H = 28        # header icon height (px): exactly two text rows
+ICON_H = 28         # header icon height (px): exactly two text rows
+SCALE = 4           # render oversampling
+IVY_ON_BLACK = "#f3e6de"
+
+BROWSERS = [
+    r"C:\Program Files\Google\Chrome\Application\chrome.exe",
+    r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe",
+    "google-chrome", "chromium", "msedge",
+]
 
 
-def ink_mask(img):
-    """Grayscale ink coverage: 255 = black ink, 0 = white paper."""
-    # Transparent PNGs: composite onto white paper first.
-    rgba = img.convert("RGBA")
-    paper = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
-    g = ImageOps.grayscale(Image.alpha_composite(paper, rgba).convert("RGB"))
-    return ImageOps.invert(g)
+def browser():
+    for b in BROWSERS:
+        if os.path.exists(b) or shutil.which(b):
+            return b
+    sys.exit("gen_logo: need Chrome or Edge to rasterise the SVG")
 
 
-def bbox_of(mask, box=None, thresh=96):
-    m = mask.crop(box) if box else mask
-    bw = m.point(lambda v: 255 if v > thresh else 0)
-    bb = bw.getbbox()
-    if box and bb:
-        bb = (bb[0] + box[0], bb[1] + box[1], bb[2] + box[0], bb[3] + box[1])
-    return bb
+def variant(svg, symbol_only):
+    s = svg.replace("fill:#3b2520", "fill:" + IVY_ON_BLACK)
+    if symbol_only:
+        s = re.sub(r'<g\s+id="wordmark".*(?=</svg>)', "", s, flags=re.S)   # wordmark is the last group
+    w, h = 520 * SCALE, 620 * SCALE
+    s = re.sub(r'width="520"\s+height="620"', f'width="{w}" height="{h}"', s, count=1)
+    # Black paper under everything.
+    return s.replace("</defs>", '</defs><rect width="520" height="620" fill="#000"/>', 1), w, h
 
 
-def to4bit(mask, name):
-    w, h = mask.size
-    px = mask.load()
-    out = []
-    for y in range(h):
-        row = []
-        for x in range(0, w, 2):
-            a = px[x, y] >> 4
-            b = (px[x + 1, y] >> 4) if x + 1 < w else 0
-            row.append((a << 4) | b)
-        out.extend(row)
-    lines = [f"#define {name.upper()}_W {w}", f"#define {name.upper()}_H {h}",
-             f"static const uint8_t {name}[{len(out)}] = {{"]
-    for i in range(0, len(out), 24):
-        lines.append("    " + ",".join(f"0x{v:02X}" for v in out[i:i + 24]) + ",")
-    lines.append("};")
-    return "\n".join(lines)
+def rasterise(svg_text, w, h, tmp, name):
+    src = os.path.join(tmp, name + ".svg")
+    png = os.path.join(tmp, name + ".png")
+    with open(src, "w", encoding="utf-8") as f:
+        f.write(svg_text)
+    subprocess.run([browser(), "--headless", "--disable-gpu", "--hide-scrollbars",
+                    f"--window-size={w},{h}", f"--screenshot={png}",
+                    "file:///" + src.replace("\\", "/")],
+                   check=True, capture_output=True, timeout=60)
+    return Image.open(png).convert("RGB").crop((0, 0, w, h))
 
 
-def fit(mask, box, height):
-    crop = mask.crop(box)
+def fit(img, height):
+    lum = img.convert("L").point(lambda v: 255 if v > 12 else 0)
+    crop = img.crop(lum.getbbox())
     w = max(2, round(crop.width * height / crop.height))
     return crop.resize((w, height), Image.LANCZOS)
 
 
+def to565(img, name):
+    w, h = img.size
+    px = img.load()
+    out = []
+    for y in range(h):
+        for x in range(w):
+            r, g, b = px[x, y]
+            out.append(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3))
+    lines = [f"#define {name.upper()}_W {w}", f"#define {name.upper()}_H {h}",
+             f"static const uint16_t {name}[{len(out)}] = {{"]
+    for i in range(0, len(out), 16):
+        lines.append("    " + ",".join(f"0x{v:04X}" for v in out[i:i + 16]) + ",")
+    lines.append("};")
+    return "\n".join(lines)
+
+
 def main():
     src, dst = sys.argv[1], sys.argv[2]
-    img = Image.open(src)
-    ink = ink_mask(img)
-    W, H = ink.size
-
-    full = bbox_of(ink)
-    # Brain: the top part of the drawing, above the bulb neck. Find the first
-    # row (from the top of the drawing) where the ink narrows sharply: the
-    # neck. Fallback: top 58% of the drawing height.
-    x0, y0, x1, y1 = full
-    fw, fh = x1 - x0, y1 - y0
-    # Brain = the bulb's head, down to the neck (above the screw lines).
-    brain_bottom = y0 + int(fh * 0.62)
-    # The "TM" mark sits alone in the top-right corner, above the right lobe:
-    # blank that corner before measuring the brain.
-    no_tm = ink.copy()
-    no_tm.paste(0, (x0 + int(fw * 0.82), y0, x1, y0 + int(fh * 0.07)))
-    brain = bbox_of(no_tm, (x0, y0, x1, brain_bottom))
-    ink_brain = no_tm
-
-    full_m = fit(ink, full, FULL_H)
-    brain_m = fit(ink_brain, brain, BRAIN_H)
+    svg = open(src, encoding="utf-8").read()
+    with tempfile.TemporaryDirectory() as tmp:
+        full = fit(rasterise(*variant(svg, False), tmp, "full"), FULL_H)
+        icon = fit(rasterise(*variant(svg, True), tmp, "icon"), ICON_H)
     with open(dst, "w", encoding="ascii") as f:
-        f.write("// Generated by tools/gen_logo.py from the Braino AI logo. Do not edit.\n")
-        f.write("// 4-bit ink coverage masks, two pixels per byte (high nibble first).\n")
+        f.write("// Generated by tools/gen_logo.py from assets/ivy_ai_logo.svg. Do not edit.\n")
+        f.write("// RGB565 pixels on black, row-major.\n")
         f.write("#pragma once\n#include <stdint.h>\n\n")
-        f.write(to4bit(full_m, "logo_full") + "\n\n")
-        f.write(to4bit(brain_m, "logo_brain") + "\n")
-    prev = "models_out/ui/logo"
-    full_m.save(prev + "_full_preview.png")
-    brain_m.resize((brain_m.width * 4, brain_m.height * 4), Image.NEAREST).save(
-        prev + "_brain_preview.png")
-    print(f"full {full_m.size} from {full}, brain {brain_m.size} from {brain} (source {W}x{H})")
+        f.write(to565(full, "logo_full") + "\n\n")
+        f.write(to565(icon, "logo_icon") + "\n")
+    os.makedirs("models_out/ui", exist_ok=True)
+    full.save("models_out/ui/logo_full_preview.png")
+    icon.resize((icon.width * 4, icon.height * 4), Image.NEAREST).save("models_out/ui/logo_icon_preview.png")
+    print(f"full {full.size}, icon {icon.size}")
 
 
 if __name__ == "__main__":

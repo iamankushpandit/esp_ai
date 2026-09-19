@@ -7,7 +7,7 @@
 #pragma once
 #include <stdbool.h>
 
-#define WAKE_PHRASE "Hey Ivy"   // stock esp-sr model wn9_heyivy_tts2 (until a custom "Braino")
+#define WAKE_PHRASE "Hey Ivy"   // stock esp-sr model wn9_heyivy_tts2 (matches the name, Ivy AI)
 
 typedef void (*wake_cb_t)(void);
 

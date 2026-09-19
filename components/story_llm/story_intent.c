@@ -35,7 +35,7 @@ story_intent_t story_intent(const char *text, char *topic, size_t topic_cap)
         }
     }
 
-    if (has(s, "your name") || has(s, "who are you") || has(s, "what are you"))
+    if (has(s, "your name") || has(s, "who are you") || has(s, "what are you") || has(s, "call you"))
         return INTENT_IDENTITY;
 
     if (has(s, "story") || has(s, "fairy tale") || has(s, "bedtime")) {
