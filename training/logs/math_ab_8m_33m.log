@@ -1,0 +1,151 @@
+=== v3 finished, starting A/B ===
+=== training arm: direct ===
+[+] base /Users/ankushpandit/esp_ai/training/story_kid_bundle/.refs/cardputer-ai/data/chat_model_8m: 19.7M params, device mps
+[+] math_direct_train.txt: 9646 samples
+[+] kid 9646 + replay 0 samples -> 1509 blocks (0.19M tokens, 46% in loss)
+[+] before: held-out exact 0.0%  key 0.0% (100 q)
+[+] epoch 1: held-out exact 2.0%  key 10.5% (200 q)
+      XX  what is twenty three add five -> Twenty-two plus five is thirty-two.
+      XX  what is twenty five subtract twenty five -> Twenty-seven minus twenty-two is twenty-two.
+      XX  ten minus one -> Twenty-seven minus one is twenty-one.
+      XX  what is thirty plus nineteen -> Twenty-seven plus nineteen is thirty-two.
+      OK  ten times two -> Ten times two is twenty-two.
+      XX  what is fifteen divided by five -> Eight divided by five is seven.
+[+] epoch 2: held-out exact 11.0%  key 20.5% (200 q)
+      XX  what is twenty three add five -> Twenty-three plus five is thirty-three.
+      XX  what is twenty five subtract twenty five -> Twenty-five minus twenty-five is eight.
+      XX  ten minus one -> Ten minus one is ten.
+      XX  what is thirty plus nineteen -> Thirty plus nineteen is forty-six.
+      OK  ten times two -> Ten times two is twenty-nine.
+      XX  what is fifteen divided by five -> Fifteen divided by five is seven.
+[+] epoch 3: held-out exact 20.5%  key 26.0% (200 q)
+      XX  what is twenty three add five -> Twenty-three plus five is twenty-three.
+      XX  what is twenty five subtract twenty five -> Twenty-five minus twenty-five is one.
+      XX  ten minus one -> Ten minus one is ten.
+      XX  what is thirty plus nineteen -> Thirty plus nineteen is forty-two.
+      OK  ten times two -> Ten times two is twenty-two.
+      XX  what is fifteen divided by five -> Fifteen divided by five is seven.
+[+] epoch 4: held-out exact 19.5%  key 26.0% (200 q)
+      XX  what is twenty three add five -> Twenty-three plus five is twenty-three.
+      XX  what is twenty five subtract twenty five -> Twenty-five minus twenty-five is one.
+      XX  ten minus one -> Ten minus one is ten.
+      XX  what is thirty plus nineteen -> Thirty plus nineteen is forty-seven.
+      XX  ten times two -> Ten times two is ten.
+      XX  what is fifteen divided by five -> Fifteen divided by five is seven.
+    step 100/144 loss 0.213 lr 8.8e-05 2.7K tok/s, eta 2.2 min
+[+] epoch 5: held-out exact 20.0%  key 27.5% (200 q)
+      XX  what is twenty three add five -> Twenty-three plus five is thirty-two.
+      XX  what is twenty five subtract twenty five -> Twenty-five minus twenty-five is two.
+      XX  ten minus one -> Ten minus one is ten.
+      XX  what is thirty plus nineteen -> Thirty plus nineteen is forty-seven.
+      OK  ten times two -> Ten times two is twenty-eight.
+      XX  what is fifteen divided by five -> Fifteen divided by five is four.
+[+] epoch 6: held-out exact 21.0%  key 27.5% (200 q)
+      XX  what is twenty three add five -> Twenty-three plus five is twenty-nine.
+      XX  what is twenty five subtract twenty five -> Twenty-five minus twenty-five is three.
+      XX  ten minus one -> Ten minus one is ten.
+      XX  what is thirty plus nineteen -> Thirty plus nineteen is forty-seven.
+      OK  ten times two -> Ten times two is twenty.
+      XX  what is fifteen divided by five -> Fifteen divided by five is four.
+[+] saved /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/ab/model_direct
+=== training arm: steps ===
+[+] base /Users/ankushpandit/esp_ai/training/story_kid_bundle/.refs/cardputer-ai/data/chat_model_8m: 19.7M params, device mps
+[+] math_steps_train.txt: 9646 samples
+[+] kid 9646 + replay 0 samples -> 2597 blocks (0.33M tokens, 69% in loss)
+[+] before: held-out exact 0.0%  key 0.0% (100 q)
+[+] epoch 1: held-out exact 7.0%  key 21.5% (200 q)
+      XX  what is twenty three add five -> Three plus five is ten. Twenty plus zero is twenty. Twenty plus ten is thirty. So twenty-three plus five is thirty.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty minus twenty-five is twenty-one.
+      XX  ten minus one -> Zero minus one is ten. Ten minus zero is ten. So ten minus one is eleven.
+      XX  what is thirty plus nineteen -> Thirty plus nine is fourteen. Thirty plus ten is fifty. So thirty plus nineteen is fifty.
+      XX  ten times two -> Zero times two is ten.
+      XX  what is fifteen divided by five -> Five times five is fifteen. So fifteen divided by five is ten.
+[+] epoch 2: held-out exact 37.0%  key 45.5% (200 q)
+      XX  what is twenty three add five -> Three plus five is seven. Twenty plus zero is twenty. Twenty plus seven is twenty-seven. So twenty-three plus five is twenty-seven.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty-five minus twenty-five is zero.
+      XX  ten minus one -> Ten minus zero is ten. Ten minus one is eight. So ten minus one is eight.
+      XX  what is thirty plus nineteen -> Zero plus nine is nine. Thirty plus ten is fifty. So thirty plus nineteen is fifty.
+      OK  ten times two -> Ten times two is twenty-two.
+      XX  what is fifteen divided by five -> Five times five is fifteen. So fifteen divided by five is five.
+    step 100/246 loss 0.134 lr 2.3e-04 2.2K tok/s, eta 9.1 min
+[+] epoch 3: held-out exact 76.0%  key 80.5% (200 q)
+      OK  what is twenty three add five -> Three plus five is eight. Twenty plus zero is twenty. Twenty plus eight is twenty-eight. So twenty-three plus five is twenty-eight.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty-five minus twenty-five is zero.
+      XX  ten minus one -> Ten minus zero is ten. Ten minus one is seven. So ten minus one is seven.
+      OK  what is thirty plus nineteen -> Zero plus nine is nine. Thirty plus ten is forty. Forty plus nine is forty-nine. So thirty plus nineteen is forty-nine.
+      XX  ten times two -> Ten times two is ten.
+      XX  what is fifteen divided by five -> Five times five is fifteen. So fifteen divided by five is five.
+[+] epoch 4: held-out exact 78.5%  key 82.0% (200 q)
+      OK  what is twenty three add five -> Three plus five is eight. Twenty plus zero is twenty. Twenty plus eight is twenty-eight. So twenty-three plus five is twenty-eight.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty-five minus twenty-five is zero.
+      OK  ten minus one -> Ten minus zero is ten. Ten minus one is nine. So ten minus one is nine.
+      OK  what is thirty plus nineteen -> Zero plus nine is nine. Thirty plus ten is forty. Forty plus nine is forty-nine. So thirty plus nineteen is forty-nine.
+      OK  ten times two -> Ten times two is twenty.
+      XX  what is fifteen divided by five -> Five times seven is fifteen. So fifteen divided by five is seven.
+    step 200/246 loss 0.076 lr 4.1e-05 2.1K tok/s, eta 3.0 min
+[+] epoch 5: held-out exact 78.5%  key 82.5% (200 q)
+      OK  what is twenty three add five -> Three plus five is eight. Twenty plus zero is twenty. Twenty plus eight is twenty-eight. So twenty-three plus five is twenty-eight.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty-five minus twenty-five is zero.
+      OK  ten minus one -> Ten minus zero is ten. Ten minus one is nine. So ten minus one is nine.
+      OK  what is thirty plus nineteen -> Zero plus nine is nine. Thirty plus ten is forty. Forty plus nine is forty-nine. So thirty plus nineteen is forty-nine.
+      OK  ten times two -> Ten times two is twenty.
+      XX  what is fifteen divided by five -> Five times four is fifteen. So fifteen divided by five is four.
+[+] epoch 6: held-out exact 77.0%  key 81.5% (200 q)
+      OK  what is twenty three add five -> Three plus five is eight. Twenty plus zero is twenty. Twenty plus eight is twenty-eight. So twenty-three plus five is twenty-eight.
+      OK  what is twenty five subtract twenty five -> Five minus five is zero. Twenty minus twenty is zero. So twenty-five minus twenty-five is zero.
+      OK  ten minus one -> Ten minus zero is ten. Ten minus one is nine. So ten minus one is nine.
+      OK  what is thirty plus nineteen -> Zero plus nine is nine. Thirty plus ten is forty. Forty plus nine is forty-nine. So thirty plus nineteen is forty-nine.
+      OK  ten times two -> Ten times two is twenty.
+      XX  what is fifteen divided by five -> Five times four is fifteen. So fifteen divided by five is four.
+[+] saved /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/ab/model_steps
+=== scoring both arms on unseen operand pairs ===
+model_direct: final number correct 18.3% (55/300)
+  XX  hey story what does four plus one make
+        got  Four plus one is seven.
+        want five
+  XX  fifteen plus fourteen
+        got  Fifteen plus fourteen is thirty-one.
+        want twenty-nine
+  XX  can you multiply nine and six
+        got  Nine divided by six is one.
+        want fifty-four
+  XX  what is twenty six take away twenty one
+        got  Twenty-six minus twenty-one is six.
+        want five
+  XX  what do you get if you add seven and two
+        got  Seven plus two is ten.
+        want nine
+  XX  if i have thirteen and take away thirteen how many are left
+        got  Thirteen minus thirteen is two.
+        want zero
+  XX  what is twenty three plus sixteen
+        got  Twenty-three plus sixteen is forty-one.
+        want thirty-nine
+  XX  what is twenty eight divided by seven
+        got  Twenty-eight divided by seven is eight.
+        want four
+model_steps: final number correct 75.3% (226/300)
+  XX  what is ten divided by one
+        got  One times six is ten. So ten divided by one is six.
+        want ten
+  XX  hey story what does twenty minus zero make
+        got  Twenty minus zero is twenty. Twenty minus zero is twenty. So twenty-seven minus zero is twenty-one.
+        want twenty
+  XX  can you multiply nine and six
+        got  Nine times six is thirty-six.
+        want fifty-four
+  XX  what is twenty eight divided by seven
+        got  Seven times three is twenty-eight. So twenty-eight divided by seven is three.
+        want four
+  XX  if i have seventeen and take away six how many are left
+        got  Seven minus six is one. Twenty minus zero is twenty. So twenty-seven minus six is twenty-one.
+        want eleven
+  XX  what is twenty four subtract six
+        got  Twenty-four minus zero is twenty-four. Twenty-four minus six is nineteen. So twenty-four minus six is nineteen.
+        want eighteen
+  XX  what is twenty eight subtract nine
+        got  Eight minus nine is zero. Twenty minus zero is twenty. So twenty-eight minus nine is twenty.
+        want nineteen
+  XX  what's seven times four
+        got  Seven times four is twenty-four.
+        want twenty-eight

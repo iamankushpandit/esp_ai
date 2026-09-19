@@ -78,6 +78,26 @@ def norm(s):
     return re.sub(r"[^a-z0-9 ]", " ", s.lower()).split()
 
 
+# Words that carry no answer content, so "in all" / "is" / "the" cannot make a
+# wrong answer look right.
+FILLER = {
+    "a", "an", "the", "is", "are", "was", "were", "it", "its", "in", "on", "at",
+    "of", "to", "and", "or", "that", "this", "there", "you", "your", "we", "i",
+    "all", "so", "then", "do", "does", "did", "have", "has", "called", "makes",
+    "make", "get", "gets", "be", "been", "will", "can", "for", "with", "by",
+}
+
+
+def content(words):
+    """The words that decide whether an answer is right.
+
+    The old metric compared only want[-2:], so every word problem - which ends
+    "in all" - scored as correct regardless of the number. Compare the full
+    content payload instead.
+    """
+    return [w for w in words if w not in FILLER]
+
+
 @torch.no_grad()
 def answer(model, tok, q, max_new=40):
     ids = tok(f"User: {q}\nBot:", return_tensors="pt").input_ids.to(model.device)
@@ -94,8 +114,10 @@ def score(model, tok, evals):
         got = answer(model, tok, e["q"])
         g, want = norm(got), norm(e["a"])
         ex = g == want
-        # key = the answer's content words after "is"/"are"/"make" etc. all present
-        k = all(wd in g for wd in want[-2:])
+        # key = every content word of the expected answer is present. NOT
+        # want[-2:] - that scored "in all" as a correct word problem.
+        cw = content(want)
+        k = bool(cw) and all(wd in g for wd in cw)
         exact += ex
         key += k
         rows.append((e["q"], got, ex, k))
@@ -108,6 +130,11 @@ def main():
     ap.add_argument("--train", nargs="+", default=[str(ROOT / "models_out/kid/kid_train.txt")])
     ap.add_argument("--eval", nargs="+", default=[str(ROOT / "models_out/kid/kid_eval.jsonl")])
     ap.add_argument("--replay", type=int, default=20000, help="original chat/story samples mixed in")
+    # The checkout lives under training/story_kid_bundle/.refs, but ROOT here is
+    # the repo root, so the default below does not exist for every caller. Make
+    # it an argument rather than a hardcoded path that silently points nowhere.
+    ap.add_argument("--replay-file", default=str(REF / "data/chat_train.txt"),
+                    help="original chat corpus to sample replay from")
     ap.add_argument("--base", default=str(REF / "data/chat_model_8m"))
     ap.add_argument("--out", default=str(ROOT / "models_out/kid/model_8m_kid"))
     ap.add_argument("--epochs", type=int, default=3)
@@ -115,6 +142,10 @@ def main():
     ap.add_argument("--batch-size", type=int, default=32)
     ap.add_argument("--lr", type=float, default=3e-4)
     ap.add_argument("--eval-n", type=int, default=300)
+    ap.add_argument("--save-every-epoch", action="store_true",
+                    help="also dump <out>/ep<N> each epoch. On a long run this "
+                         "is the difference between an interruption costing an "
+                         "epoch and costing everything.")
     ap.add_argument("--seed", type=int, default=1)
     a = ap.parse_args()
 
@@ -133,8 +164,18 @@ def main():
         part = [s for s in Path(f).read_text(encoding="utf-8").split("\n\n") if s.strip()]
         print(f"[+] {Path(f).name}: {len(part)} samples")
         kid += part
-    orig = [s for s in (REF / "data/chat_train.txt").read_text(encoding="utf-8").split("\n\n") if s.strip()]
-    replay = rng.sample(orig, min(a.replay, len(orig)))
+    # Fail here, before the training loop, rather than after loading the model
+    # and packing 91k samples. A missing replay corpus is a setup mistake and
+    # should say so immediately.
+    replay = []
+    if a.replay:
+        rf = Path(a.replay_file)
+        if not rf.exists():
+            raise SystemExit(f"--replay {a.replay} needs --replay-file, but "
+                             f"{rf} does not exist. Pass the right path, or "
+                             f"--replay 0 to train without it.")
+        orig = [s for s in rf.read_text(encoding="utf-8").split("\n\n") if s.strip()]
+        replay = rng.sample(orig, min(a.replay, len(orig)))
     mix = kid + replay
     rng.shuffle(mix)
     x, y = pack(mix, tok, a.seq_len)
@@ -145,7 +186,23 @@ def main():
     for f in a.eval:   # equal share per eval file so small sets are represented
         rows = [json.loads(l) for l in Path(f).read_text(encoding="utf-8").splitlines() if l.strip()]
         evals += rng.sample(rows, min(a.eval_n // len(a.eval), len(rows)))
-    ex, ky, _ = score(model, tok, evals[:100])
+    # Score on a CPU copy, not on the training device. Greedy generation is
+    # sequential - one kernel launch per token - and on MPS that measured ~64
+    # minutes for a 400-question pass, against ~24 minutes to train a whole
+    # epoch. Evaluation was costing more than three times what training cost,
+    # and it also poisoned the tok/s readout, which divides training tokens by
+    # a wall clock that includes eval.
+    eval_model = GPTNeoForCausalLM.from_pretrained(a.base).to("cpu").eval()
+
+    def cpu_state():
+        return {k: v.detach().to("cpu", copy=True)
+                for k, v in model.state_dict().items()}
+
+    def score_cpu(rows):
+        eval_model.load_state_dict(cpu_state())
+        return score(eval_model, tok, rows)
+
+    ex, ky, _ = score_cpu(evals[:100])
     print(f"[+] before: held-out exact {ex*100:.1f}%  key {ky*100:.1f}% (100 q)")
 
     loader = DataLoader(TensorDataset(x, y), batch_size=a.batch_size, shuffle=True)
@@ -153,6 +210,8 @@ def main():
     warm = min(200, total // 10)
     opt = torch.optim.AdamW(model.parameters(), lr=a.lr, weight_decay=0.01)
     step, t0 = 0, time.time()
+    best_ex = best_ky = -1.0
+    best_ep, best_state = 0, None
     for ep in range(a.epochs):
         for bx, by in loader:
             lr = a.lr * step / warm if step < warm else \
@@ -172,12 +231,31 @@ def main():
                 print(f"    step {step}/{total} loss {loss.item():.3f} lr {lr:.1e} "
                       f"{step*a.batch_size*a.seq_len/el/1e3:.1f}K tok/s, eta {el/step*(total-step)/60:.1f} min",
                       flush=True)
-        ex, ky, rows = score(model, tok, evals)
+        ex, ky, rows = score_cpu(evals)
         print(f"[+] epoch {ep+1}: held-out exact {ex*100:.1f}%  key {ky*100:.1f}% ({len(evals)} q)")
         for q, got, e, k in rows[:6]:
             print(f"      {'OK ' if k else 'XX '} {q} -> {got}")
+
+        # Keep the BEST epoch, not the last one. The v3 run peaked at epoch 5
+        # (55.5% exact) and then overfitted down to 50.5% by epoch 8 - and it
+        # was epoch 8 that got saved, throwing away five points for nothing.
+        if a.save_every_epoch:
+            d = Path(a.out) / f"ep{ep+1}"
+            d.mkdir(parents=True, exist_ok=True)
+            model.save_pretrained(d, state_dict=cpu_state())
+            tok.save_pretrained(d)
+            print(f"[+] wrote {d}", flush=True)
+
+        if (ex, ky) > (best_ex, best_ky):
+            best_ex, best_ky, best_ep = ex, ky, ep + 1
+            best_state = cpu_state()
+
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
+    if best_state is not None:
+        model.load_state_dict(best_state)
+        print(f"[+] restoring epoch {best_ep} (exact {best_ex*100:.1f}%  "
+              f"key {best_ky*100:.1f}%) - the best, not the last")
     model.cpu().save_pretrained(out)
     tok.save_pretrained(out)
     print(f"[+] saved {out}")

@@ -1,0 +1,403 @@
+=== GPU free, building v4 data (math style: steps) ===
+=== 1/4 spelling (356 words, space-separated letters) ===
+356 words  4272 train samples  712 eval questions
+wrote spelling_train.txt and spelling_eval.jsonl
+=== 2/4 arithmetic, style=steps, held-out operand pairs ===
+1782 pairs (267 held out)  9646 train samples
+  2216 eval questions on unseen pairs, 3030 on seen pairs
+wrote math_v4_train.txt, math_v4_eval.jsonl, math_v4_eval_seen.jsonl
+=== 3/4 phrasing augmentation on knowledge + jokes ===
+477 facts
+  train questions 1699 -> 5905 (3.6 -> 12.4 per fact)
+  eval questions  342 -> 684 (reserved wordings)
+wrote kid_aug_train.txt and kid_aug_eval.jsonl
+4008 facts
+  train questions 11848 -> 50645 (3.0 -> 12.6 per fact)
+  eval questions  3348 -> 6696 (reserved wordings)
+wrote gume_aug_train.txt and gume_aug_eval.jsonl
+268 facts
+  train questions 936 -> 3331 (3.5 -> 12.4 per fact)
+  eval questions  169 -> 338 (reserved wordings)
+wrote school_aug_train.txt and school_aug_eval.jsonl
+114 facts
+  train questions 1752 -> 1585 (15.4 -> 13.9 per fact)
+  eval questions  238 -> 476 (reserved wordings)
+wrote joke_aug_train.txt and joke_aug_eval.jsonl
+356 facts
+  train questions 3011 -> 3544 (8.5 -> 10.0 per fact)
+  eval questions  712 -> 1424 (reserved wordings)
+wrote spelling_aug_train.txt and spelling_aug_eval.jsonl
+=== 4/4 category balance ===
+category                 before    after   note
+----------------------------------------------------------------
+other                     18820    18820   kept
+comparisons                9941     9941   kept
+geography                  7580     7580   kept
+arithmetic 2-digit         6710     6710   kept
+periodic table             5690     5690   kept
+money                      4070     4070   kept
+spelling                   3544     3544   kept
+school (new)               3331     3331   kept
+arithmetic small           2936     3000   repeat x1
+word problems              2475     3000   repeat x1
+time & calendar            2312     3000   repeat x1
+jokes                      1585     3000   repeat x1
+science & nature           1255     3000   repeat x2
+community & safety         1080     3000   repeat x2
+colors & shapes             975     3000   repeat x3
+space                       975     3000   repeat x3
+letters & phonics           668     3000   repeat x4
+animals                     569     3000   repeat x5
+body                        140     1680   repeat x12 (capped, 1680 < 3000)
+----------------------------------------------------------------
+TOTAL                     74656    91366
+wrote /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v4/v4_train.txt
+
+train: /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v4/v4_train.txt  (91366 samples)
+eval:  /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v4/v4_eval.jsonl (   11834 questions)
+=== training v4 ===
+[+] base training/story_kid_bundle/.refs/cardputer-ai/data/chat_model_8m: 19.7M params, device mps
+[+] v4_train.txt: 91366 samples
+[+] kid 91366 + replay 12000 samples -> 28189 blocks (3.61M tokens, 46% in loss)
+[+] before: held-out exact 0.0%  key 0.0% (100 q)
+    step 100/5292 loss 1.514 lr 1.5e-04 14.6K tok/s, eta 48.7 min
+    step 200/5292 loss 1.182 lr 3.0e-04 14.5K tok/s, eta 47.8 min
+    step 300/5292 loss 1.050 lr 3.0e-04 14.4K tok/s, eta 47.4 min
+    step 400/5292 loss 0.723 lr 3.0e-04 14.3K tok/s, eta 46.8 min
+[+] epoch 1: held-out exact 30.8%  key 35.8% (400 q)
+      XX  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is El Salvador.
+      XX  i have a question on which continent can you find hungary -> The blue spot is in Europe.
+      XX  i have a question how do you spell thank can you help -> Thank is spelled w a n t.
+      XX  excuse me story how would you spell gave -> Gave is spelled c o n d.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep1
+    step 500/5292 loss 0.586 lr 3.0e-04 13.2K tok/s, eta 49.7 min
+    step 600/5292 loss 0.570 lr 3.0e-04 13.4K tok/s, eta 47.9 min
+    step 700/5292 loss 0.750 lr 2.9e-04 13.5K tok/s, eta 46.3 min
+    step 800/5292 loss 0.704 lr 2.9e-04 13.7K tok/s, eta 44.9 min
+[+] epoch 2: held-out exact 52.8%  key 58.5% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      XX  i have a question on which continent can you find hungary -> The capital of Hungary is Budapest.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      XX  hey story which city is the capital of guinea -> The capital of Guinea is Baku.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep2
+    step 900/5292 loss 0.511 lr 2.9e-04 13.1K tok/s, eta 45.6 min
+    step 1000/5292 loss 0.465 lr 2.8e-04 13.3K tok/s, eta 44.1 min
+    step 1100/5292 loss 0.630 lr 2.8e-04 13.4K tok/s, eta 42.6 min
+    step 1200/5292 loss 0.581 lr 2.7e-04 5.8K tok/s, eta 95.5 min
+    step 1300/5292 loss 0.535 lr 2.7e-04 4.1K tok/s, eta 132.5 min
+[+] epoch 3: held-out exact 56.5%  key 62.3% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Do is spelled d i d.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep3
+    step 1400/5292 loss 0.391 lr 2.6e-04 4.3K tok/s, eta 123.7 min
+    step 1500/5292 loss 0.416 lr 2.6e-04 4.5K tok/s, eta 114.8 min
+    step 1600/5292 loss 0.537 lr 2.5e-04 4.7K tok/s, eta 106.9 min
+    step 1700/5292 loss 0.419 lr 2.4e-04 4.9K tok/s, eta 99.8 min
+[+] epoch 4: held-out exact 55.2%  key 59.8% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep4
+    step 1800/5292 loss 0.323 lr 2.3e-04 5.1K tok/s, eta 94.2 min
+    step 1900/5292 loss 0.311 lr 2.3e-04 5.2K tok/s, eta 88.3 min
+    step 2000/5292 loss 0.406 lr 2.2e-04 5.4K tok/s, eta 82.9 min
+    step 2100/5292 loss 0.301 lr 2.1e-04 5.6K tok/s, eta 78.0 min
+    step 2200/5292 loss 0.392 lr 2.0e-04 5.8K tok/s, eta 73.4 min
+[+] epoch 5: held-out exact 61.3%  key 66.5% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep5
+    step 2300/5292 loss 0.250 lr 1.9e-04 5.9K tok/s, eta 69.6 min
+    step 2400/5292 loss 0.260 lr 1.9e-04 6.0K tok/s, eta 65.5 min
+    step 2500/5292 loss 0.279 lr 1.8e-04 6.2K tok/s, eta 61.6 min
+    step 2600/5292 loss 0.310 lr 1.7e-04 6.3K tok/s, eta 57.9 min
+[+] epoch 6: held-out exact 61.0%  key 66.2% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      OK  i have a question how do you spell thank can you help -> Thank is spelled t h a n k.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep6
+    step 2700/5292 loss 0.162 lr 1.6e-04 6.5K tok/s, eta 54.8 min
+    step 2800/5292 loss 0.154 lr 1.5e-04 6.6K tok/s, eta 51.5 min
+    step 2900/5292 loss 0.142 lr 1.4e-04 6.7K tok/s, eta 48.4 min
+    step 3000/5292 loss 0.200 lr 1.3e-04 6.9K tok/s, eta 45.5 min
+[+] epoch 7: held-out exact 61.8%  key 67.2% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      OK  i have a question how do you spell thank can you help -> Thank is spelled t h a n k.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep7
+    step 3100/5292 loss 0.111 lr 1.2e-04 7.0K tok/s, eta 42.9 min
+    step 3200/5292 loss 0.100 lr 1.2e-04 7.1K tok/s, eta 40.2 min
+    step 3300/5292 loss 0.118 lr 1.1e-04 7.2K tok/s, eta 37.6 min
+    step 3400/5292 loss 0.115 lr 9.8e-05 7.4K tok/s, eta 35.1 min
+    step 3500/5292 loss 0.125 lr 9.0e-05 7.5K tok/s, eta 32.7 min
+[+] epoch 8: held-out exact 62.0%  key 67.5% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep8
+    step 3600/5292 loss 0.070 lr 8.2e-05 7.6K tok/s, eta 30.6 min
+    step 3700/5292 loss 0.087 lr 7.5e-05 7.7K tok/s, eta 28.3 min
+    step 3800/5292 loss 0.083 lr 6.7e-05 7.8K tok/s, eta 26.2 min
+    step 3900/5292 loss 0.078 lr 6.0e-05 7.9K tok/s, eta 24.1 min
+[+] epoch 9: held-out exact 62.7%  key 68.0% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep9
+    step 4000/5292 loss 0.058 lr 5.4e-05 8.0K tok/s, eta 22.2 min
+    step 4100/5292 loss 0.057 lr 4.8e-05 8.1K tok/s, eta 20.2 min
+    step 4200/5292 loss 0.047 lr 4.2e-05 8.2K tok/s, eta 18.3 min
+    step 4300/5292 loss 0.058 lr 3.6e-05 8.3K tok/s, eta 16.4 min
+    step 4400/5292 loss 0.059 lr 3.1e-05 8.4K tok/s, eta 14.6 min
+[+] epoch 10: held-out exact 61.8%  key 66.2% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep10
+    step 4500/5292 loss 0.050 lr 2.7e-05 8.4K tok/s, eta 12.8 min
+    step 4600/5292 loss 0.056 lr 2.3e-05 8.5K tok/s, eta 11.1 min
+    step 4700/5292 loss 0.060 lr 2.0e-05 8.6K tok/s, eta 9.4 min
+    step 4800/5292 loss 0.064 lr 1.7e-05 8.7K tok/s, eta 7.7 min
+[+] epoch 11: held-out exact 64.2%  key 68.5% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep11
+    step 4900/5292 loss 0.044 lr 1.4e-05 8.7K tok/s, eta 6.1 min
+    step 5000/5292 loss 0.051 lr 1.2e-05 8.8K tok/s, eta 4.5 min
+    step 5100/5292 loss 0.054 lr 1.1e-05 8.9K tok/s, eta 2.9 min
+    step 5200/5292 loss 0.047 lr 1.0e-05 9.0K tok/s, eta 1.4 min
+[+] epoch 12: held-out exact 63.5%  key 67.5% (400 q)
+      OK  excuse me story which city is the capital of el salvador i really want to know -> The capital of El Salvador is San Salvador.
+      OK  i have a question on which continent can you find hungary -> Hungary is in Europe.
+      XX  i have a question how do you spell thank can you help -> Can is spelled c a n.
+      OK  excuse me story how would you spell gave -> Gave is spelled g a v e.
+      OK  what is fourteen plus twenty one -> Four plus one is five. Ten plus twenty is thirty. Thirty plus five is thirty-five. So fourteen plus twenty-one is thirty-five.
+      OK  hey story which city is the capital of guinea -> The capital of Guinea is Conakry.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v4/ep12
+[+] restoring epoch 11 (exact 64.2%  key 68.5%) - the best, not the last
+[+] saved training/story_kid_bundle/models_out/kid/model_8m_kid_v4
+=== per-field accuracy ===
+model training/story_kid_bundle/models_out/kid/model_8m_kid_v4  device cpu
+
+category                 n   exact     key   pool
+------------------------------------------------------------
+other                   60   43.3%   60.0%   2070
+arithmetic 2-digit      60   80.0%   81.7%   1633
+spelling                60   60.0%   61.7%   1424
+geography               60   83.3%   90.0%   1368
+comparisons             60   80.0%   85.0%   1162
+money                   60   30.0%   36.7%   1068
+periodic table          60   68.3%   70.0%   944
+arithmetic small        60   75.0%   75.0%   583
+time & calendar         60   26.7%   26.7%   416
+science & nature        60   75.0%   78.3%   230
+letters & phonics       60   63.3%   63.3%   230
+animals                 60   53.3%   55.0%   226
+space                   60   68.3%   70.0%   194
+colors & shapes         60   48.3%   55.0%   166
+community & safety      60   90.0%   90.0%   78
+body                    38   68.4%   68.4%   38
+word problems            4   75.0%   75.0%   4
+------------------------------------------------------------
+WEIGHTED               942   63.3%   66.7%
+
+example misses
+  [other] Hey story what letters stand for dubnium can you help?
+      got  Db is the symbol for dubnium.
+      want The symbol for dubnium is Db.
+  [other] hi story how long is december i really want to know
+      got  December is the last month of the year.
+      want December has thirty-one days.
+  [arithmetic 2-digit] how many eights are in fifty six
+      got  Eight times twelve is fifty-six. So fifty-six divided by eight is twelve.
+      want Eight times seven is fifty-six. So fifty-six divided by eight is seven.
+  [arithmetic 2-digit] if i have twenty eight and take away ten how many are left
+      got  Tess has twenty-two left.
+      want Eight minus zero is eight. Twenty minus ten is ten. So twenty-eight minus ten is eighteen.
+  [spelling] Help me with this one please spell the word got can you help?
+      got  Can is spelled c a n.
+      want Got is spelled g o t.
+  [spelling] Excuse me story please spell the word seed can you help?
+      got  The word seed is spelled s o o.
+      want Seed is spelled s e e d.
+  [geography] hi story which city is texas's capital
+      got  Austin is the capital of Texas.
+      want The capital of Texas is Austin.
+  [geography] hey story which city is louisiana's capital can you help
+      got  Baton Rouge is the capital of Louisiana.
+      want The capital of Louisiana is Baton Rouge.
+  [comparisons] i have a question which fraction is larger three fifths or six eighths i really want to know
+      got  Three fifths is bigger than six eighths.
+      want Six eighths is bigger than three fifths.
+  [comparisons] hi story is four more than thirteen i really want to know
+      got  Fourteen is bigger.
+      want Thirteen is bigger.
+  [money] Help me with this one how many pennies equal a dime?
+      got  It takes ten pennies to make a dime.
+      want Ten pennies make a dime.
+  [money] Help me with this one name the coin worth fifty cents i really want to know?
+      got  Your change is fifty cents.
+      want A half dollar is worth fifty cents.
+  [periodic table] i have a question what's aluminum's atomic number
+      got  Aluminum is a metal. Light metal in cans and cooking foil.
+      want Aluminum has thirteen protons, so its atomic number is thirteen.
+  [periodic table] I have a question which element matches this clue every phone holds a little of it?
+      got  That is arsenic.
+      want That is tantalum.
+  [arithmetic small] what is 14 - 4
+      got  Fourteen minus zero is fourteen. Fourteen minus four is eight. So fourteen minus four is eight.
+      want Four minus four is zero. Ten minus zero is ten. So fourteen minus four is ten.
+  [arithmetic small] what is fifteen divided by five
+      got  Five times seven is fifteen. So fifteen divided by five is seven.
+      want Five times three is fifteen. So fifteen divided by five is three.
+  [time & calendar] excuse me story big hand on two and little hand on four what time is that
+      got  It is twenty minutes past two, or two twenty.
+      want It is ten minutes past four, or four ten.
+  [time & calendar] hey story big hand on seven and little hand on five what time is that i really want to know
+      got  You're almost right, don't you think? I'm not going to take it to school with me.
+      want It is twenty-five minutes to six, or five thirty-five.
+  [science & nature] i have a question count the letters in ice can you help
+      got  Ice is spelled i c e.
+      want Ice has three letters.
+  [science & nature] Hi story name the three states of matter can you help?
+      got  Yes, I'd like to take a closer look at the first problem.
+      want The three states of matter are solid, liquid and gas.
+  [letters & phonics] hi story which letter follows d
+      got  C comes after D.
+      want E comes after D.
+  [letters & phonics] help me with this one which letter follows o
+      got  O comes after O.
+      want P comes after O.
+  [animals] i have a question is a whale a mammal
+      got  A whale is concave. It has corners that point inward.
+      want No, a whale is not a fish. It is a mammal that breathes air.
+  [animals] i have a question count the legs on a bird can you help
+      got  The cat is four legs.
+      want A bird has two legs.
+  [space] I have a question where does the sun go at night?
+      got  The Sun sets in the west.
+      want It is dark at night because our side of the Earth turns away from the sun.
+  [space] excuse me story how far from the sun is venus in the order can you help
+      got  Venus is the Sun's. Venus and Mercury are the only planets with no moon of their own.
+      want Venus is planet number two from the sun.
+  [colors & shapes] hey story which colors do i mix to get orange i really want to know
+      got  Mix red and white to make orange.
+      want Mix red and yellow to make orange.
+  [colors & shapes] help me with this one count the sides of a rectangle i really want to know
+      got  The four sides of a rectangle is four sides.
+      want A rectangle has four sides.
+  [community & safety] Hi story make me laugh with a bread joke can you help?
+      got  What do you call a bird that can make ytterbium? A cloud!
+      want Why did the bread go to the doctor? It was feeling crumby!
+  [community & safety] help me with this one do you know any jokes can you help
+      got  Why was the sock so sad? Because it lost its partner!
+      want Why did the banana go to the doctor? It wasn't peeling well!
+  [body] Help me with this one why do we breathe i really want to know?
+      got  Because we're our twin and we have no teeth to keep us awake.
+      want We breathe air. Our lungs take in oxygen from the air.
+  [body] I have a question how many bones does a person have i really want to know?
+      got  A person has two legs.
+      want A grown-up has two hundred and six bones.
+  [word problems] help me with this one quick question how long does sunlight take to reach us i really want to know
+      got  Grass is hanging out of sight.
+      want About eight minutes. Sunlight you feel now left the Sun about eight minutes ago.
+=== phrasing gap (was 85.0% trained / 25.8% held-out on v1) ===
+120 facts, each asked with a trained wording and a held-out wording
+
+wording             exact      key
+----------------------------------
+trained             99.2%    99.2%
+held-out            64.2%    70.0%
+----------------------------------
+gap (key): +29.2 points
+
+facts wrong BOTH ways (genuinely not learned): 1/120 = 0.8%
+  excuse me story how much change from fifty cents when the price is forty seven cents can you help  ->  want: Your change is three cents.
+
+reading: a large gap means the facts are in there and the wording is the problem (fix: more paraphrases per fact). A small gap with both low means the facts were never learned (fix: capacity or more data).
+=== arithmetic on UNSEEN operand pairs ===
+model_8m_kid_v4: final number correct 80.7% (242/300)
+  XX  what is ten divided by one
+        got  Ten times one is ten. So ten divided by one is one.
+        want ten
+  XX  can you multiply nine and six
+        got  Nine and six make nine.
+        want fifty-four
+  XX  if i have thirteen and take away thirteen how many are left
+        got  Thirteen comes before thirteen.
+        want zero
+  XX  what is twenty eight divided by seven
+        got  Seven times two is twenty-eight. So twenty-eight divided by seven is two.
+        want four
+  XX  if i have seventeen and take away six how many are left
+        got  Tess has forty-three left.
+        want eleven
+  XX  what is twenty four subtract six
+        got  Twenty-four minus zero is twenty-four. Twenty-four minus six is sixteen. So twenty-four minus six is sixteen.
+        want eighteen
+  XX  what is twenty eight subtract nine
+        got  Twenty-eight minus zero is twenty-eight. Twenty-eight minus nine is twelve. So twenty-eight minus nine is twelve.
+        want nineteen
+  XX  what's seven times four
+        got  Seven times four is thirty-six.
+        want twenty-eight
+=== arithmetic on SEEN pairs (recall, for contrast) ===
+model_8m_kid_v4: final number correct 74.3% (223/300)
+  XX  can you multiply five and ten
+        got  Eighteen minus zero is eighteen. Eighteen minus ten is twenty. So eighteen minus five is twenty.
+        want fifty
+  XX  can you multiply ten and four
+        got  Ten times four is forty. So forty divided by ten is four.
+        want forty
+  XX  what do you get if you add three and four
+        got  You add four is twelve.
+        want seven
+  XX  can you multiply eleven and eight
+        got  Eleven and eight areeight.
+        want eighty-eight
+  XX  if i have twelve and take away one how many are left
+        got  Two tokens of the tokens corner and one square make three.
+        want eleven
+  XX  what do you get if you add twelve and six
+        got  Your plus six is ten.
+        want eighteen
+  XX  if i have twenty eight and take away fifteen how many are left
+        got  Twenty-eight is bigger than twenty.
+        want thirteen
+  XX  hey story what is six shared between six
+        got  Six times six is thirty-six. So thirty-six divided by six is six.
+        want one
