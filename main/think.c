@@ -1,5 +1,6 @@
 // THINKING phase: SD -> PSRAM model load, TinyTalk answer, streamed to UI.
 #include "think.h"
+#include "story_intent.h"
 #include "phase.h"
 #include "board.h"
 #include "esp_log.h"
@@ -51,6 +52,17 @@ static bool on_piece(void *u, const char *p, int n)
 bool think_answer(const llm_history_t *hist, const char *question, char *answer, size_t cap,
                   think_stream_fn fn, void *user, llm_stats_t *st)
 {
+    char topic[LLM_TURN_CHARS];
+    story_intent_t intent = story_intent(question, topic, sizeof topic);
+    if (intent == INTENT_IDENTITY) {
+        // Deterministic answer; no need to load the model at all.
+        snprintf(answer, cap, "%s", INTENT_IDENTITY_ANSWER);
+        if (st) { memset(st, 0, sizeof *st); st->stop_reason = "identity"; }
+        if (fn) fn(user, answer, 0, 0);
+        ESP_LOGI(TAG, "intent: identity (canned answer)");
+        return true;
+    }
+
     phase_t ph;
     if (!phase_begin(&ph, "THINK")) return false;
     bool ok = false;
@@ -69,7 +81,12 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
         if (llm_load(&llm, &b, &p, &g_fast, &g_bulk)) {
             int64_t load_us = story_time_us() - t0;
             stream_t s = {.fn = fn, .user = user};
-            ok = llm_answer(&llm, hist, question, answer, cap, on_piece, &s, st);
+            if (intent == INTENT_STORY) {
+                ESP_LOGI(TAG, "intent: story about \"%s\"", topic);
+                ok = llm_story(&llm, topic, answer, cap, on_piece, &s, st);
+            } else {
+                ok = llm_answer(&llm, hist, question, answer, cap, on_piece, &s, st);
+            }
             if (fn) fn(user, answer, st ? st->gen_tokens : s.tokens,
                        st && st->gen_us ? st->gen_tokens / (st->gen_us / 1e6f) : rate(&s, story_time_us()));
             if (st) st->load_us = load_us;

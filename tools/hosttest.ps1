@@ -13,6 +13,7 @@ $inc = @("-Icomponents/story_core/include", "-Icomponents/story_ui/include", "-I
 $tests = @{
     "test_arena" = @("host/test_arena.c") + $core
     "test_wrap"  = @("host/test_wrap.c", "components/story_ui/ui_wrap.c")
+    "test_intent" = @("host/test_intent.c", "components/story_llm/story_intent.c")
     "llm_chat"   = @("host/llm_chat.c", "components/story_llm/neo.c", "components/story_llm/story_llm.c") + $core
 }
 $testArgs = @{

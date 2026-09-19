@@ -12,7 +12,7 @@ static const char *TAG = "llm";
 llm_params_t llm_default_params(void)
 {
     llm_params_t p = {
-        .temperature = 0.7f,
+        .temperature = 0.3f,   // tuned on host battery (host/llm_battery.txt)
         .top_p = 0.9f,
         .soft_max_tokens = 48,
         .hard_max_tokens = 80,
@@ -121,25 +121,22 @@ static int build_prompt(llm_t *l, const llm_history_t *h, const char *q, int bud
     return n + m;
 }
 
-bool llm_answer(llm_t *l, const llm_history_t *h, const char *q, char *ans, size_t cap,
-                llm_piece_cb cb, void *user, llm_stats_t *st)
+// Shared decode loop. `chat` stops when the model starts a new "User" turn.
+// A repetition guard stops (and trims) when a REP_N-token run repeats, which is
+// how small models fall into loops ("who is the one who is the one ...").
+#define REP_N 6
+#define REP_HIST 96
+static bool generate(llm_t *l, int n_prompt, bool chat, char *ans, size_t cap, llm_piece_cb cb,
+                     void *user, llm_stats_t *st)
 {
-    llm_stats_t dummy;
-    if (!st) st = &dummy;
-    memset(st, 0, sizeof *st);
-    ans[0] = 0;
-    if (!l->loaded) { SLOGE(TAG, "answer: model not loaded"); return false; }
-    l->stop = false;
-
     const llm_params_t *p = &l->params;
     int kvL = l->net.kv_len;
-    int n_prompt = build_prompt(l, h, q, kvL - 16);
-    if (n_prompt <= 0) { SLOGE(TAG, "prompt did not fit"); return false; }
     st->prompt_tokens = n_prompt;
-
     neo_sampler_t smp;
     neo_sampler_init(&smp, p->temperature, p->top_p, p->seed ? p->seed : (uint64_t)story_time_us());
 
+    int gen_ids[REP_HIST];
+    size_t gen_alen[REP_HIST];   // answer length before each generated token
     int64_t t0 = story_time_us();
     int pos = 0, abspos = 0, token = l->prompt[0];
     size_t alen = 0;
@@ -163,13 +160,27 @@ bool llm_answer(llm_t *l, const llm_history_t *h, const char *q, char *ans, size
         } else {
             next = neo_sample(&smp, logits, V);
             if (next == l->tok.eos_id) { st->stop_reason = "eos"; break; }
+            int g = st->gen_tokens;
+            if (g < REP_HIST) { gen_ids[g] = next; gen_alen[g] = alen; }
             st->gen_tokens++;
+            // Repetition guard: last REP_N tokens seen before in this answer?
+            if (g + 1 >= 2 * REP_N && g < REP_HIST) {
+                int s = g + 1 - REP_N;
+                for (int j = 0; j + REP_N <= s; j++) {
+                    if (!memcmp(gen_ids + j, gen_ids + s, REP_N * sizeof(int))) {
+                        alen = gen_alen[s];   // drop the repeated run
+                        ans[alen] = 0;
+                        st->stop_reason = "repeat";
+                        goto out;
+                    }
+                }
+            }
             int plen;
             const char *piece = neo_tok_piece(&l->tok, next, &plen);
-            // A newline that starts "User" means the model began the next turn.
             if (pending_nl) {
-                if (plen >= 4 && !strncmp(piece, "User", 4)) { st->stop_reason = "turn"; break; }
-                if (alen + 1 < cap) ans[alen++] = ' ';
+                // In chat mode a newline followed by "User" is the next turn.
+                if (chat && plen >= 4 && !strncmp(piece, "User", 4)) { st->stop_reason = "turn"; break; }
+                if (alen > 0 && alen + 1 < cap && !(plen > 0 && piece[0] == ' ')) ans[alen++] = ' ';
                 pending_nl = false;
             }
             if (plen == 1 && piece[0] == '\n') {
@@ -192,9 +203,54 @@ bool llm_answer(llm_t *l, const llm_history_t *h, const char *q, char *ans, size
         pos++;
         abspos++;
     }
+out:
     st->gen_us = story_time_us() - t0 - st->prefill_us;
-    // trim trailing whitespace
-    while (alen > 0 && isspace((unsigned char)ans[alen - 1])) ans[--alen] = 0;
+    // If we were cut off mid-sentence (hard/repeat), end at the last sentence.
+    if (strcmp(st->stop_reason, "eos") && strcmp(st->stop_reason, "soft")) {
+        size_t k = alen;
+        while (k > 0 && !strchr(".!?", ans[k - 1])) k--;
+        if (k > 0) alen = k;
+    }
+    while (alen > 0 && isspace((unsigned char)ans[alen - 1])) alen--;
     ans[alen] = 0;
     return true;
+}
+
+bool llm_answer(llm_t *l, const llm_history_t *h, const char *q, char *ans, size_t cap,
+                llm_piece_cb cb, void *user, llm_stats_t *st)
+{
+    llm_stats_t dummy;
+    if (!st) st = &dummy;
+    memset(st, 0, sizeof *st);
+    ans[0] = 0;
+    if (!l->loaded) { SLOGE(TAG, "answer: model not loaded"); return false; }
+    l->stop = false;
+    int n_prompt = build_prompt(l, h, q, l->net.kv_len - 16);
+    if (n_prompt <= 0) { SLOGE(TAG, "prompt did not fit"); return false; }
+    return generate(l, n_prompt, true, ans, cap, cb, user, st);
+}
+
+bool llm_story(llm_t *l, const char *topic, char *ans, size_t cap, llm_piece_cb cb, void *user,
+               llm_stats_t *st)
+{
+    llm_stats_t dummy;
+    if (!st) st = &dummy;
+    memset(st, 0, sizeof *st);
+    ans[0] = 0;
+    if (!l->loaded) { SLOGE(TAG, "story: model not loaded"); return false; }
+    l->stop = false;
+    // TinyStories-Instruct's native format.
+    char seg[LLM_TURN_CHARS + 32];
+    char t[LLM_TURN_CHARS];
+    copy_trim(t, topic, sizeof t);
+    snprintf(seg, sizeof seg, "Summary: %s\nStory:", t);
+    int n = neo_tok_encode(&l->tok, seg, l->prompt, l->net.kv_len - 16);
+    if (n <= 0) { SLOGE(TAG, "story prompt did not fit"); return false; }
+    // Stories get a longer budget than chat answers.
+    llm_params_t saved = l->params;
+    l->params.soft_max_tokens = saved.soft_max_tokens + 24;
+    l->params.hard_max_tokens = saved.hard_max_tokens + 32;
+    bool ok = generate(l, n, false, ans, cap, cb, user, st);
+    l->params = saved;
+    return ok;
 }

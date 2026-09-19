@@ -74,6 +74,11 @@ bool llm_answer(llm_t *l, const llm_history_t *hist, const char *question,
                 char *answer, size_t answer_cap, llm_piece_cb cb, void *user,
                 llm_stats_t *st);
 
+// Tells a short story using TinyStories-Instruct's native prompt format
+// ("Summary: <topic>\nStory:"). No history.
+bool llm_story(llm_t *l, const char *topic, char *answer, size_t answer_cap, llm_piece_cb cb,
+               void *user, llm_stats_t *st);
+
 void llm_history_clear(llm_history_t *h);
 void llm_history_push(llm_history_t *h, const char *user, const char *bot);
 
