@@ -9,21 +9,28 @@ static char clean(unsigned char c)
 }
 
 // Greedy word wrap into a ring of max_rows rows, so we keep the tail.
+// Soft wraps continue with a `hang`-column indent; a '\n' starts flush left.
 int ui_wrap_ex(const char *text, int cols, int hang, char out[][UI_MAX_COLS + 1], int max_rows)
 {
     if (cols > UI_MAX_COLS) cols = UI_MAX_COLS;
     if (hang < 0 || hang >= cols) hang = 0;
     int nrows = 0;
     char row[UI_MAX_COLS + 1];
-    int len = 0;
+    int len = 0, base = 0;          // base = indent chars at the start of this row
     const char *p = text ? text : "";
 
-#define EMIT() do { row[len] = 0; memcpy(out[nrows % max_rows], row, len + 1); nrows++; \
-                    len = 0; for (int h_ = 0; h_ < hang; h_++) row[len++] = ' '; } while (0)
-#define ROW_EMPTY() (len == (nrows > 0 ? hang : 0))
+#define EMIT(indent) do {                                           \
+        row[len] = 0;                                               \
+        memcpy(out[nrows % max_rows], row, (size_t)len + 1);        \
+        nrows++;                                                    \
+        len = 0;                                                    \
+        base = (indent);                                            \
+        for (int h_ = 0; h_ < base; h_++) row[len++] = ' ';         \
+    } while (0)
+#define ROW_EMPTY() (len == base)
 
     while (*p) {
-        if (*p == '\n') { EMIT(); p++; continue; }
+        if (*p == '\n') { EMIT(0); p++; continue; }
         if (*p == ' ' && ROW_EMPTY() && nrows > 0) { p++; continue; }  // no leading spaces on wrapped rows
         // measure next word (or single space)
         const char *q = p;
@@ -36,13 +43,13 @@ int ui_wrap_ex(const char *text, int cols, int hang, char out[][UI_MAX_COLS + 1]
         } else if (wl > cols - hang || ROW_EMPTY()) {
             // hard-break a word longer than a row
             while (len < cols && *p && *p != ' ' && *p != '\n') row[len++] = clean((unsigned char)*p++);
-            EMIT();
+            EMIT(hang);
         } else {
             while (len > 0 && row[len - 1] == ' ') len--;   // strip trailing space before wrapping
-            EMIT();
+            EMIT(hang);
         }
     }
-    if (!ROW_EMPTY() || nrows == 0) EMIT();
+    if (!ROW_EMPTY() || nrows == 0) EMIT(0);
 #undef EMIT
 #undef ROW_EMPTY
 

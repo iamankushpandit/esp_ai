@@ -7,6 +7,7 @@
 #include "phase.h"
 #include "speak.h"
 #include "think.h"
+#include "story_intent.h"
 #include "ui.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -23,28 +24,31 @@ static void speak_error(const char *msg)
     speak_text(msg, NULL, NULL);
 }
 
-pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
+pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns)
 {
+    bool followup = turn > 1;
+    bool last = turn >= max_turns;
     static char question[256];
     static char answer[LLM_ANSWER_CHARS + 1];
     hear_stats_t hs = {0};
     llm_stats_t ls = {0};
     speak_stats_t ss = {0};
     pipeline_result_t res = PIPE_OK;
-    int turn = hist ? hist->n + 1 : 1;
     story_mem_log("turn-start");
     int64_t t0 = story_time_us();
 
-    app_ui_clear_turn();
+    // A session starts on a clean transcript; follow-ups append to it.
+    if (!followup) app_ui_clear_turn();
     board_backlight(80);
 
     // ---- LISTEN + TRANSCRIBE
     hear_result_t hr = hear_listen(hp, question, sizeof question, status_cb, &hs);
     int64_t t_hear = story_time_us();
     if (hr == HEAR_NO_SPEECH) {
+        res = PIPE_NO_SPEECH;
+        if (followup) goto done;          // quiet follow-up window: end normally
         app_ui_status("No speech", UI_GREY);
         speak_error("I didn't hear anything.");
-        res = PIPE_NO_SPEECH;
         goto done;
     }
     if (hr != HEAR_OK || question[0] == 0) {
@@ -54,7 +58,17 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
         res = hr == HEAR_ERROR ? PIPE_ERROR : PIPE_NOT_UNDERSTOOD;
         goto done;
     }
-    app_ui_you(question);
+    app_ui_you(question);                 // appends a new turn to the transcript
+
+    // ---- BYE (no model needed)
+    char topic[8];
+    if (story_intent(question, topic, sizeof topic) == INTENT_BYE) {
+        app_ui_story("Bye bye.");
+        app_ui_status("Speaking...", UI_ACCENT);
+        speak_text("Bye bye.", NULL, NULL);
+        res = PIPE_BYE;
+        goto done;
+    }
 
     // ---- THINK
     app_ui_status("Thinking...", UI_YELLOW);
@@ -66,8 +80,12 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
         goto done;
     }
     int64_t t_think = story_time_us() - t_think0;
+    if (hist) llm_history_push(hist, question, answer);   // context without the sign-off
+    if (last) {
+        size_t n = strlen(answer);
+        snprintf(answer + n, sizeof answer - n, " Bye bye.");
+    }
     app_ui_story(answer);
-    if (hist) llm_history_push(hist, question, answer);
 
     // ---- SPEAK
     app_ui_status("Speaking...", UI_ACCENT);   // detail line keeps the tok/s
@@ -78,7 +96,7 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
     }
     int64_t t_speak = story_time_us() - t_speak0;
 
-    ESP_LOGI(TAG, "================ TURN %d ================", turn);
+    ESP_LOGI(TAG, "================ TURN %d/%d ================", turn, max_turns);
     ESP_LOGI(TAG, "RECORD    %.2f s (speech chunks %d, noise %d, peak %d)", hs.record_us / 1e6,
              hs.speech_chunks, hs.noise_floor, hs.peak_energy);
     ESP_LOGI(TAG, "STT       %.2f s (open %lld ms, pre-encode %lld ms, infer %lld ms, SD %lld ms)",
@@ -97,10 +115,35 @@ pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist)
 
 done:
     story_mem_log("turn-end");
-    if (res == PIPE_OK) {
-        app_ui_status("Done", UI_GREEN);
-    } else {
-        app_ui_status("Ready", UI_GREY);
-    }
     return res;
+}
+
+// A session: first question + up to (max_turns - 1) follow-ups without the
+// wake trigger. Ends on "bye", after the last answer, on a silent follow-up
+// window, or on an error. Context lives only for the session.
+void pipeline_session(const hear_params_t *hp, int max_turns)
+{
+    static llm_history_t hist;
+    llm_history_clear(&hist);
+    static const char *why[] = {"answered", "no speech", "not understood", "error", "bye"};
+    const char *reason = "last turn";
+    int turn = 1;
+    story_mem_log("session-start");
+    for (; turn <= max_turns; turn++) {
+        pipeline_result_t r = pipeline_turn(hp, &hist, turn, max_turns);
+        if (r == PIPE_BYE || r == PIPE_ERROR || (r == PIPE_NO_SPEECH)) { reason = why[r]; break; }
+        if (turn < max_turns) {
+            char st[64];
+            snprintf(st, sizeof st, "Listening... follow-up %d/%d", turn, max_turns - 1);
+            app_ui_status(st, UI_ACCENT);
+        }
+    }
+    ESP_LOGI(TAG, "SESSION END after %d turn(s): %s", turn > max_turns ? max_turns : turn, reason);
+    printf("SESSION END turns=%d reason=%s\n", turn > max_turns ? max_turns : turn, reason);
+    llm_history_clear(&hist);           // no conversation state survives the session
+    app_ui_status("Session ended", UI_GREY);
+    board_backlight(0);                 // screen off; wake trigger turns it back on
+    app_ui_clear_turn();                // cleared while dark, so the next session starts clean
+    app_ui_status("Ready", UI_GREEN);
+    story_mem_log("session-end");
 }

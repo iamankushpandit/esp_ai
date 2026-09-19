@@ -14,6 +14,8 @@
 
 static const char *TAG = "hear";
 
+volatile int g_hear_listen_count;
+
 #define STT_MODEL_PATH BOARD_SD_MOUNT "/story/stt/model.bin"
 #define RING_SLOTS 12
 
@@ -102,6 +104,7 @@ hear_result_t hear_listen(const hear_params_t *p, char *text, size_t cap, hear_s
     c->done = xSemaphoreCreateBinary();
 
     board_mic_start();
+    g_hear_listen_count++;   // lets test harnesses time a spoken question
     int64_t t0 = story_time_us();
     xTaskCreatePinnedToCore(capture_task, "mic_cap", 3072, c, configMAX_PRIORITIES - 2, NULL,
                             xPortGetCoreID() == 0 ? 1 : 0);

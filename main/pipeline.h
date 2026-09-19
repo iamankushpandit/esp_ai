@@ -7,7 +7,14 @@ typedef enum {
     PIPE_NO_SPEECH,
     PIPE_NOT_UNDERSTOOD,
     PIPE_ERROR,
+    PIPE_BYE,
 } pipeline_result_t;
 
-// One question/answer turn. `hist` may be NULL (no conversation context).
-pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist);
+#define SESSION_MAX_TURNS 4   // first question + three follow-ups
+
+// One question/answer turn (turn is 1-based). `hist` may be NULL. The last
+// turn's answer gets " Bye bye." appended.
+pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns);
+
+// Full conversation session; returns when it ends (screen off afterwards).
+void pipeline_session(const hear_params_t *hp, int max_turns);

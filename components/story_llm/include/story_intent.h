@@ -11,9 +11,10 @@ typedef enum {
     INTENT_CHAT = 0,   // normal question/answer
     INTENT_STORY,      // "tell me a story about X" -> story format, topic filled
     INTENT_IDENTITY,   // "what is your name / who are you" -> fixed answer
+    INTENT_BYE,        // short "bye / goodbye / that's all" -> end the session
 } story_intent_t;
 
-#define INTENT_IDENTITY_ANSWER "I'm Story, a little talking robot. I like to chat and tell stories."
+#define INTENT_IDENTITY_ANSWER "I am ESP Bot, a little talking robot. I like to chat and tell stories."
 
 // Classify a (lower- or mixed-case) transcript. For INTENT_STORY, writes the
 // story topic (e.g. "a red robot") to `topic`.

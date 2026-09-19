@@ -1,15 +1,28 @@
 #include "app_ui.h"
 #include "board.h"
 #include "ui.h"
+#include "board_lcd_stream.h"
+#include <math.h>
 #include <stdio.h>
 #include <string.h>
 
 #define ROW_Y(r) (2 + (r) * UI_ROW_H)
 #define COLS (BOARD_LCD_W / UI_FONT_W)   // 30
 
-static ui_box_t s_status, s_you, s_story, s_detail, s_footer;
+#define MAX_TURNS 4
+#define Q_CHARS 160
+#define A_CHARS 480
+
+static ui_box_t s_status, s_convo, s_detail;
 static int s_spin;
 static float s_last_rate;
+
+// Session transcript (bounded: at most MAX_TURNS turns, oldest dropped).
+static struct {
+    char q[Q_CHARS];
+    char a[A_CHARS];
+} s_turns[MAX_TURNS];
+static int s_nturns;
 
 // Copy model/STT text, keeping plain ASCII only (UI glyph codes live above
 // 0x7F, so stray UTF-8 bytes must never reach the renderer).
@@ -18,41 +31,55 @@ static void sanitize(char *dst, size_t cap, const char *src)
     size_t n = 0;
     for (; src && *src && n + 1 < cap; src++) {
         unsigned char c = (unsigned char)*src;
-        dst[n++] = (c >= 0x20 && c < 0x7F) || c == '\n' ? (char)c : '?';
+        dst[n++] = (c >= 0x20 && c < 0x7F) ? (char)c : (c == '\n' ? ' ' : '?');
     }
     dst[n] = 0;
+}
+
+static void render_convo(void)
+{
+    static char buf[MAX_TURNS * (Q_CHARS + A_CHARS + 8)];
+    size_t n = 0;
+    buf[0] = 0;
+    for (int i = 0; i < s_nturns; i++) {
+        if (i > 0) n += (size_t)snprintf(buf + n, sizeof buf - n, "\n\n");   // blank line between turns
+        if (s_turns[i].q[0]) n += (size_t)snprintf(buf + n, sizeof buf - n, "> %s", s_turns[i].q);
+        if (s_turns[i].a[0])
+            n += (size_t)snprintf(buf + n, sizeof buf - n, "%s" UI_G_BULLET " %s",
+                                  s_turns[i].q[0] ? "\n" : "", s_turns[i].a);
+    }
+    ui_box_set(&s_convo, buf);
+}
+
+static void header_row(int r, const char *text, int accent_at, int white_from, int white_n)
+{
+    char row[COLS + 1];
+    uint8_t attr[COLS] = {0};
+    const uint16_t pal[3] = {UI_DIM, UI_ACCENT, UI_WHITE};
+    memset(row, ' ', COLS);
+    row[COLS] = 0;
+    row[0] = row[COLS - 1] = UI_G_V[0];
+    size_t n = strlen(text);
+    memcpy(row + 2, text, n > COLS - 4 ? COLS - 4 : n);
+    if (accent_at >= 0) attr[2 + accent_at] = 1;
+    for (int k = 0; k < white_n; k++) attr[2 + white_from + k] = 2;
+    ui_draw_row_attr(0, ROW_Y(r), BOARD_LCD_W, row, attr, pal, UI_BLACK);
 }
 
 static void draw_header(void)
 {
     char row[COLS + 1];
-    uint8_t attr[COLS];
-    const uint16_t pal[3] = {UI_DIM, UI_ACCENT, UI_WHITE};
-
-    // ╭──────╮
+    row[COLS] = 0;
     row[0] = UI_G_TL[0];
     memset(row + 1, UI_G_H[0], COLS - 2);
     row[COLS - 1] = UI_G_TR[0];
-    row[COLS] = 0;
     ui_draw_row(0, ROW_Y(0), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
 
-    // │ ✻ Story      │
-    memset(row, ' ', COLS);
-    memset(attr, 0, sizeof attr);
-    row[0] = row[COLS - 1] = UI_G_V[0];
-    row[2] = (char)(UI_G_SPIN0 + 3);
-    attr[2] = 1;
-    memcpy(row + 4, "Story", 5);
-    memset(attr + 4, 2, 5);
-    ui_draw_row_attr(0, ROW_Y(1), BOARD_LCD_W, row, attr, pal, UI_BLACK);
+    char title[16] = {(char)(UI_G_SPIN0 + 3), ' '};
+    strcpy(title + 2, "ESP Bot");
+    header_row(1, title, 0, 2, 7);                  // ✻ accent, "ESP Bot" white
+    header_row(2, "  (c) iamankushpandit", -1, 0, 0);
 
-    // │   offline voice assistant │
-    memset(row, ' ', COLS);
-    row[0] = row[COLS - 1] = UI_G_V[0];
-    memcpy(row + 4, "offline voice assistant", 23);
-    ui_draw_row(0, ROW_Y(2), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
-
-    // ╰──────╯
     row[0] = UI_G_BL[0];
     memset(row + 1, UI_G_H[0], COLS - 2);
     row[COLS - 1] = UI_G_BR[0];
@@ -64,14 +91,14 @@ void app_ui_init(void)
     // The only full-screen fill: once at boot, before the backlight is on.
     board_lcd_fill(0, 0, BOARD_LCD_W, BOARD_LCD_H, UI_BLACK);
     draw_header();
-    ui_box_init(&s_you, 0, ROW_Y(5), BOARD_LCD_W, 4, UI_WHITE, UI_BLACK);
-    ui_box_style(&s_you, 1, UI_DIM, 2);            // dim "> ", indented wrap
-    ui_box_init(&s_story, 0, ROW_Y(10), BOARD_LCD_W, 9, UI_WHITE, UI_BLACK);
-    ui_box_style(&s_story, 1, UI_ACCENT, 2);       // accent bullet, indented wrap
-    ui_box_init(&s_detail, 0, ROW_Y(19), BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
-    ui_box_init(&s_status, 0, ROW_Y(20), BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
+    ui_box_init(&s_convo, 0, ROW_Y(4) + 4, BOARD_LCD_W, 12, UI_WHITE, UI_BLACK);
+    ui_box_style(&s_convo, 0, UI_WHITE, 2);        // 2-col hanging indent
+    ui_box_mark(&s_convo, 0, '>', UI_DIM);
+    ui_box_mark(&s_convo, 1, UI_G_BULLET[0], UI_ACCENT);
+    ui_box_init(&s_detail, 0, ROW_Y(16) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
+    ui_box_init(&s_status, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
     ui_box_style(&s_status, 1, UI_ACCENT, 0);
-    ui_box_init(&s_footer, 0, ROW_Y(21), BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
+    app_ui_button(BTN_IDLE);
 }
 
 void app_ui_status(const char *s, uint16_t color)
@@ -94,20 +121,25 @@ void app_ui_status(const char *s, uint16_t color)
 
 void app_ui_you(const char *text)
 {
-    char clean[256], buf[260];
-    sanitize(clean, sizeof clean, text);
-    if (clean[0]) snprintf(buf, sizeof buf, "> %s", clean);
-    else buf[0] = 0;
-    ui_box_set(&s_you, buf);
+    if (s_nturns == MAX_TURNS) {   // drop the oldest turn
+        memmove(&s_turns[0], &s_turns[1], sizeof s_turns[0] * (MAX_TURNS - 1));
+        s_nturns--;
+    }
+    sanitize(s_turns[s_nturns].q, Q_CHARS, text);
+    s_turns[s_nturns].a[0] = 0;
+    s_nturns++;
+    app_ui_detail("");
+    render_convo();
 }
 
 void app_ui_story(const char *text)
 {
-    static char clean[512], buf[520];
-    sanitize(clean, sizeof clean, text);
-    if (clean[0]) snprintf(buf, sizeof buf, UI_G_BULLET " %s", clean);
-    else buf[0] = 0;
-    ui_box_set(&s_story, buf);
+    if (s_nturns == 0) {           // an answer with no question (e.g. an error)
+        s_turns[0].q[0] = 0;
+        s_nturns = 1;
+    }
+    sanitize(s_turns[s_nturns - 1].a, A_CHARS, text);
+    render_convo();
 }
 
 void app_ui_detail(const char *text)
@@ -118,18 +150,90 @@ void app_ui_detail(const char *text)
     ui_box_set(&s_detail, buf);
 }
 
-void app_ui_footer(const char *text)
+// ---------------------------------------------------------------- ask button
+// An orange spark (irregular starburst) on a dark rounded tile, drawn
+// procedurally with 2x2 supersampling. Only the 52x52 tile is ever redrawn.
+#define BTN_SIZE 52
+#define BTN_X ((BOARD_LCD_W - BTN_SIZE) / 2)
+#define BTN_Y 263
+#define BTN_TOUCH_PAD 10                 // generous touch target around the tile
+
+static int s_btn_state = -1;
+
+static uint16_t mix565(uint16_t a, uint16_t b, float t)   // t: 0 -> a, 1 -> b
 {
-    char buf[48];
-    snprintf(buf, sizeof buf, "  %s", text ? text : "");
-    ui_box_set(&s_footer, buf);
+    int ar = a >> 11, ag = (a >> 5) & 63, ab = a & 31;
+    int br = b >> 11, bg = (b >> 5) & 63, bb = b & 31;
+    int r = ar + (int)((br - ar) * t + 0.5f), g = ag + (int)((bg - ag) * t + 0.5f),
+        bl = ab + (int)((bb - ab) * t + 0.5f);
+    return (uint16_t)((r << 11) | (g << 5) | bl);
+}
+
+// Coverage of the spark at (x, y) relative to its center, radius R.
+static float spark(float x, float y, float R)
+{
+    // 12 rays with hand-drawn-looking lengths and a slight rotation.
+    static const float len[12] = {1.00f, 0.74f, 0.93f, 0.70f, 0.98f, 0.78f,
+                                  0.90f, 0.72f, 1.00f, 0.76f, 0.94f, 0.71f};
+    float r = sqrtf(x * x + y * y);
+    if (r < 0.20f * R) return 1.0f;                      // solid core
+    for (int k = 0; k < 12; k++) {
+        float a = (float)k * (6.2831853f / 12.0f) + 0.13f;
+        float dx = cosf(a), dy = sinf(a);
+        float along = x * dx + y * dy;                   // distance along the ray
+        if (along <= 0 || along > len[k] * R) continue;
+        float perp = fabsf(-x * dy + y * dx);            // distance from the ray axis
+        float half_w = 0.105f * R * (1.0f - 0.85f * along / (len[k] * R)) + 0.4f;  // tapered
+        if (perp <= half_w) return 1.0f;
+    }
+    return 0.0f;
+}
+
+void app_ui_button(app_btn_state_t st)
+{
+    if ((int)st == s_btn_state) return;                  // dirty-region: only on change
+    s_btn_state = (int)st;
+    uint16_t tile = st == BTN_PRESSED ? RGB565(70, 44, 36) : RGB565(34, 34, 34);
+    uint16_t edge = st == BTN_PRESSED ? UI_ACCENT : RGB565(70, 70, 70);
+    uint16_t ink = st == BTN_BUSY ? RGB565(120, 80, 66)
+                 : st == BTN_PRESSED ? RGB565(250, 160, 125) : UI_ACCENT;
+    const float R = BTN_SIZE * 0.36f, c = (BTN_SIZE - 1) / 2.0f, corner = 11.0f;
+
+    board_lcd_window(BTN_X, BTN_Y, BTN_SIZE, BTN_SIZE);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int py = 0; py < BTN_SIZE; py++) {
+        for (int px = 0; px < BTN_SIZE; px++) {
+            // Rounded-square tile with a 1 px edge; outside the corners stays black.
+            float qx = fabsf(px - c) - (c - corner), qy = fabsf(py - c) - (c - corner);
+            float d = (qx > 0 && qy > 0) ? sqrtf(qx * qx + qy * qy) - corner
+                                         : (qx > qy ? qx : qy) - corner;
+            uint16_t col;
+            if (d > 0.5f) col = UI_BLACK;
+            else if (d > -0.5f) col = edge;
+            else {
+                float cov = 0;
+                for (int s = 0; s < 4; s++)
+                    cov += spark(px - c + ((s & 1) ? 0.25f : -0.25f), py - c + ((s & 2) ? 0.25f : -0.25f), R);
+                col = mix565(tile, ink, cov / 4.0f);
+            }
+            buf[py * BTN_SIZE + px] = (uint16_t)((col >> 8) | (col << 8));
+        }
+    }
+    board_lcd_stream_push(buf, BTN_SIZE * BTN_SIZE);
+    board_lcd_stream_end();
+}
+
+bool app_ui_button_hit(int x, int y)
+{
+    return x >= BTN_X - BTN_TOUCH_PAD && x < BTN_X + BTN_SIZE + BTN_TOUCH_PAD &&
+           y >= BTN_Y - BTN_TOUCH_PAD && y < BTN_Y + BTN_SIZE + BTN_TOUCH_PAD;
 }
 
 void app_ui_clear_turn(void)
 {
-    ui_box_set(&s_you, "");
-    ui_box_set(&s_story, "");
-    ui_box_set(&s_detail, "");
+    s_nturns = 0;
+    render_convo();
+    app_ui_detail("");
 }
 
 void app_ui_llm_progress(const char *text, int tokens, float tok_per_s)

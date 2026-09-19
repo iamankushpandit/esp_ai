@@ -35,3 +35,6 @@ hear_result_t hear_listen(const hear_params_t *p, char *text, size_t cap, hear_s
 
 // TRANSCRIBE phase from a 16 kHz mono s16 WAV on the SD card (test path).
 hear_result_t hear_wav(const char *path, char *text, size_t cap, hear_stats_t *st);
+
+// Incremented each time the mic opens for a question (test harness hook).
+extern volatile int g_hear_listen_count;

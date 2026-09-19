@@ -98,6 +98,33 @@ static void cmd_hearplay(const char *args)
     board_audio_set_volume(70);
 }
 
+// Test: a whole session with pre-recorded questions. Each WAV is played
+// through the speaker shortly after the device starts listening.
+typedef struct { char paths[4][96]; int n; int vol; } sess_play_t;
+static sess_play_t s_sess;
+
+static void session_player_task(void *arg)
+{
+    sess_play_t *s = (sess_play_t *)arg;
+    int seen = g_hear_listen_count;
+    for (int i = 0; i < s->n; i++) {
+        while (g_hear_listen_count == seen) vTaskDelay(pdMS_TO_TICKS(20));
+        seen = g_hear_listen_count;
+        vTaskDelay(pdMS_TO_TICKS(1200));
+        FILE *f = fopen(s->paths[i], "rb");
+        if (!f) continue;
+        int16_t buf[256];
+        size_t n;
+        fseek(f, 44, SEEK_SET);
+        board_audio_set_volume(s->vol);
+        board_spk_start();
+        while ((n = fread(buf, 2, 256, f)) > 0) board_spk_write(buf, n, 1000);
+        board_spk_stop();
+        fclose(f);
+    }
+    vTaskDelete(NULL);
+}
+
 static void dispatch(const char *line)
 {
     if (!strncmp(line, "put ", 4)) {
@@ -133,8 +160,20 @@ static void dispatch(const char *line)
         think_set_model_dir(line + 7);
         printf("LLM dir %s\n", think_model_dir());
         printf("OK\n");
+    } else if (!strncmp(line, "sessionplay ", 12)) {
+        // sessionplay <vol> <wav1> [wav2 .. wav4]: fewer WAVs than turns
+        // exercises the silent follow-up timeout.
+        memset(&s_sess, 0, sizeof s_sess);
+        s_sess.n = sscanf(line + 12, "%d %95s %95s %95s %95s", &s_sess.vol, s_sess.paths[0],
+                          s_sess.paths[1], s_sess.paths[2], s_sess.paths[3]) - 1;
+        if (s_sess.n > 0) {
+            xTaskCreatePinnedToCore(session_player_task, "sessplay", 4096, &s_sess, 5, NULL, 1);
+            pipeline_session(&s_hear, SESSION_MAX_TURNS);
+            board_audio_set_volume(70);
+        }
+        printf("OK\n");
     } else if (!strcmp(line, "go")) {
-        pipeline_turn(&s_hear, NULL);
+        pipeline_session(&s_hear, SESSION_MAX_TURNS);
         printf("OK\n");
     } else if (!strncmp(line, "goplay ", 7)) {
         // End-to-end loopback test: the question is played through the speaker.
@@ -144,7 +183,7 @@ static void dispatch(const char *line)
             board_audio_set_volume(vol);
             xTaskCreatePinnedToCore(wav_player_task, "wavplay", 4096, &s_play, 5, NULL, 1);
             vTaskDelay(pdMS_TO_TICKS(50));
-            pipeline_turn(&s_hear, NULL);
+            pipeline_turn(&s_hear, NULL, 1, 2);   // single turn, no sign-off
             board_audio_set_volume(70);
         }
         printf("OK\n");
@@ -175,19 +214,56 @@ void app_main(void)
     ESP_LOGI(TAG, "READY lcd=%s touch=%s audio=%s sd=%s arenas=%d", esp_err_to_name(lcd),
              esp_err_to_name(tp), esp_err_to_name(au), esp_err_to_name(sd), arenas);
 
-    // BOOT button (GPIO0, active low) starts a turn: the Stage E trigger until
-    // the wake word exists.
+    // Triggers: the on-screen spark button (tap = press + release inside it).
+    // The physical BOOT button still works as a hidden backup.
     gpio_config_t btn = {.pin_bit_mask = 1ULL << BOARD_BOOT_BTN, .mode = GPIO_MODE_INPUT,
                          .pull_up_en = GPIO_PULLUP_ENABLE};
     gpio_config(&btn);
-    app_ui_footer("BOOT to ask " UI_G_MIDDOT " offline");
 
+    const int64_t SCREEN_TIMEOUT_US = 30LL * 1000000;
+    bool screen_on = true, touching = false, armed_press = false;
+    int64_t last_activity = story_time_us();
     char line[200];
     while (1) {
-        if (console_readline(line, sizeof line, 50)) dispatch(line);
+        bool start = false;
+        if (console_readline(line, sizeof line, 30)) {
+            dispatch(line);
+            last_activity = story_time_us();
+        }
+
+        int tx = 0, ty = 0;
+        bool t = board_touch_read(&tx, &ty);
+        if (t && !touching) {                          // touch down
+            ESP_LOGI(TAG, "touch down %d,%d", tx, ty);
+            if (!screen_on) {                          // first tap only wakes the screen
+                board_backlight(80);
+                screen_on = true;
+            } else if (app_ui_button_hit(tx, ty)) {
+                armed_press = true;
+                app_ui_button(BTN_PRESSED);
+            }
+            last_activity = story_time_us();
+        } else if (!t && touching && armed_press) {     // release: act like a real button
+            armed_press = false;
+            start = true;
+        }
+        touching = t;
+
         if (gpio_get_level(BOARD_BOOT_BTN) == 0) {
             while (gpio_get_level(BOARD_BOOT_BTN) == 0) vTaskDelay(pdMS_TO_TICKS(10));
-            pipeline_turn(&s_hear, NULL);
+            start = true;
+        }
+        if (start) {
+            board_backlight(80);
+            app_ui_button(BTN_BUSY);
+            pipeline_session(&s_hear, SESSION_MAX_TURNS);   // ends with the screen off
+            app_ui_button(BTN_IDLE);
+            screen_on = false;
+            last_activity = story_time_us();
+        }
+        if (screen_on && story_time_us() - last_activity > SCREEN_TIMEOUT_US) {
+            board_backlight(0);
+            screen_on = false;
         }
     }
 }

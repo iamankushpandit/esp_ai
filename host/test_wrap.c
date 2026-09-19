@@ -34,6 +34,14 @@ int main(void)
     CHECK(strcmp(r[2], "  about a") == 0);
     CHECK(strcmp(r[3], "  cat") == 0);
 
+    // hard newline starts flush left even with a hanging indent
+    n = ui_wrap_ex("> hi there friend\n\n> next", 12, 2, r, 6);
+    CHECK(n == 4);
+    CHECK(strcmp(r[0], "> hi there") == 0);
+    CHECK(strcmp(r[1], "  friend") == 0);
+    CHECK(strcmp(r[2], "") == 0);
+    CHECK(strcmp(r[3], "> next") == 0);
+
     // UI glyph bytes pass through; other high bytes don't
     n = ui_wrap("\x86 ok \xff", 10, r, 2);
     CHECK((unsigned char)r[0][0] == 0x86 && r[0][5] == '?');

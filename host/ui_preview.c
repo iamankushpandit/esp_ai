@@ -10,10 +10,10 @@
 
 static uint16_t fb[BOARD_LCD_H][BOARD_LCD_W];
 static uint16_t dma[BOARD_LCD_STREAM_PX];
-static int wx, wy, ww, wh, wpos;
+static int wx, wy, ww, wpos;
 static long pushed;
 
-void board_lcd_window(int x, int y, int w, int h) { wx = x; wy = y; ww = w; wh = h; wpos = 0; }
+void board_lcd_window(int x, int y, int w, int h) { (void)h; wx = x; wy = y; ww = w; wpos = 0; }
 uint16_t *board_lcd_stream_buf(void) { return dma; }
 void board_lcd_stream_push(uint16_t *buf, size_t n)
 {
@@ -32,8 +32,13 @@ void board_lcd_fill(int x, int y, int w, int h, uint16_t c)
     pushed += (long)w * h;
 }
 
-static void dump(const char *path)
+static const char *s_dir;
+static int s_frame;
+
+static void dump(void)
 {
+    char path[256];
+    snprintf(path, sizeof path, "%s/ui_%d.ppm", s_dir, s_frame++);
     FILE *f = fopen(path, "wb");
     fprintf(f, "P6\n%d %d\n255\n", BOARD_LCD_W, BOARD_LCD_H);
     for (int y = 0; y < BOARD_LCD_H; y++)
@@ -49,29 +54,42 @@ static void dump(const char *path)
 #define STEP(label, code) do { pushed = 0; code; \
     printf("%-34s repainted %5ld px (%4.1f%% of screen)\n", label, pushed, 100.0 * pushed / (BOARD_LCD_W * BOARD_LCD_H)); } while (0)
 
+static void stream(const char *ans, int tok, float rate)
+{
+    char part[512];
+    int n = (int)strlen(ans);
+    for (int k = 14, i = 1; k < n; k += 18, i++) {
+        memcpy(part, ans, (size_t)k);
+        part[k] = 0;
+        STEP("  stream update", app_ui_llm_progress(part, i * 3, rate));
+    }
+    STEP("  answer final", app_ui_llm_progress(ans, tok, rate));
+}
+
 int main(int argc, char **argv)
 {
-    const char *dir = argc > 1 ? argv[1] : ".";
-    char p[256];
-    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN); app_ui_footer("BOOT to ask " UI_G_MIDDOT " offline"));
-    snprintf(p, sizeof p, "%s/ui_0_idle.ppm", dir); dump(p);
-    STEP("listening", app_ui_clear_turn(); app_ui_status("Listening...", UI_ACCENT));
-    STEP("transcribing", app_ui_status("Transcribing...", UI_ACCENT));
-    STEP("transcript shown", app_ui_you("tell me a story about a cat"));
-    snprintf(p, sizeof p, "%s/ui_1_listen.ppm", dir); dump(p);
-    const char *ans = "Once upon a time, there was a big, strong cat. The cat was very good at jumping "
-                      "and played all day. One day, the cat saw a little mouse.";
-    char part[256];
-    int n = (int)strlen(ans);
-    for (int k = 12, i = 1; k < n; k += 16, i++) {
-        memcpy(part, ans, k); part[k] = 0;
-        char lbl[40]; snprintf(lbl, sizeof lbl, "stream update %d", i);
-        STEP(lbl, app_ui_llm_progress(part, i * 3, 6.2f));
-    }
-    STEP("answer final", app_ui_llm_progress(ans, 34, 6.3f));
-    snprintf(p, sizeof p, "%s/ui_2_thinking.ppm", dir); dump(p);
-    STEP("speaking", app_ui_status("Speaking...", UI_ACCENT));
-    STEP("done", app_ui_status("Done", UI_GREEN));
-    snprintf(p, sizeof p, "%s/ui_3_done.ppm", dir); dump(p);
+    s_dir = argc > 1 ? argv[1] : ".";
+    STEP("boot (init)", app_ui_init(); app_ui_status("Ready", UI_GREEN));
+    dump();
+
+    STEP("button pressed", app_ui_button(BTN_PRESSED));
+    dump();
+    STEP("turn 1: listening", app_ui_button(BTN_BUSY); app_ui_clear_turn(); app_ui_status("Listening...", UI_ACCENT));
+    STEP("turn 1: transcribing", app_ui_status("Transcribing...", UI_ACCENT));
+    STEP("turn 1: transcript", app_ui_you("what color is a banana"));
+    stream("I know! The banana is yellow.", 8, 6.1f);
+    STEP("turn 1: speaking", app_ui_status("Speaking...", UI_ACCENT));
+    STEP("follow-up 1 listening", app_ui_status("Listening... follow-up 1/3", UI_ACCENT));
+    STEP("turn 2: transcript", app_ui_you("how many legs does a dog have"));
+    stream("A dog has four legs.", 6, 6.3f);
+    dump();
+
+    STEP("follow-up 2 listening", app_ui_status("Listening... follow-up 2/3", UI_ACCENT));
+    STEP("turn 3: transcript (scrolls)", app_ui_you("tell me a story about a cat"));
+    stream("Once upon a time, there was a big, strong cat. The cat saw a little mouse. "
+           "They became good friends. Bye bye.", 34, 6.4f);
+    STEP("turn 3: speaking", app_ui_status("Speaking...", UI_ACCENT));
+    dump();
+    STEP("session end", app_ui_status("Session ended", UI_GREY); app_ui_button(BTN_IDLE));
     return 0;
 }

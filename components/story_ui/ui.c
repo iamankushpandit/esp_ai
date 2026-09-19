@@ -75,16 +75,33 @@ void ui_box_invalidate(ui_box_t *b)
     for (int i = 0; i < b->rows; i++) b->shown[i][0] = '\x01';  // never equals real text
 }
 
+void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg)
+{
+    if (k < 0 || k > 1) return;
+    b->mark_ch[k] = ch;
+    b->mark_fg[k] = fg;
+    if (b->nmarks < k + 1) b->nmarks = (uint8_t)(k + 1);
+}
+
 static void paint(ui_box_t *b, int i, const char *s)
 {
+    int y = b->y + i * UI_ROW_H;
     if (i == 0 && b->lead_n) {
         uint8_t attr[UI_MAX_COLS] = {0};
         for (int k = 0; k < b->lead_n && k < UI_MAX_COLS; k++) attr[k] = 1;
         uint16_t pal[2] = {b->fg, b->lead_fg};
-        ui_draw_row_attr(b->x, b->y, b->w, s, attr, pal, b->bg);
-    } else {
-        ui_draw_row(b->x, b->y + i * UI_ROW_H, b->w, s, b->fg, b->bg);
+        ui_draw_row_attr(b->x, y, b->w, s, attr, pal, b->bg);
+        return;
     }
+    for (int k = 0; k < b->nmarks; k++) {
+        if (s[0] && s[0] == b->mark_ch[k]) {
+            uint8_t attr[UI_MAX_COLS] = {1};
+            uint16_t pal[2] = {b->fg, b->mark_fg[k]};
+            ui_draw_row_attr(b->x, y, b->w, s, attr, pal, b->bg);
+            return;
+        }
+    }
+    ui_draw_row(b->x, y, b->w, s, b->fg, b->bg);
 }
 
 int ui_box_set(ui_box_t *b, const char *text)

@@ -48,6 +48,9 @@ typedef struct {
     uint8_t lead_n;          // first lead_n chars of the first row use lead_fg
     uint16_t lead_fg;
     uint8_t hang;            // continuation rows are indented by this many cols
+    uint8_t nmarks;          // rows starting with mark_ch[k] draw that char in mark_fg[k]
+    char mark_ch[2];
+    uint16_t mark_fg[2];
     char shown[UI_MAX_ROWS][UI_MAX_COLS + 1];
 } ui_box_t;
 
@@ -62,6 +65,8 @@ int ui_wrap(const char *text, int cols, char out[][UI_MAX_COLS + 1], int max_row
 void ui_box_init(ui_box_t *b, int x, int y, int w, int rows, uint16_t fg, uint16_t bg);
 // Colored lead (e.g. bullet) + hanging indent.
 void ui_box_style(ui_box_t *b, uint8_t lead_n, uint16_t lead_fg, uint8_t hang);
+// Per-row marker coloring (e.g. '>' dim, bullet accent) for transcript boxes.
+void ui_box_mark(ui_box_t *b, int k, char ch, uint16_t fg);
 // Returns number of rows repainted.
 int ui_box_set(ui_box_t *b, const char *text);
 void ui_box_set_color(ui_box_t *b, uint16_t fg);  // repaints non-empty rows

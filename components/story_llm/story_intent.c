@@ -18,6 +18,23 @@ story_intent_t story_intent(const char *text, char *topic, size_t topic_cap)
     lower_copy(s, text ? text : "", sizeof s);
     if (topic && topic_cap) topic[0] = 0;
 
+    // Goodbye: only for short utterances, so "a story about a bus stop" or
+    // "why do birds say goodbye" style questions still get answered.
+    int words = 0;
+    for (const char *c = s; *c; c++)
+        if (isalpha((unsigned char)*c) && (c == s || !isalpha((unsigned char)c[-1]))) words++;
+    if (words > 0 && words <= 5) {
+        static const char *bye[] = {"bye", "goodbye", "good bye", "see you", "that's all", "thats all",
+                                    "that is all", "i'm done", "im done", "stop", "go to sleep", "never mind"};
+        for (size_t i = 0; i < sizeof bye / sizeof bye[0]; i++) {
+            const char *m = strstr(s, bye[i]);
+            size_t n = strlen(bye[i]);
+            // whole-word match
+            if (m && (m == s || !isalpha((unsigned char)m[-1])) && !isalpha((unsigned char)m[n]))
+                return INTENT_BYE;
+        }
+    }
+
     if (has(s, "your name") || has(s, "who are you") || has(s, "what are you"))
         return INTENT_IDENTITY;
 
