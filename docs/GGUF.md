@@ -59,3 +59,10 @@ Felladrin/Minueza-32M (~7 MB of layers), SmolLM2-135M and up.
 `mradermacher/TinyStories-LLaMA2-20M-256h-4l-GQA-GGUF` is a broken conversion
 (garbage in llama.cpp's own maths too); converting the sibling
 `Mxode/TinyStories-LLaMA2-25M-256h-4l-GQA` with `hf_llama_to_gguf.py` works.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

@@ -1,0 +1,1446 @@
+<!DOCTYPE html>
+<!--
+  Ivy AI — the landing page and the write-up, in one document.
+
+  This file is a TEMPLATE. tools/gen_site.py substitutes the double-braced
+  placeholders and writes site/_build/index.html. (Do not write an example of
+  one here: the generator refuses to ship a page with an unsubstituted
+  placeholder left in it, and cannot tell a comment from the real thing.) Do not edit the generated file: every
+  number on this page is derived from the repository (docs/STAGE_E_RESULTS.md,
+  docs/GGUF.md, the build output, the training branch), because a
+  hand-maintained copy of a measurement is a measurement that will be wrong and
+  cannot say so.
+
+  No framework, no build step beyond string substitution, no analytics, no
+  cookies, no fonts from anybody else. On load this page fetches nothing at
+  all; the Install tab loads esp-web-tools only when opened.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ivy AI</title>
+<link rel="icon" href="assets/ivy_ai_logo.svg" type="image/svg+xml">
+<meta name="description" content="Offline LLM assistant, proof of concept. A language model, a speech recogniser and a speech synthesiser sharing 8 MB of PSRAM on an ESP32-S3, with the Wi-Fi off. Ask by voice or type it. What it cost, with the numbers.">
+<style>
+:root{
+  /* Baby pink is a TINT. It is the accent on paper, never the background of a
+     wall of text, and the deep plum carries the type. The five band colours
+     below were picked to sit beside #F4C2C2 without fighting it. */
+  --pink:#F4C2C2; --pink-deep:#C2566F; --pink-wash:#FDEFEF;
+  --paper:#FDFAF9; --paper-2:#F7EFED;
+  --ink:#2B1A21; --ink-soft:#6A5560; --line:#E6D6D6;
+  --plum:#4A2740; --teal:#2C5F5C; --indigo:#36406B; --clay:#A9543E; --moss:#41603B;
+  --band-fg:#FFF7F7;
+  --serif:ui-serif,Georgia,"Iowan Old Style","Times New Roman",serif;
+  --sans:ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --gutter:clamp(18px,5vw,64px);
+  --measure:34rem;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --paper:#171013; --paper-2:#1F171B; --pink-wash:#2A1B21;
+    --ink:#F6EAEC; --ink-soft:#BCA6AE; --line:#3A2A31;
+    --pink-deep:#F4C2C2; --band-fg:#FFF7F7;
+  }
+}
+:root[data-theme="dark"]{
+  --paper:#171013; --paper-2:#1F171B; --pink-wash:#2A1B21;
+  --ink:#F6EAEC; --ink-soft:#BCA6AE; --line:#3A2A31;
+  --pink-deep:#F4C2C2; --band-fg:#FFF7F7;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--paper); color:var(--ink);
+  font-family:var(--sans); font-size:17px; line-height:1.6;
+  overflow-x:hidden;
+}
+h1,h2,h3{line-height:1.08; letter-spacing:-.02em; margin:0 0 .5em}
+h1{font-size:clamp(2.6rem,8vw,5.2rem); font-weight:800}
+h2{font-size:clamp(1.8rem,4.4vw,3rem); font-weight:750}
+h3{font-size:clamp(1.15rem,2.2vw,1.4rem); font-weight:700}
+p{margin:0 0 1.1em; max-width:var(--measure)}
+a{color:var(--pink-deep)}
+a:focus-visible,button:focus-visible,select:focus-visible{outline:3px solid var(--pink-deep); outline-offset:2px}
+code,kbd{font-family:var(--mono); font-size:.88em}
+.wrap{padding:0 var(--gutter); max-width:1180px; margin:0 auto}
+
+/* ---- tabs ------------------------------------------------------------- */
+nav.tabs{position:sticky; top:0; z-index:20; background:var(--paper);
+  border-bottom:1px solid var(--line)}
+nav.tabs .wrap{display:flex; align-items:center; gap:.4rem; overflow-x:auto;
+  scrollbar-width:none; padding-top:.5rem; padding-bottom:.5rem}
+nav.tabs .wrap::-webkit-scrollbar{display:none}
+.brand{font-weight:800; letter-spacing:-.03em; margin-right:1rem; white-space:nowrap;
+  display:flex; align-items:center; gap:.45rem; text-decoration:none; color:var(--ink)}
+.brand .mark{width:1.5rem; height:1.5rem; display:block; flex:0 0 auto}
+.kicker{display:inline-block; font-size:.78rem; font-weight:700; letter-spacing:.09em;
+  text-transform:uppercase; color:var(--pink-deep); margin-bottom:1rem}
+.footer-logo{width:104px; height:auto; display:block; margin-bottom:1.1rem}
+pre{background:var(--paper-2); border:1px solid var(--line); border-radius:10px;
+  padding:.85rem 1rem; overflow-x:auto; font-size:.86rem; max-width:var(--measure)}
+nav.tabs a.tab{white-space:nowrap; text-decoration:none; color:var(--ink-soft);
+  padding:.35rem .6rem; border-radius:999px; font-size:.93rem; font-weight:600}
+nav.tabs a.tab[aria-selected="true"]{background:var(--pink); color:#2B1A21}
+.tabpanel[hidden]{display:none}
+
+/* ---- hero ------------------------------------------------------------- */
+.hero{padding:clamp(3rem,9vw,7rem) 0 clamp(2rem,5vw,4rem);
+  background:linear-gradient(180deg,var(--pink-wash),var(--paper))}
+.hero h1 span{display:block}
+.hero h1 .accent{color:var(--pink-deep)}
+.lede{font-family:var(--serif); font-size:clamp(1.12rem,2.1vw,1.42rem);
+  max-width:40rem; color:var(--ink)}
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr));
+  gap:1px; background:var(--line); border:1px solid var(--line);
+  border-radius:14px; overflow:hidden; margin:2.2rem 0 0}
+.kpi{background:var(--paper); padding:1rem 1.1rem}
+.kpi b{display:block; font-size:clamp(1.4rem,3vw,1.9rem); letter-spacing:-.03em; line-height:1.1}
+.kpi span{display:block; font-size:.82rem; color:var(--ink-soft); margin-top:.25rem}
+.cta{display:flex; flex-wrap:wrap; gap:.7rem; margin-top:1.8rem}
+.btn{display:inline-block; text-decoration:none; font-weight:700; font-size:.95rem;
+  padding:.7rem 1.15rem; border-radius:999px; border:1.5px solid var(--ink)}
+.btn.primary{background:var(--ink); color:var(--paper)}
+.btn.ghost{color:var(--ink)}
+
+/* ---- colour bands ----------------------------------------------------- */
+.band{padding:clamp(2.6rem,7vw,5.5rem) 0; color:var(--band-fg)}
+.band h2{color:var(--band-fg)}
+.band p{color:rgba(255,247,247,.86); font-size:1.05rem}
+.band .wrap{display:grid; gap:clamp(1rem,4vw,3rem); grid-template-columns:1fr}
+@media(min-width:820px){.band .wrap{grid-template-columns:1.05fr 1fr; align-items:center}}
+.band.plum{background:var(--plum)} .band.teal{background:var(--teal)}
+.band.indigo{background:var(--indigo)} .band.clay{background:var(--clay)}
+.band.moss{background:var(--moss)} .band.rose{background:var(--pink-deep)}
+.band.rose p{color:rgba(255,255,255,.92)}
+.band .pull{font-family:var(--serif); font-size:clamp(1.2rem,2.6vw,1.7rem);
+  border-left:4px solid var(--pink); padding-left:1rem; color:#fff}
+/* --pink-deep is a link colour for PAPER. On a dark band it is nearly the
+   band's own value and the link disappears. Bands get the tint instead. */
+.band a{color:var(--pink); text-decoration-thickness:1.5px; text-underline-offset:2px}
+.band a:hover{color:#fff}
+.tag{display:inline-block; background:var(--pink); color:#2B1A21; font-weight:700;
+  font-size:.74rem; letter-spacing:.06em; text-transform:uppercase;
+  padding:.25rem .6rem; border-radius:999px; margin-bottom:1rem}
+
+/* ---- model progression ------------------------------------------------ */
+.demo{border:1px solid var(--line); border-radius:16px; overflow:hidden;
+  background:var(--paper-2); margin:1.6rem 0 2rem}
+.demo-qs{display:flex; flex-wrap:wrap; gap:.4rem; padding:.9rem;
+  border-bottom:1px solid var(--line); background:var(--paper)}
+.demo-q{font:inherit; font-size:.88rem; font-weight:600; cursor:pointer;
+  border:1px solid var(--line); background:var(--paper); color:var(--ink-soft);
+  padding:.4rem .75rem; border-radius:999px}
+.demo-q.on{background:var(--pink); border-color:var(--pink); color:#2B1A21}
+.demo-panel{padding:1.2rem}
+.demo-why{font-family:var(--serif); color:var(--ink-soft); max-width:46rem}
+.demo-ask{display:flex; gap:.6rem; align-items:baseline; flex-wrap:wrap;
+  border-left:4px solid var(--pink); padding:.5rem .9rem; margin:1rem 0 1.4rem;
+  background:var(--pink-wash); border-radius:0 10px 10px 0}
+.demo-ask span{font-size:.74rem; text-transform:uppercase; letter-spacing:.07em;
+  color:var(--ink-soft); font-weight:700}
+.demo-ask b{font-size:1.1rem}
+.demo-row{display:grid; gap:.3rem 1.1rem; grid-template-columns:1fr;
+  padding:1rem 0; border-top:1px solid var(--line)}
+@media(min-width:680px){.demo-row{grid-template-columns:8.5rem 1fr}}
+.demo-ver b{display:block; font-size:1.02rem}
+.demo-ver span{font-size:.8rem; color:var(--ink-soft)}
+.demo-text{font-family:var(--mono); font-size:.92rem; line-height:1.55;
+  background:var(--paper); border:1px solid var(--line); border-radius:10px;
+  padding:.7rem .9rem; margin:0 0 .5rem; white-space:pre-wrap; min-height:1.2em}
+.demo-text.none{color:var(--ink-soft); font-family:var(--sans)}
+.demo-text.typing::after{content:"\2588"; opacity:.5}
+.demo-verdict{font-weight:700; font-size:.88rem; margin:0}
+.demo-verdict.ok{color:#1F7A52} .demo-verdict.bad{color:#B3261E}
+.demo-verdict.meh{color:var(--ink-soft)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .demo-verdict.ok{color:#5FD3A0}
+  :root:not([data-theme="light"]) .demo-verdict.bad{color:#FF9A92}}
+.demo-src{font-size:.8rem; color:var(--ink-soft); margin:.25rem 0 0; max-width:44rem}
+
+.timeline{list-style:none; counter-reset:tl; padding:0; margin:1.6rem 0;
+  display:grid; gap:1rem}
+.timeline li{border:1px solid var(--line); border-radius:14px; padding:1rem 1.15rem;
+  background:var(--paper-2)}
+.tl-head{display:flex; align-items:baseline; gap:.6rem; flex-wrap:wrap}
+.tl-head h3{margin:0}
+.tl-sub{color:var(--ink-soft); font-size:.92rem}
+.tl-bar{display:flex; align-items:center; gap:.6rem; margin:.6rem 0 .4rem;
+  font-size:.86rem; color:var(--ink-soft)}
+.tl-bar i{display:block; height:.6rem; border-radius:999px; background:var(--pink);
+  max-width:calc(100% - 4rem)}
+.tl-bar b{color:var(--ink); font-size:.95rem}
+.tl-bar.none{font-style:italic}
+.tl-facts{font-size:.82rem; text-transform:uppercase; letter-spacing:.06em;
+  color:var(--pink-deep); font-weight:700; margin:0 0 .5rem}
+.timeline p{margin:0; max-width:var(--measure)}
+
+.broken{display:grid; gap:.2rem; margin:1.4rem 0}
+.broken-row{display:grid; gap:.1rem .9rem; grid-template-columns:1fr auto;
+  border-top:1px solid var(--line); padding:.9rem 0}
+.broken-row b{font-size:1.02rem}
+.broken-row .fig{grid-row:1; grid-column:2; font-weight:800; font-size:1.15rem;
+  color:#B3261E; font-variant-numeric:tabular-nums}
+.broken-row p{grid-column:1/-1; margin:0; font-size:.95rem; color:var(--ink-soft)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .broken-row .fig{color:#FF9A92}}
+
+.gifs{display:grid; gap:1.6rem; grid-template-columns:1fr; margin:1.6rem 0 2.4rem}
+@media(min-width:900px){.gifs{grid-template-columns:1fr 1fr}}
+.gifs figure{margin:0}
+.gifs img{width:100%; height:auto; display:block; border-radius:12px;
+  border:1px solid var(--line); background:#120D10}
+
+/* ---- paper ------------------------------------------------------------ */
+section.paper{padding:clamp(2.4rem,6vw,4.5rem) 0}
+.paper h2{max-width:22ch}
+.standfirst{font-family:var(--serif); font-size:1.15rem; color:var(--ink-soft);
+  max-width:44rem; margin-bottom:2.2rem}
+.qa{border-top:1px solid var(--line); padding:1.8rem 0}
+.qa:last-of-type{border-bottom:1px solid var(--line)}
+.qa .q{font-family:var(--serif); font-size:clamp(1.3rem,2.6vw,1.75rem);
+  font-weight:600; margin:0 0 .3rem; max-width:26ch; letter-spacing:-.01em}
+.qa .a{font-weight:700; color:var(--pink-deep); font-size:1.02rem; margin:0 0 .9rem}
+.qa .body{max-width:var(--measure)}
+.grid2{display:grid; gap:1.4rem; grid-template-columns:1fr}
+@media(min-width:760px){.grid2{grid-template-columns:1fr 1fr}}
+.card{border:1px solid var(--line); border-radius:14px; padding:1.1rem 1.2rem;
+  background:var(--paper-2)}
+.card h3{margin-bottom:.35rem}
+.card p{font-size:.95rem; margin-bottom:0; color:var(--ink-soft)}
+figure{margin:1.6rem 0; max-width:100%}
+figcaption{font-size:.87rem; color:var(--ink-soft); margin-top:.6rem; max-width:var(--measure)}
+table{border-collapse:collapse; width:100%; font-size:.92rem; margin:.4rem 0 1rem}
+th,td{text-align:left; padding:.5rem .7rem; border-bottom:1px solid var(--line);
+  vertical-align:top}
+th{font-size:.78rem; text-transform:uppercase; letter-spacing:.05em; color:var(--ink-soft)}
+td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
+.scroll-x{overflow-x:auto}
+.note{background:var(--pink-wash); border-left:4px solid var(--pink);
+  padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin:1.4rem 0}
+.note p:last-child{margin-bottom:0}
+.no-ai{display:inline-flex; align-items:center; gap:.4rem; font-weight:700;
+  color:#0E7C7B; font-size:.9rem}
+.no-ai i{width:.62rem; height:.62rem; background:#19B3B0; transform:rotate(45deg);
+  display:inline-block}
+ol.steps{counter-reset:s; list-style:none; padding:0; margin:1.4rem 0;
+  display:grid; gap:1rem}
+ol.steps li{counter-increment:s; padding-left:3rem; position:relative; max-width:var(--measure)}
+ol.steps li::before{content:counter(s); position:absolute; left:0; top:-.1rem;
+  width:2.1rem; height:2.1rem; border-radius:50%; background:var(--pink);
+  color:#2B1A21; font-weight:800; display:grid; place-items:center}
+footer{border-top:1px solid var(--line); padding:2.5rem 0 3.5rem;
+  color:var(--ink-soft); font-size:.9rem}
+footer a{color:var(--ink-soft)}
+.built{font-family:var(--mono); font-size:.78rem; color:var(--ink-soft)}
+@media (prefers-reduced-motion:no-preference){
+  .tabpanel:not([hidden]){animation:fade .25s ease}
+  @keyframes fade{from{opacity:0; transform:translateY(4px)}to{opacity:1}}
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" aria-hidden="true" focusable="false" style="position:absolute">
+<g id="ivy-lockup">
+  <defs
+     id="defs16">
+    <linearGradient
+       id="leaf-gradient"
+       x1="54"
+       y1="64"
+       x2="276"
+       y2="292"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#f2aa83"
+         id="stop4" />
+      <stop
+         offset="0.52"
+         stop-color="#df7e5e"
+         id="stop6" />
+      <stop
+         offset="1"
+         stop-color="#bd563d"
+         id="stop8" />
+    </linearGradient>
+    <linearGradient
+       id="stem-gradient"
+       x1="160"
+       y1="104"
+       x2="160"
+       y2="312"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#fff0e7"
+         id="stop11" />
+      <stop
+         offset="1"
+         stop-color="#fffaf6"
+         id="stop13" />
+    </linearGradient>
+  </defs>
+  <!-- Original Ivy AI symbol: a five-lobed ivy leaf carrying a neural circuit. -->
+  <g
+     id="symbol"
+     transform="translate(100,28)">
+    <path
+       fill="url(#leaf-gradient)"
+       d="m 160,30 c -11,33 -28,58 -55,67 -22,7 -40,-2 -60,-18 6,40 23,66 49,80 -28,10 -51,29 -67,59 42,-2 72,11 89,39 14,23 30,44 44,59 14,-15 30,-36 44,-59 17,-28 47,-41 89,-39 -16,-30 -39,-49 -67,-59 26,-14 43,-40 49,-80 -20,16 -38,25 -60,18 -27,-9 -44,-34 -55,-67 z"
+       id="path18" />
+    <path
+       fill="#ffffff"
+       opacity="0.13"
+       d="m 160,30 c -11,33 -28,58 -55,67 -22,7 -40,-2 -60,-18 6,40 23,66 49,80 -28,10 -51,29 -67,59 42,-2 72,11 89,39 14,23 30,44 44,59 z"
+       id="path20" />
+    <g
+       fill="none"
+       stroke="url(#stem-gradient)"
+       stroke-width="11"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="g32">
+      <path
+         d="M 160,277 V 111"
+         id="path22" />
+      <path
+         d="M 160,161 118,128 H 92"
+         id="path24" />
+      <path
+         d="m 160,161 42,-33 h 26"
+         id="path26" />
+      <path
+         d="m 160,213 -25,22 h -13"
+         id="path28" />
+      <path
+         d="m 160,213 25,22 h 13"
+         id="path30" />
+    </g>
+    <g
+       fill="#ffffff"
+       id="g48">
+      <path
+         id="circle34"
+         d="m 172,104 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle36"
+         d="m 104,128 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle38"
+         d="m 240,128 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle40"
+         d="m 134,235 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle42"
+         d="m 210,235 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle44"
+         d="m 169,161 a 9,9 0 0 1 -9,9 9,9 0 0 1 -9,-9 9,9 0 0 1 9,-9 9,9 0 0 1 9,9 z" />
+      <path
+         id="circle46"
+         d="m 169,213 a 9,9 0 0 1 -9,9 9,9 0 0 1 -9,-9 9,9 0 0 1 9,-9 9,9 0 0 1 9,9 z" />
+    </g>
+    <path
+       d="m 160,277 c 0,21 -9,37 -25,50"
+       fill="none"
+       stroke="#a94632"
+       stroke-width="11"
+       stroke-linecap="round"
+       id="path50" />
+  </g>
+  <!-- The delivered file converts these characters into vector outlines. -->
+  <g
+     id="wordmark"
+     font-family="'URW Gothic', 'Nimbus Sans', sans-serif"
+     font-weight="600">
+    <g
+       aria-label="Ivy"
+       id="text53"
+       style="font-size:116px;letter-spacing:-5;fill:#3b2520">
+      <path
+         d="M 125.888,545 H 141.78 V 459.276 H 125.888 Z"
+         id="path71" />
+      <path
+         d="m 171.46408,545 h 12.296 l 25.868,-64.264 h -17.4 l -14.616,42.572 -14.848,-42.572 h -17.168 z"
+         id="path73" />
+      <path
+         d="m 219.59204,566.46 h 16.588 l 37.12,-85.724 h -17.864 l -15.428,41.644 -14.268,-41.644 h -17.632 l 23.548,58.232 z"
+         id="path75" />
+    </g>
+    <g
+       aria-label="AI"
+       id="text55"
+       style="font-size:116px;letter-spacing:-4;fill:#d97757">
+      <path
+         d="m 289.812,545 h 17.516 l 9.512,-22.156 h 30.508 L 356.512,545 h 17.516 l -35.96,-85.724 H 325.54 Z m 32.828,-37.352 9.164,-25.984 9.164,25.984 z"
+         id="path78" />
+      <path
+         d="m 378.72797,545 h 15.892 v -85.724 h -15.892 z"
+         id="path80" />
+    </g>
+    <g
+       aria-label="™"
+       id="text57"
+       style="font-weight:700;font-size:19px;fill:#b5523c">
+      <path
+         d="m 423.651,447.959 h -2.242 l -2.318,4.883 -2.166,-4.883 h -2.299 v 7.486 h 1.539 v -5.434 l 2.432,5.434 h 1.007 l 2.508,-5.453 v 5.453 h 1.539 z m -9.595,0 h -6.707 v 1.425 h 2.584 v 6.061 h 1.539 v -6.061 h 2.584 z"
+         id="path83" />
+    </g>
+  </g>
+</g>
+</svg>
+
+
+<nav class="tabs" aria-label="Sections">
+  <div class="wrap">
+    <a class="brand" href="#home">
+      <svg class="mark" viewBox="117 48 286 317" aria-hidden="true"><use href="#ivy-lockup"/></svg>Ivy AI</a>
+    <a class="tab" id="tab-home" href="#home">Home</a>
+    <a class="tab" id="tab-log" href="#log">Build log</a>
+    <a class="tab" id="tab-results" href="#results">Results</a>
+    <a class="tab" id="tab-progress" href="#progress">Versions</a>
+    <a class="tab" id="tab-install" href="#install">Install</a>
+    <a class="tab" id="tab-ask" href="#ask">Ask it</a>
+    <a class="tab" id="tab-train" href="#train">Training</a>
+    <a class="tab" id="tab-privacy" href="#privacy">Privacy</a>
+    <a class="tab" id="tab-community" href="#community">Community</a>
+  </div>
+</nav>
+
+<main>
+
+<!-- =================== HOME =================== -->
+<div class="tabpanel" id="panel-home" aria-labelledby="tab-home">
+
+<header class="hero">
+  <div class="wrap">
+    <span class="kicker">Offline LLM assistant · proof of concept</span>
+    <h1><span>It listens.</span><span>It answers.</span><span class="accent">Wi-Fi off.</span></h1>
+    <p class="lede">A speech recogniser, a language model and a speech synthesiser
+    taking turns inside 8&nbsp;MB of PSRAM on a board that costs less than a
+    takeaway. Ask out loud, or type it. No cloud, no account, no microphone
+    leaving the room. It is a proof of concept, and this page is the write-up as
+    much as the demo — what it cost, what broke, and the numbers we actually
+    measured.</p>
+
+    <div class="kpis">
+      <div class="kpi"><b>13.0–13.4 tok/s</b><span>tokens/sec, on the chip</span></div>
+      <div class="kpi"><b>4.0–7.3 s</b><span>end of speech → first audio</span></div>
+      <div class="kpi"><b>19.7M</b><span>parameters, answering offline</span></div>
+      <div class="kpi"><b>0</b><span>bytes of your voice sent anywhere</span></div>
+    </div>
+
+    <div class="cta">
+      <a class="btn primary" href="#install">Flash it from your browser</a>
+      <a class="btn ghost" href="#log">Read the build log</a>
+    </div>
+  </div>
+</header>
+
+<section class="band plum">
+  <div class="wrap">
+    <div>
+      <span class="tag">Offline by construction</span>
+      <h2>It runs with<br>the Wi-Fi off.</h2>
+      <p>Not "private cloud". Not "we don't store it". There is no network path
+      for your voice to take, because the recogniser, the model and the voice
+      all live on the SD card and run on the chip. Pull the aerial off and
+      nothing about the conversation changes.</p>
+      <p>Wi-Fi is used for one thing: asking an NTP server what time it is, once
+      an hour, so the clock is right. That is the entire list.</p>
+    </div>
+    <p class="pull">The only way to prove audio never leaves a device is for
+    there to be nowhere for it to go.</p>
+  </div>
+</section>
+
+<section class="band teal">
+  <div class="wrap">
+    <div>
+      <span class="tag">Honesty, on screen</span>
+      <h2>Cyan means<br>no AI touched this.</h2>
+      <p>The time, the date, its own name, a kitchen timer — those are twenty
+      lines of C, not a language model, and the screen says so with a cyan
+      diamond. Everything else came from a model small enough to fit here, which
+      means it is sometimes wrong and says so in its own voice.</p>
+      <p>An assistant that tells you which answers it made up is worth more than
+      one that sounds confident about both kinds.</p>
+    </div>
+    <p class="pull"><span class="no-ai"><i></i>no AI</span> &nbsp;— a label, not a
+    disclaimer buried in a settings page.</p>
+  </div>
+</section>
+
+<section class="band rose">
+  <div class="wrap">
+    <div>
+      <span class="tag">Two ways in</span>
+      <h2>Ask out loud.<br>Or type it.</h2>
+      <p>Press <kbd>BOOT</kbd>, say your question, and stop talking — 720 ms
+      of silence is how it knows you have finished. Or tap the question in on the
+      on-screen T9 keypad and skip the microphone entirely.</p>
+      <p>The same model answers either way, and the typed path is also the honest
+      way to see what the model can do without the recogniser's mistakes in the
+      middle of it.</p>
+    </div>
+    <p class="pull">A speech recogniser that mishears "red robot" as "re robot"
+    is a different failure from a model that does not know the answer. Typing
+    tells the two apart.</p>
+  </div>
+</section>
+
+<section class="band indigo">
+  <div class="wrap">
+    <div>
+      <span class="tag">The real constraint</span>
+      <h2>Internal RAM,<br>not compute.</h2>
+      <p>The chip is fast enough. What it does not have is fast memory: about
+      264&nbsp;KB of internal SRAM that the recogniser, the model, the radio and
+      the operating system all want at once. So the pipeline runs in phases, and
+      each phase hands the whole arena back before the next one starts.</p>
+      <p>Twelve consecutive conversations, measured: <strong>zero drift.</strong>
+      The same 50,412 bytes free after turn twelve as after turn one.</p>
+    </div>
+    <p class="pull">Where each tensor lives decides what fits. Not how fast the
+    chip is.</p>
+  </div>
+</section>
+
+<section class="band clay">
+  <div class="wrap">
+    <div>
+      <span class="tag">Seven models deep</span>
+      <h2>The score fell<br>and that was<br>the improvement.</h2>
+      <p>Version 4 scored 64.2% and version 7 scored 60.9%, and v7 is the better
+      model by a distance — it answers a question space three times larger, and
+      it is allowed to say <em>I don't know</em>. The exam got harder and fairer
+      at the same time as the model got better, which is what makes a headline
+      benchmark number almost meaningless on its own.</p>
+      <p>The whole arc, including the two experiments that were predicted to
+      help and made it worse, is in <a href="#log">the build log</a>.</p>
+    </div>
+    <p class="pull">A benchmark that only ever goes up is measuring the wrong
+    thing.</p>
+  </div>
+</section>
+
+<section class="band moss">
+  <div class="wrap">
+    <div>
+      <span class="tag">Swap the brain</span>
+      <h2>Choose a model.<br>Or train your own.</h2>
+      <p>The model is a file on the SD card, not something baked into the
+      firmware. Drop in a different GGUF and point the device at it — the ones
+      already measured on this board are in <a href="#results">Results</a>, with
+      the arithmetic that tells you whether a candidate will fit before you
+      download it.</p>
+      <p>Or train one. <a href="#train">The whole pipeline is written up</a>:
+      generate the question set, fine-tune on a Mac overnight, convert to the
+      device format, copy it to the card.</p>
+    </div>
+    <p class="pull">The interesting thing about a model that fits on a card is
+    that you can replace it.</p>
+  </div>
+</section>
+
+</div>
+
+<!-- =================== BUILD LOG =================== -->
+<div class="tabpanel" id="panel-log" aria-labelledby="tab-log" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>The build log.</h2>
+    <p class="standfirst">Six questions, each answered with a number and what it
+    cost to get it. Stop after any one of them and you will have learned one
+    whole thing. Every figure below is measured on the board described in
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/STAGE_E_RESULTS.md">STAGE_E_RESULTS.md</a>
+    or on the training runs behind
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>.</p>
+
+    <div class="qa">
+      <p class="q">Can a board this cheap hear you at all?</p>
+      <p class="a">Yes — 13.1M int8 parameters, streamed off an SD card.</p>
+      <div class="body">
+        <p>A conformer CTC recogniser, distilled and quantised until it fits, with
+        the weights read from the card rather than held in memory. Open takes
+        425 ms and the encoder does 1.4–2.9&nbsp;seconds of audio in
+        2.7–4.6&nbsp;seconds, of which about 1.2&nbsp;s is nothing but SD reads
+        — 12.55&nbsp;MB of them per sentence.</p>
+        <p>Two things had to be true and neither was obvious. The model file must
+        be opened <em>unbuffered</em>, because the C library's buffering turns one
+        large read into many small ones against a card that punishes exactly that.
+        And the mel filter must stay resident: evict it to save memory and every
+        utterance pays to rebuild it.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">Why is there a phase arena?</p>
+      <p class="a">Because internal RAM runs out first, and Wi-Fi takes 171 KB of it.</p>
+      <div class="body">
+        <p>One PSRAM arena, one internal arena, and a phase that begins, takes what
+        it needs, runs, and gives all of it back. Every transition logs free
+        memory, largest block, minimum-ever and how long the phase took, so a
+        regression shows up as a number rather than a crash three weeks later.</p>
+        <p>The counter-intuitive part: PSRAM is not the scarce resource. Internal
+        SRAM is. The radio's permanent allocations came out of it until a boot-time
+        warm-up pushed them elsewhere, and the recogniser's first convolution had
+        to be tiled to fit what was left. Minimum-ever internal free across the
+        soak: 17,952 bytes.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">Why are there seven versions of the model?</p>
+      <p class="a">Because each one answered the previous one's failure, and two answers were wrong.</p>
+      <div class="body">
+        <p>3M was too small to hold a conversation. 8M fit, and could not answer a
+        child's question — so the training data was generated from
+        <a href="https://github.com/iamankushpandit/Gume">Braino!</a>'s own game
+        tables, the same author's other project, which turns "teach it everything"
+        into a closed set you can actually enumerate. Then v5 learned to refuse
+        questions outside that set, which is the feature that makes the rest
+        trustworthy.</p>
+        <p>Two predictions failed, and both are worth more than the successes.
+        Class balancing was expected to help, and hurt. Raising paraphrases per
+        fact from 14 to 20 was expected to close the gap between wording the model
+        had seen and wording it had not; it <em>widened</em> it, to
+        55.0 points, while trained-wording accuracy hit a perfect 100%.
+        The model memorised harder instead of generalising better.</p>
+        <div class="note">
+          <p><strong>The diagnosis survived anyway, and got stronger.</strong> 0.0%
+          of the 19,813 facts are wrong under <em>every</em> wording tried — so all
+          of them are stored and retrievable, and the bottleneck is phrasing, not
+          capacity. Only the proposed remedy was wrong. It is written up as a
+          falsified prediction rather than quietly dropped.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">What actually fits?</p>
+      <p class="a">About 10M weights at Q4 — and the arithmetic tells you before you download anything.</p>
+      <div class="body">
+        <p>Q4_0 costs 0.5625 bytes per weight, so the budget is roughly ten million
+        of them. Non-embedding weights come to <code>layers × (2·dim² + 2·dim·kv_dim
+        + 3·dim·ffn)</code>. <code>dim</code> and <code>ffn</code> must be multiples
+        of 32 or the weights cannot be quantised at all. And a 32,000-token
+        vocabulary is usually most of a tiny model, so shrink it first — 65.3% of
+        our parameters were embedding rows, against a corpus using 8.9% of the
+        vocabulary.</p>
+        <p>The models that <em>didn't</em> fit are in <a href="#results">Results</a>,
+        with the reason for each. One publicly available conversion turned out to be
+        broken upstream — it produces garbage in llama.cpp's own maths too.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">How fast does it feel?</p>
+      <p class="a">4.0–7.3 s from the end of your sentence to the first syllable back.</p>
+      <div class="body">
+        <p>The full breakdown is in <a href="#results">Results</a>. The short version
+        is that the model is not the slow part: generation runs at 13.0–13.4 tok/s and
+        loading it from the card takes 241 ms. The recogniser is the slow
+        part, and inside the recogniser the SD card is the slow part.</p>
+        <p>Which is the useful kind of answer, because it says what to fix next:
+        double-buffer the reads, not the maths.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">What went wrong that we'd rather not print?</p>
+      <p class="a">Six measurement bugs — every one of which flattered the result.</p>
+      <div class="body">
+        <p>A metric that scored the wrong substring. Evaluation running on the GPU
+        when greedy decoding is sequential, so the CPU was 22× faster and a
+        15.6-hour run became 50 minutes. A crashed run that reported success,
+        because it was piped through <code>tee</code>. A trainer that saved the
+        final epoch instead of the best one. Held-out sets that tested the wrong
+        thing. A grader with two parsing bugs.</p>
+        <p>The pattern is the finding: every one of them made the results look
+        better, faster or cleaner than they were. In a regime where a single
+        experiment costs hours, the evaluation code is as likely to be wrong as
+        the model — and it fails in the direction you are least likely to
+        question.</p>
+      </div>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- =================== RESULTS =================== -->
+<div class="tabpanel" id="panel-results" aria-labelledby="tab-results" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>Results.</h2>
+    <p class="standfirst">Measured on a Freenove FNK0104B — ESP32-S3, 8&nbsp;MB
+    octal PSRAM, 16&nbsp;MB flash — under ESP-IDF v6.1. Nothing here is
+    simulated and nothing uses a network. These tables are generated from the
+    repository at build time, so a figure cannot be right in the docs and stale
+    on this page.</p>
+
+    <h3>Seven versions. Four measured this way.</h3>
+    <p>v1 to v3 were the 3M and 8M models before there was a held-out set worth
+    the name, so they have no comparable number and are not shown. That is the
+    honest reason, and it is also the first of the measurement lessons.</p>
+    <figure><svg viewBox="0 0 640 260" role="img" width="100%" aria-label="Held-out accuracy by model version: v4 64.2%, v5 48.5%, v6 53.0%, v7 60.9%"><style>.v{font:700 14px var(--sans,sans-serif); fill:currentColor}.n{font:700 15px var(--sans,sans-serif); fill:currentColor}.s{font:400 11px var(--sans,sans-serif); fill:currentColor; opacity:.62}</style><rect x="40" y="67.3" width="74" height="146.7" rx="6" fill="#F4C2C2"/><text x="77" y="58.3" text-anchor="middle" class="v">64.2%</text><text x="77" y="234" text-anchor="middle" class="n">v4</text><text x="77" y="250" text-anchor="middle" class="s">narrow set</text><rect x="148" y="103.1" width="74" height="110.9" rx="6" fill="#F4C2C2"/><text x="185" y="94.1" text-anchor="middle" class="v">48.5%</text><text x="185" y="234" text-anchor="middle" class="n">v5</text><text x="185" y="250" text-anchor="middle" class="s">full parity + refusal</text><rect x="256" y="92.9" width="74" height="121.1" rx="6" fill="#F4C2C2"/><text x="293" y="83.9" text-anchor="middle" class="v">53.0%</text><text x="293" y="234" text-anchor="middle" class="n">v6</text><text x="293" y="250" text-anchor="middle" class="s">floor-balanced</text><rect x="364" y="74.8" width="74" height="139.2" rx="6" fill="#C2566F"/><text x="401" y="65.8" text-anchor="middle" class="v">60.9%</text><text x="401" y="234" text-anchor="middle" class="n">v7</text><text x="401" y="250" text-anchor="middle" class="s">fractions fixed</text></svg></figure>
+    <figcaption>Held-out exact-match accuracy. The drop at v5 is the eval getting
+    harder and fairer, not the model getting worse: v5 is the first version
+    carrying the full question space and the first allowed to refuse. Compare
+    like with like only inside a column.</figcaption>
+
+    <h3>Where a turn goes</h3>
+    <figure><svg viewBox="0 0 960 46" width="100%" height="46" role="img" aria-label="Where one turn's time goes: Recognise 4.6 s, Load the model 0.2 s, Think 1.2 s, Wake the voice 0.2 s, Speak 0.7 s"><rect x="0.0" y="0" width="640.7" height="46" fill="#4A2740"/><rect x="640.7" y="0" width="33.6" height="46" fill="#2C5F5C"/><rect x="674.2" y="0" width="171.4" height="46" fill="#36406B"/><rect x="845.7" y="0" width="21.0" height="46" fill="#A9543E"/><rect x="866.7" y="0" width="93.3" height="46" fill="#41603B"/></svg><div class="key"><span style="--c:#4A2740">Recognise <b>4.6 s</b></span><span style="--c:#2C5F5C">Load the model <b>0.2 s</b></span><span style="--c:#36406B">Think <b>1.2 s</b></span><span style="--c:#A9543E">Wake the voice <b>0.2 s</b></span><span style="--c:#41603B">Speak <b>0.7 s</b></span></div><style>.key{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin-top:.7rem;font-size:.84rem;color:var(--ink-soft)}.key span::before{content:"";display:inline-block;width:.6rem;height:.6rem;border-radius:2px;background:var(--c);margin-right:.4rem}</style></figure>
+    <div class="scroll-x"><table>
+<thead><tr>
+<th>Stage</th>
+<th>Time</th>
+<th>Notes</th>
+</tr></thead><tbody>
+<tr><td>RECORD</td><td>3–4.5 s</td><td>includes ~1.5 s lead-in silence + 720 ms end-of-speech silence</td></tr>
+<tr><td>STT open</td><td>425 ms</td><td>646 header reads + 1.16 MB resident tensors from SD</td></tr>
+<tr><td>STT pre-encode</td><td>~185–320 ms / 360 ms chunk</td><td>overlaps recording (real-time)</td></tr>
+<tr><td>STT encoder + decode</td><td>2.7–4.6 s for 1.4–2.9 s audio</td><td>of which <strong>~1.2 s is SD reads</strong> (12.55 MB)</td></tr>
+<tr><td>LLM load (SD → PSRAM)</td><td>241 ms</td><td>2.36 MB</td></tr>
+<tr><td>LLM generation</td><td><strong>13.0–13.4 tok/s</strong></td><td>5–25 tokens per answer</td></tr>
+<tr><td>TTS init</td><td>151 ms</td><td>1.43 MB lingware SD → PSRAM + Pico init</td></tr>
+<tr><td>TTS first audio</td><td>100–670 ms</td><td>depends on first sentence length</td></tr>
+<tr><td><strong>End of speech → first audio</strong></td><td><strong>4.0–7.3 s</strong></td><td></td></tr>
+</tbody></table></div>
+
+    <h3>Memory per phase</h3>
+    <p>Each phase takes the arena, runs, and hands all of it back. The internal
+    arena is the tight one.</p>
+    <div class="scroll-x"><table>
+<thead><tr>
+<th>Phase</th>
+<th class="num">Internal arena peak (of 264 KB)</th>
+<th class="num">PSRAM arena peak (of 7 MB)</th>
+</tr></thead><tbody>
+<tr><td>HEAR (listen + STT)</td><td class="num">262,192 B</td><td class="num">5,537,312 B</td></tr>
+<tr><td>THINK (TinyTalk 3M, kv 128)</td><td class="num">213,104 B</td><td class="num">2,416,304 B</td></tr>
+<tr><td>SPEAK (PicoTTS en-US)</td><td class="num">32,768 B (SD bounce buffer)</td><td class="num">2,528,080 B</td></tr>
+</tbody></table></div>
+
+    <h3>Models run on the device</h3>
+    <div class="scroll-x"><table>
+<thead><tr>
+<th>file</th>
+<th>source</th>
+<th class="num">size</th>
+<th class="num">speed</th>
+<th>what it does</th>
+</tr></thead><tbody>
+<tr><td>delphi6.4m.gguf</td><td>delphi-suite/v0-llama2-6.4m (HF .bin) -&gt; Q4_0, vocab 4096 kept</td><td class="num">3.8 MB</td><td class="num">7.3 tok/s</td><td>TinyStories; loads in 0.9 s</td></tr>
+<tr><td>stories15M-ivy.gguf</td><td>ggml-org/models tinyllamas/stories15M-q4_0, vocab 32000 -&gt; 6997</td><td class="num">5.5 MB</td><td class="num">7.3 tok/s</td><td>best storyteller</td></tr>
+<tr><td>tinyllama15M-alpaca.gguf</td><td>mradermacher/tinyllama-15M-alpaca-finetuned Q8_0 -&gt; Q4_0, vocab -&gt; 7846, Alpaca prompt</td><td class="num">4.6 MB</td><td class="num">6.6 tok/s</td><td>follows instructions, weak answers</td></tr>
+<tr><td>tinyllama-v0.gguf</td><td>Maykeye/TinyLLama-v0 (HF, bf16) -&gt; GGUF, vocab -&gt; 5814</td><td class="num">0.8 MB</td><td class="num">22 tok/s</td><td>short simple stories</td></tr>
+<tr><td>stories260K.gguf</td><td>ggml-org/models tinyllamas/stories260K</td><td class="num">1.1 MB</td><td class="num">32 tok/s</td><td>demo of raw speed</td></tr>
+</tbody></table></div>
+
+    <h3>And the ones that did not fit</h3>
+    <p>Negative results, with the rule that predicts them. stories42M (~14&nbsp;MB
+    of layers), TinyStories-LLaMA2-25M (feed-forward alone ~5.2&nbsp;MB),
+    delphi-suite v0-llama2-12.8m (7.9&nbsp;MB), Felladrin/Minueza-32M
+    (~7&nbsp;MB of layers), SmolLM2-135M and everything above it. The
+    delphi-suite 1.6m and 3.2m models fail for a different reason: dim 168 and
+    216 are not multiples of 32, so they cannot be quantised and stay F32 —
+    which makes the <em>smaller</em> model the one that is too big.</p>
+
+    <div class="note">
+      <p><strong>Firmware size today:</strong> 2,792,496 bytes of the
+      6 MB application partition (44.4%). The models are not in
+      here — they live on the SD card, which is why the install is two steps.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- =================== PROGRESSION =================== -->
+<div class="tabpanel" id="panel-progress" aria-labelledby="tab-progress" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>How it learned.</h2>
+    <p class="standfirst">Six versions of the same small brain, from one that
+    knew nothing to the one in the device today. No background needed &mdash;
+    this page assumes you have never trained anything and do not much care what
+    a language model is. Every answer quoted below is one the model really gave,
+    and where we did not keep a record, it says so instead of inventing
+    something plausible.</p>
+
+    <h3>Three things worth knowing first</h3>
+    <div class="grid2">
+      <div class="card"><h3>It does not look anything up</h3>
+      <p>There is no encyclopedia on the card and no search. The model works by
+      predicting what word most likely comes next, over and over. Everything it
+      "knows" is baked into a few million numbers, which is why it can be
+      confidently, fluently wrong.</p></div>
+      <div class="card"><h3>Training is just showing it examples</h3>
+      <p>We write out thousands of question-and-answer pairs and show them to
+      it repeatedly. It nudges those numbers a little each time so its guesses
+      get closer. That is the whole of it &mdash; there is no moment where
+      anyone explains a rule to it.</p></div>
+      <div class="card"><h3>The only score that counts is on questions it never saw</h3>
+      <p>Test it on the exact questions it was taught and it looks brilliant,
+      because it can simply memorise. So we hold a set back &mdash; same facts,
+      different wording &mdash; and that is the number we quote. It is always
+      the lower one.</p></div>
+      <div class="card"><h3>Why the scores go down as well as up</h3>
+      <p>Twice we made the exam harder on purpose: more subjects, and permission
+      to say "I don't know". A model that answers fewer questions but stops
+      making things up is better, and scores worse. Watch what changed, not just
+      the number.</p></div>
+    </div>
+
+    <h3 style="margin-top:2.4rem">Ask the same question to each version</h3>
+    <p>Pick a question and watch what the different versions said. These are
+    real recorded answers, warts and all.</p>
+    <div class="demo" id="demo">
+<div class="demo-qs" role="tablist">
+<button type="button" class="demo-q on" data-q="0" role="tab" aria-selected="true">why is the sky blue?</button>
+<button type="button" class="demo-q" data-q="1" role="tab" aria-selected="false">what is twenty-three plus fourteen?</button>
+<button type="button" class="demo-q" data-q="2" role="tab" aria-selected="false">what is twenty-eight divided by seven?</button>
+<button type="button" class="demo-q" data-q="3" role="tab" aria-selected="false">what is half of twelve?</button>
+<button type="button" class="demo-q" data-q="4" role="tab" aria-selected="false">what is fifty percent of twenty?</button>
+<button type="button" class="demo-q" data-q="5" role="tab" aria-selected="false">will it be sunny tomorrow?</button>
+</div>
+<div class="demo-panel on" data-panel="0">
+<p class="demo-why">A question nobody ever taught it. Watch the earliest model answer anyway — confidently, and with nonsense.</p>
+<div class="demo-ask"><span>You ask</span><b>why is the sky blue?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>TinyTalk 3M</b><span>the first thing that ran</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="I don&#x27;t know, it just seem like the wind is pretty pretty.">I don&#x27;t know, it just seem like the wind is pretty pretty.</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">docs/STAGE_E_RESULTS.md</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v7</b><span>where it is now</span></div>
+<div class="demo-ans">
+<p class="demo-text none">—</p>
+<p class="demo-verdict meh">Not recorded</p>
+<p class="demo-src">not asked on the published sheet</p>
+</div></div>
+</div>
+<div class="demo-panel" data-panel="1" hidden>
+<p class="demo-why">The single biggest lesson of the whole project, and it is about how you write the answer down, not how big the model is.</p>
+<div class="demo-ask"><span>You ask</span><b>what is twenty-three plus fourteen?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>TinyTalk 2 8M</b><span>bigger, still untaught</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="Twenty-three plus fourteen is thirty-eight.">Twenty-three plus fourteen is thirty-eight.</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">the &#x27;direct answer&#x27; style scored 18.3% on sums it had never seen — this is what that failure looks like</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v4</b><span>first real teaching</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="Three plus four is seven.
+Twenty plus ten is thirty.
+Thirty plus seven is thirty-seven.
+So twenty-three plus fourteen is thirty-seven.">Three plus four is seven.<br>Twenty plus ten is thirty.<br>Thirty plus seven is thirty-seven.<br>So twenty-three plus fourteen is thirty-seven.</p>
+<p class="demo-verdict ok">Correct</p>
+<p class="demo-src">training/V4_RESULTS.md — the same style scored 75.3%</p>
+</div></div>
+</div>
+<div class="demo-panel" data-panel="2" hidden>
+<p class="demo-why">v4 had learned the SHAPE of a good answer without the arithmetic to fill it. This is what that looks like, and it is the most dangerous kind of wrong.</p>
+<div class="demo-ask"><span>You ask</span><b>what is twenty-eight divided by seven?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v4</b><span>first real teaching</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="Seven times two is twenty-eight. So twenty-eight divided by seven is two.">Seven times two is twenty-eight. So twenty-eight divided by seven is two.</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">training/V4_RESULTS.md — the answer is four</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v7</b><span>where it is now</span></div>
+<div class="demo-ans">
+<p class="demo-text none">—</p>
+<p class="demo-verdict ok">Declined to answer — which is the correct behaviour</p>
+<p class="demo-src">division is not in the syllabus at all, so from v5 on this is a question it is meant to decline</p>
+</div></div>
+</div>
+<div class="demo-panel" data-panel="3" hidden>
+<p class="demo-why">The fix that worked twice: when a subject is small enough to list completely, list it completely instead of hoping the model works it out.</p>
+<div class="demo-ask"><span>You ask</span><b>what is half of twelve?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v5</b><span>the whole syllabus, and “I don’t know”</span></div>
+<div class="demo-ans">
+<p class="demo-text none">—</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">training/V7_RESULTS.md records this as wrong in v5; the exact words were not kept</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v7</b><span>where it is now</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="Half means splitting into two equal groups. Twelve splits into six and six. So half of twelve is six.">Half means splitting into two equal groups. Twelve splits into six and six. So half of twelve is six.</p>
+<p class="demo-verdict ok">Correct</p>
+<p class="demo-src">training/V7_RESULTS.md</p>
+</div></div>
+</div>
+<div class="demo-panel" data-panel="4" hidden>
+<p class="demo-why">Same fix, same subject. Fractions and percentages went from 17.5% right to 91.2% right.</p>
+<div class="demo-ask"><span>You ask</span><b>what is fifty percent of twenty?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v5</b><span>the whole syllabus, and “I don’t know”</span></div>
+<div class="demo-ans">
+<p class="demo-text none">—</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">training/V7_RESULTS.md records this as wrong in v5</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v7</b><span>where it is now</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="Fifty percent means half. Half of twenty is ten, because twenty splits into ten and ten. So fifty percent of twenty is ten.">Fifty percent means half. Half of twenty is ten, because twenty splits into ten and ten. So fifty percent of twenty is ten.</p>
+<p class="demo-verdict ok">Correct</p>
+<p class="demo-src">training/V7_RESULTS.md</p>
+</div></div>
+</div>
+<div class="demo-panel" data-panel="5" hidden>
+<p class="demo-why">Knowing what you do not know has to be TAUGHT. It cannot be detected, and this question is hard because it sits right next to weather, which the model does know about.</p>
+<div class="demo-ask"><span>You ask</span><b>will it be sunny tomorrow?</b></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v4</b><span>first real teaching</span></div>
+<div class="demo-ans">
+<p class="demo-text none">—</p>
+<p class="demo-verdict bad">Wrong</p>
+<p class="demo-src">v4 had no refusal at all and answered with a confident invention; the words were not recorded</p>
+</div></div>
+<div class="demo-row">
+<div class="demo-ver"><b>v7</b><span>where it is now</span></div>
+<div class="demo-ans">
+<p class="demo-text" data-type="I am not clever enough to answer that yet. I hope my makers teach me about that one day!">I am not clever enough to answer that yet. I hope my makers teach me about that one day!</p>
+<p class="demo-verdict ok">Declined to answer — which is the correct behaviour</p>
+<p class="demo-src">training/V5_RESULTS.md — one canonical refusal, so it is as easy as possible to learn</p>
+</div></div>
+</div>
+</div>
+
+    <h3>Watch each version answer</h3>
+    <p>One recording per version, at the speed the device really produces
+    text &mdash; a shade over thirteen tokens a second, which is roughly ten
+    words and slower than you expect. Each one carries the file its transcript came from, so a
+    recording that gets reposted on its own still says where it is from.</p>
+    <div class="gifs">
+      <figure><img src="assets/demo-3m.gif" alt="TinyTalk 3M answering: why is the sky blue" loading="lazy" width="620" height="360">
+        <figcaption><b>TinyTalk 3M</b> &mdash; fluent, confident, and talking
+        nonsense. Nothing had been taught to it yet.</figcaption></figure>
+      <figure><img src="assets/demo-8m.gif" alt="The untrained 8M base model's score: about zero" loading="lazy" width="620" height="360">
+        <figcaption><b>TinyTalk 2 8M, untaught</b> &mdash; no transcript was
+        kept of this one, so it shows the measured starting line instead of an
+        invented quote.</figcaption></figure>
+      <figure><img src="assets/demo-v4.gif" alt="v4 answering a division question wrongly" loading="lazy" width="620" height="360">
+        <figcaption><b>v4</b> &mdash; it has learned the shape of a good answer
+        without the arithmetic to fill it. The most dangerous kind of
+        wrong.</figcaption></figure>
+      <figure><img src="assets/demo-v5.gif" alt="v5's canonical refusal, and how often it used it" loading="lazy" width="620" height="360">
+        <figcaption><b>v5</b> &mdash; the version that learned to say it does
+        not know. It only managed it 42.7% of the time, and used it on
+        questions it did know 5.3% of the time.</figcaption></figure>
+      <figure><img src="assets/demo-v6.gif" alt="v6's recovered field scores" loading="lazy" width="620" height="360">
+        <figcaption><b>v6</b> &mdash; no transcript kept either. What it bought
+        was the small subjects, which had been starved of practice.</figcaption></figure>
+      <figure><img src="assets/demo-v7.gif" alt="v7 answering what is half of twelve correctly" loading="lazy" width="620" height="360">
+        <figcaption><b>v7</b> &mdash; the one in the device now, working through
+        a question v5 got wrong.</figcaption></figure>
+    </div>
+
+    <h3>The six versions, in order</h3>
+    <p>The bar is the score on questions it had never seen before, out of 70%
+    &mdash; not out of 100, because nothing here has ever been near 100 and a
+    chart that pretends otherwise is flattering itself.</p>
+    <ol class="timeline">
+<li><div class="tl-head"><h3>TinyTalk 3M</h3><span class="tl-sub">the first thing that ran</span></div><span class="tl-bar none">no score — never measured this way</span><p class="tl-facts">none taught</p><p>A 3-million-parameter chat model, untouched. It could form sentences and knew nothing. We put it on the board to prove the pipeline worked end to end, not to answer anything.</p></li>
+<li><div class="tl-head"><h3>TinyTalk 2 8M</h3><span class="tl-sub">bigger, still untaught</span></div><span class="tl-bar"><i style="width:1.5%"></i><b>0.0%</b></span><p class="tl-facts">none taught</p><p>The base model we build on, before any teaching. Scored about zero on the questions we care about. That is the honest starting line: everything after this was put there on purpose.</p></li>
+<li><div class="tl-head"><h3>v4</h3><span class="tl-sub">first real teaching</span></div><span class="tl-bar"><i style="width:91.7%"></i><b>64.2%</b></span><p class="tl-facts">a narrow set</p><p>Taught with worked-out answers instead of bare results, which turned out to be worth about four times on sums. Good score, small syllabus — and it invented answers when it was out of its depth.</p></li>
+<li><div class="tl-head"><h3>v5</h3><span class="tl-sub">the whole syllabus, and “I don’t know”</span></div><span class="tl-bar"><i style="width:69.3%"></i><b>48.5%</b></span><p class="tl-facts">18,602 facts</p><p>Every question the Braino! games can ask, taken from their source code so the answers are ground truth. Also the first version taught to refuse. The score fell because the exam got three times bigger.</p></li>
+<li><div class="tl-head"><h3>v6</h3><span class="tl-sub">fairer teaching</span></div><span class="tl-bar"><i style="width:75.7%"></i><b>53.0%</b></span><p class="tl-facts">18,602 facts</p><p>Some subjects had 173 times more practice than others, so the model was brilliant at sums and hopeless at spelling. Giving every subject a floor lifted the small ones a long way.</p></li>
+<li><div class="tl-head"><h3>v7</h3><span class="tl-sub">where it is now</span></div><span class="tl-bar"><i style="width:87.0%"></i><b>60.9%</b></span><p class="tl-facts">19,813 facts</p><p>Fractions and percentages went from almost never right to nearly always right, by listing every one of them rather than hoping. The other change we tried made things worse, and we left the finding in.</p></li>
+</ol>
+
+    <h3 style="margin-top:2.4rem">What still does not work</h3>
+    <p>This is the newest model, v7, the one in the device now. These are its
+    worst subjects, worst first, and none of them is a rounding error.</p>
+    <div class="broken">
+<div class="broken-row"><b>Small sums</b><span class="fig">1.7%</span><p>Adding numbers under ten — the easiest thing on the list — is the worst score we have. It has not responded to any fix tried so far.</p></div>
+<div class="broken-row"><b>Time and dates</b><span class="fig">11.7%</span><p>Reading a clock and naming days and months. Weak in every version ever trained, and a core subject we cannot ship without.</p></div>
+<div class="broken-row"><b>Animals</b><span class="fig">11.7%</span><p>Barely moved across four versions of teaching.</p></div>
+<div class="broken-row"><b>Spelling</b><span class="fig">30.0%</span><p>Up from 1.7%, so the teaching is working — just nowhere near enough yet.</p></div>
+<div class="broken-row"><b>Asking it a new way</b><span class="fig">42.5%</span><p>The big one. Ask about a fact using the exact wording it was taught and it is right 100% of the time. Reword the same question and it is right 42.5% of the time. The knowledge is in there; recognising the question is what fails.</p></div>
+</div>
+
+    <div class="note">
+      <p><strong>The honest summary:</strong> it can hold roughly twenty
+      thousand facts and get almost none of them wrong when you ask the way it
+      was taught. Ask in your own words and it is right about six times in ten.
+      It cannot tell the time, it is poor with animals, and it is worst at the
+      easiest sums on the list. It is a proof of concept, and that gap is the
+      proof of what is still missing.</p>
+    </div>
+
+    <p>What we tried that did not work is in <a href="#train">Train your own</a>;
+    the measurements and the ablations behind all of it are in
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>.</p>
+  </div>
+</section>
+</div>
+
+<!-- =================== INSTALL =================== -->
+<div class="tabpanel" id="panel-install" aria-labelledby="tab-install" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>Install.<br>Flash, then copy.</h2>
+    <p class="standfirst">Your browser can flash the firmware over Web Serial. It
+    cannot write your SD card, and the firmware without the models is a device
+    that boots and cannot hear you. So there are two steps, and the second one
+    is not optional. Anyone who tells you it is one click is going to leave you
+    with a board that looks like it worked.</p>
+
+    <ol class="steps">
+      <li><strong>Get the board.</strong> A Freenove FNK0104B (ESP32-S3, 8&nbsp;MB
+      PSRAM, 16&nbsp;MB flash, ILI9341 screen, ES8311 codec, mic and speaker), and
+      a microSD card formatted FAT32 with about 64&nbsp;MB free — the models live
+      on it, and the device cannot hear or speak without it. A battery is
+      optional and nothing needs soldering.</li>
+      <li><strong>Flash the firmware.</strong> Chrome or Edge, plug the board in
+      over USB, press the button below and pick the serial port. About a minute.
+      <div class="cta"><a class="btn primary" href="#" id="flash-btn">Flash Ivy AI stage-e-poc</a></div>
+      <p class="built" id="flash-note">The installer is wired up by the Pages
+      build; on a local preview this button is inert.</p></li>
+      <li><strong>Put the models on the card.</strong> Download
+      <code>ivy-sd-stage-e-poc.zip</code> from the release and unzip it to the
+      root of a FAT32 card &mdash; the exact layout is below. About 20&nbsp;MB.</li>
+      <li><strong>Say something.</strong> Press <kbd>BOOT</kbd>, ask a question,
+      and stop talking — 720 ms of silence is how it knows you have
+      finished.</li>
+    </ol>
+
+<h3 style="margin-top:2.6rem">Why there is an SD card at all</h3>
+    <p>The three models are about 20&nbsp;MB together and the application
+    partition is 6 MB, most of which the firmware already uses. They
+    could not be flashed alongside the code even if we wanted them there.</p>
+    <p>Which turned out to be the better arrangement anyway: the model is a
+    <em>file</em>, so swapping the brain is copying a folder rather than
+    reflashing a board, and you can keep several on one card and pick between
+    them on the device. Everything is read from the card on demand, a phase at a
+    time — nothing needs to fit in memory all at once.</p>
+    <p><strong>What to buy:</strong> any microSD card, <strong>formatted
+    FAT32</strong>, with about 64&nbsp;MB free. Size and speed class barely
+    matter; the card is read, never written. exFAT is not supported.</p>
+
+    <h3>What goes on it</h3>
+    <p>Two fixed folders, plus one folder per language model. Unzipping the
+    release bundle at the root of the card produces exactly this:</p>
+<pre><code>/story/
+  stt/
+    model.bin              conformer speech recogniser   13.8 MB
+  tts/
+    en-US_ta.bin           Pico text analysis              ~1 MB
+    en-US_lh0_sg.bin       Pico signal generation        ~1.4 MB
+  llm8m_v4/                a language model               ~4.5 MB
+    model.bin              the Q4 weights
+    tok.bin                the tokenizer
+    name.txt               optional: what to call it on screen
+
+/models/
+  something.gguf           optional: GGUF models, one file each</code></pre>
+
+    <div class="grid2">
+      <div class="card"><h3><code>/story/stt/</code> and <code>/story/tts/</code></h3>
+      <p>Fixed paths, and the firmware looks nowhere else. Miss these and the
+      device boots, shows its screen, and cannot hear or speak &mdash; which is
+      the failure most likely to look like broken hardware.</p></div>
+      <div class="card"><h3><code>/story/llm*/</code></h3>
+      <p>Any folder whose name starts with <code>llm</code> and contains both
+      <code>model.bin</code> and <code>tok.bin</code> is offered as a model.
+      Add as many as the card holds; the device lists them and remembers which
+      one you picked. Drop a <code>name.txt</code> in to label it.</p></div>
+      <div class="card"><h3><code>/models/*.gguf</code></h3>
+      <p>The other format: a single GGUF file, llama.cpp's, rather than a
+      folder. The ones already measured on this board are in
+      <a href="#results">Results</a>, and <a href="#train">Train your own</a>
+      covers converting one.</p></div>
+      <div class="card"><h3>Copying it across</h3>
+      <p>A card reader and drag-and-drop is fine. Or leave the card in the board
+      and push over USB with <code>python tools/sd_put.py --manifest</code>,
+      which runs at about 720&nbsp;KB/s and checks a CRC on every file &mdash;
+      useful when you are swapping models often.</p></div>
+    </div>
+
+    <div class="note">
+      <p><strong>Model files are licensed separately from the firmware</strong>,
+      and some of them may not be redistributed by us at all &mdash; so the
+      bundle carries each model's own licence beside the bytes, and anything we
+      cannot ship is fetched by a script instead. See
+      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/THIRD_PARTY.md">THIRD_PARTY.md</a>.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- =================== ASK =================== -->
+<div class="tabpanel" id="panel-ask" aria-labelledby="tab-ask" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>What you can ask it.</h2>
+    <p class="standfirst">Two kinds of answer, and the screen always tells you
+    which one you got.</p>
+
+    <div class="grid2">
+      <div class="card">
+        <h3><span class="no-ai"><i></i>no AI</span></h3>
+        <p><strong>The time. The date. Its own name. A timer</strong> — "set a
+        timer for five minutes". These are plain C: deterministic, instant, and
+        incapable of making something up. The cyan diamond on screen means no
+        model was involved.</p>
+      </div>
+      <div class="card">
+        <h3>The model</h3>
+        <p><strong>Everything else.</strong> Arithmetic with the working shown,
+        fractions and percentages, elements, countries and capitals, US states,
+        Roman numerals, money, time-telling, vocabulary — the question space of a
+        40-game children's learning suite, about 19,800 facts.</p>
+      </div>
+    </div>
+
+    <h3 style="margin-top:2rem">And what it will not do</h3>
+    <p>It is a 19.7M-parameter model. It will not write your code, discuss the
+    news, or know anything outside the curriculum it was taught — and from v5
+    onward it is trained to <em>say so</em> rather than invent an answer, at an
+    over-refusal rate of 3.3%. Accuracy on a phrasing it has never
+    seen is 60.9%, and that number is the honest one to judge it by.</p>
+    <p>It is built for a child aged five to eight, asking the kind of question
+    that has an answer.</p>
+  </div>
+</section>
+</div>
+
+<!-- =================== TRAIN =================== -->
+<div class="tabpanel" id="panel-train" aria-labelledby="tab-train" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>Train your own.</h2>
+    <p class="standfirst">Every number in <a href="#results">Results</a> came out
+    of this pipeline, and it runs on one laptop overnight &mdash; no cluster, no
+    rented GPUs. What follows is the real sequence, with the two traps that cost
+    us the most time marked where you will hit them.</p>
+
+    <div class="qa">
+      <p class="q">1. Decide what it has to know.</p>
+      <p class="a">Scope it from a source, not from an opinion.</p>
+      <div class="body">
+        <p>This step decides everything after it, and it is the one most people
+        skip. A 19M-parameter model cannot learn "general knowledge", so the
+        useful move is to turn open-ended generalisation into <em>closed-set
+        coverage</em>: pick a question space you can enumerate, and enumerate it.</p>
+        <p>Ours came out of another program's source code.
+        <code>gume_extract.py</code> parses the tables inside
+        <a href="https://github.com/iamankushpandit/Gume">Braino!</a> &mdash;
+        elements, countries, capitals, states, Roman numerals, coins, fractions
+        &mdash; and emits question/answer pairs from them. 18,634 facts, none
+        invented, every one traceable to a file and a line. The script stops with
+        an error if a pattern it relies on stops matching, rather than quietly
+        emitting stale data.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">2. Generate the corpus.</p>
+      <p class="a">Two generators, about 77,000 training pairs, held-out sets kept honest.</p>
+      <div class="body">
+<pre><code>python tools/kid/gen_kid_data.py --out models_out/kid
+git clone --depth 1 https://github.com/iamankushpandit/Gume.git .refs/Gume
+python tools/kid/gume_extract.py</code></pre>
+        <p><code>gen_kid_data.py</code> writes the basic child-level set (1,414
+        facts); <code>gume_extract.py</code> adds the curriculum and
+        <strong>deduplicates against it</strong>, dropping every question the
+        first generator already owns. Each writes a held-out
+        <code>*_eval.jsonl</code> of phrasings that appear nowhere in training
+        &mdash; checked against <em>both</em> generators' output, which is the
+        only way "held out" means anything.</p>
+        <div class="note">
+          <p><strong>Trap one: answer format is worth about 4&times;.</strong>
+          Present addition as a stated result and accuracy on unseen operand
+          pairs is 18.3%. Present the same sums as worked steps and it is 75.3%.
+          The effect replicates at 33M parameters (21.0% &rarr; 78.5%), so it is
+          a property of how you write the answer, not of model size. Decide your
+          answer format before you generate 77,000 examples of it.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">3. Fine-tune.</p>
+      <p class="a">One command. A few hours on an Apple Silicon Mac.</p>
+      <div class="body">
+<pre><code>bash tools/kid/mac_train.sh
+# or: EPOCHS=6 BATCH=64 bash tools/kid/mac_train.sh</code></pre>
+        <p>The script builds its own virtualenv, installs torch, transformers and
+        safetensors, downloads the TinyTalk 2 (GPT-Neo, 8M) base checkpoint and
+        its original chat corpus, and trains &mdash; on the Apple GPU through MPS,
+        or CUDA, or the CPU, whichever it finds. Keeping that original chat and
+        story corpus in the mix is what stops the model forgetting how to hold a
+        conversation while it learns the facts.</p>
+        <p>It prints a <code>before:</code> score on the held-out set (about 0%
+        for the base model), then after every epoch <code>held-out exact</code>
+        and <code>key</code>, plus six sample answers marked OK or XX. Watch the
+        held-out number, not the loss.</p>
+        <div class="note">
+          <p><strong>Trap two: your evaluation is as likely to be wrong as your
+          model.</strong> Six measurement bugs changed our reported results before
+          they were caught &mdash; a metric scoring the wrong substring, a crashed
+          run reporting success because it was piped through <code>tee</code>, a
+          trainer saving the final epoch instead of the best one, held-out sets
+          testing the wrong thing, two grader parsing bugs, and evaluation running
+          on the GPU when greedy decoding is sequential and the CPU turned out to
+          be 22&times; faster. Every one of them made the result look better or
+          faster. Unit-test the grader before you trust a run.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">4. Convert it for the device.</p>
+      <p class="a">Q4 on the card, checked on the host before it reaches the board.</p>
+      <div class="body">
+        <p>Convert the checkpoint to the device's Q4 format and run it through the
+        host C engine first &mdash; the same engine the firmware uses, built with
+        <code>zig cc</code>, so a conversion bug shows up on your laptop rather
+        than as silence from a board. Then copy it to the card and point the
+        firmware at the directory.</p>
+<pre><code>python tools/gguf/hf_llama_to_gguf.py ...   # or the CRDP converter
+pwsh tools/hosttest.ps1 llm_chat            # sanity-check on the host
+python tools/sd_put.py --manifest --only /llm/</code></pre>
+        <p>The fit rules are the gate: roughly 10M weights at Q4 (0.5625 bytes
+        each), <code>dim</code> and <code>ffn</code> multiples of 32, and shrink
+        the vocabulary first &mdash; 65.3% of our parameters were embedding rows,
+        against a corpus that used 8.9% of the tokenizer.
+        <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/GGUF.md">GGUF.md</a> has the arithmetic,
+        and the list of models that failed it.</p>
+      </div>
+    </div>
+
+    <div class="qa">
+      <p class="q">What we would tell you not to bother with.</p>
+      <p class="a">Two remedies that were predicted to help and measurably hurt.</p>
+      <div class="body">
+        <p><strong>Class balancing.</strong> Expected to help. Made it worse.</p>
+        <p><strong>More paraphrases per fact.</strong> Raising them from 14 to 20
+        was meant to close the gap between wording the model had seen and wording
+        it had not. The gap <em>widened</em> to 55.0 points, while
+        trained-wording accuracy reached a perfect 100% and held-out accuracy fell
+        to 42.5%. The model memorised harder instead of generalising better,
+        because template-varied paraphrases decorate a fixed question stem rather
+        than varying its structure.</p>
+        <p>What did work, twice, was enumeration. Fractions and percentages went
+        from 17.5% to 91.2% by enumerating the space instead of hoping for
+        generalisation &mdash; exactly as arithmetic had gone from 18.3% to 75.3%
+        earlier. If a category is weak, the answer has usually been more coverage
+        of that category, not more of everything.</p>
+      </div>
+    </div>
+
+    <p style="margin-top:2rem">The full method, the ablations and the failure
+    analysis are in
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>;
+    the per-game breakdown of where the questions come from is in
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/GUME_QUESTIONS.md">GUME_QUESTIONS.md</a>.</p>
+  </div>
+</section>
+</div>
+
+<!-- =================== PRIVACY =================== -->
+<div class="tabpanel" id="panel-privacy" aria-labelledby="tab-privacy" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>Privacy.<br>Stated precisely, on purpose.</h2>
+    <p class="standfirst">Absolute claims are what get privacy pages
+    discredited. So here is the exact list, including the one thing that does
+    touch the network — because a page that said "sends nothing anywhere" three
+    paragraphs above a description of NTP would deserve everything it got.</p>
+
+    <div class="grid2">
+      <div class="card"><h3>Your voice</h3><p>Recorded into memory, transcribed on
+      the chip, and overwritten by the next question. It is never written to the
+      card, never stored, and there is no code path that could send it anywhere.</p></div>
+      <div class="card"><h3>Wi-Fi</h3><p>Optional, and used for exactly one thing:
+      an NTP server, so the clock is right, resynced once an hour. Skip Wi-Fi
+      entirely and nothing else about the device changes.</p></div>
+      <div class="card"><h3>Bluetooth</h3><p>Off. Not "off by default" — the radio
+      is disabled in the build configuration.</p></div>
+      <div class="card"><h3>Accounts</h3><p>There are none. Nothing to sign in to,
+      no identifier, no pairing with a phone, no companion app.</p></div>
+      <div class="card"><h3>The models</h3><p>On your SD card. The recogniser, the
+      language model and the voice all run on the chip; none of them calls out,
+      because none of them can.</p></div>
+      <div class="card"><h3>This page</h3><p>Talks to your board over Web Serial,
+      inside your browser. No analytics, no cookies, no fonts from anybody else.
+      On load it fetches nothing; opening Install loads the flashing tool.</p></div>
+    </div>
+
+    <div class="note">
+      <p>The claim is checkable, which is the point of the licence. The firmware
+      is GPL-3.0-or-later: anyone shipping a modified build has to offer its
+      source to whoever holds the device. On a thing with an always-on
+      microphone, that is not a licensing preference — it is the only audit
+      anybody gets.</p>
+    </div>
+  </div>
+</section>
+</div>
+
+<!-- =================== COMMUNITY =================== -->
+<div class="tabpanel" id="panel-community" aria-labelledby="tab-community" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>Builders wanted.</h2>
+    <p class="standfirst">The most useful thing anyone could bring is a better
+    model that fits, or a port to another board.</p>
+
+    <div class="grid2">
+      <div class="card"><h3>Bring a model</h3><p>The fit rules are in
+      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/GGUF.md">GGUF.md</a> and the converter is in
+      <code>tools/gguf/</code>. Roughly 10M weights at Q4, dim and ffn multiples of
+      32, and shrink the vocabulary first.</p></div>
+      <div class="card"><h3>Fix the phrasing gap</h3><p>The open question of the
+      whole project: 55.0 points between wording the model has seen and
+      wording it has not, and more paraphrases made it worse. Structural
+      variation, not decoration, is the hypothesis nobody has tested yet.</p></div>
+      <div class="card"><h3>Built with AI, on purpose</h3><p>Most of this code was
+      written with an AI agent, in the open, with the failures left in the commit
+      history. The build log is honest about that too.</p></div>
+      <div class="card"><h3>Licence</h3><p>GPL-3.0-or-later, with a linking
+      exception for Espressif's SDK. Fork it, ship it, keep the name off it, and
+      pass the source along. See <a href="https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md">NOTICE.md</a>.</p></div>
+    </div>
+
+    <h3 style="margin-top:2rem">Standing on</h3>
+    <p><a href="https://github.com/slvDev/esp32-ai">slvDev/esp32-ai</a> and
+    <a href="https://github.com/manjunathshiva/esp32-tinyllm">manjunathshiva/esp32-tinyllm</a>
+    (MIT — Viacheslav Sierbov, Manjunath Janardhan) showed that a model this size
+    runs on this chip at all, and made the argument this project is built on: place
+    weights by how often they are read, not by how big they are. The recogniser is
+    <a href="https://github.com/lspr98/conformer-stt-s3">lspr98/conformer-stt-s3</a>
+    (Apache-2.0), the voice is SVOX Pico via
+    <a href="https://github.com/DiUS/esp-picotts">DiUS/esp-picotts</a>
+    (Apache-2.0), and the inference engine began as
+    <a href="https://github.com/therezor/cardputer-ai">therezor/cardputer-ai</a>
+    (MIT). Full credit and obligations:
+    <a href="https://github.com/iamankushpandit/esp_ai/blob/main/THIRD_PARTY.md">THIRD_PARTY.md</a>.</p>
+  </div>
+</section>
+</div>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <svg class="footer-logo" viewBox="0 0 520 620" role="img"
+         aria-label="Ivy AI"><use href="#ivy-lockup"/></svg>
+    <p>Ivy AI © 2026 <a href="https://github.com/iamankushpandit">iamankushpandit</a>.
+    Free software under <a href="https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE">GPL-3.0-or-later</a>
+    with the <a href="https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE.exception">Espressif linking
+    exception</a>. <strong>Ivy AI</strong> is a product name and is not licensed by
+    the GPL — <a href="https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md">NOTICE.md</a> explains the one
+    thing a fork is asked to change.</p>
+    <p class="built">Generated 2026-09-20 from stage-e-poc · every figure on this
+    page is derived from the repository, not typed twice.</p>
+  </div>
+</footer>
+
+<script>
+// Tabs. Without JS every panel is visible and the page still reads top to
+// bottom -- the panels are hidden here, on load, rather than in the markup, so
+// a reader with no JS loses navigation and nothing else.
+(function(){
+  var tabs = [].slice.call(document.querySelectorAll('nav.tabs a.tab'));
+  var names = tabs.map(function(t){ return t.getAttribute('href').slice(1); });
+  function show(name){
+    if (names.indexOf(name) < 0) name = names[0];
+    names.forEach(function(n){
+      var panel = document.getElementById('panel-' + n);
+      if (panel) panel.hidden = (n !== name);
+      var tab = document.getElementById('tab-' + n);
+      if (tab) tab.setAttribute('aria-selected', String(n === name));
+    });
+    document.title = name === 'home' ? 'Ivy AI' : 'Ivy AI — ' + document.getElementById('tab-' + name).textContent;
+  }
+  names.forEach(function(n){
+    var panel = document.getElementById('panel-' + n);
+    if (panel) panel.hidden = true;
+  });
+  // Switch on the CLICK, not only on hashchange. Every in-page link to a tab
+  // is handled here, so navigation works even where the address bar cannot
+  // change -- a file:// preview, a snapshot, an embedded viewer. Relying on
+  // hashchange alone made every tab on this page dead in exactly those
+  // places, and the page still looked fine.
+  document.addEventListener('click', function(e){
+    var a = e.target.closest ? e.target.closest('a[href^="#"]') : null;
+    if (!a) return;
+    var name = a.getAttribute('href').slice(1);
+    if (names.indexOf(name) < 0) return;
+    e.preventDefault();
+    show(name);
+    window.scrollTo(0, 0);
+    try { history.replaceState(null, '', '#' + name); } catch (err) { /* file:// */ }
+  });
+  window.addEventListener('hashchange', function(){
+    show(location.hash.slice(1));
+    window.scrollTo(0, 0);
+  });
+  show(location.hash.slice(1) || 'home');
+})();
+</script>
+<script>
+// The progression panel. Everything it shows is already in the markup; this
+// only switches questions and paces the reveal, so with the script disabled
+// the whole thing is still readable -- just all at once.
+(function(){
+  var root = document.getElementById('demo');
+  if (!root) return;
+  var slow = !window.matchMedia || !matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  function type(el){
+    var full = el.getAttribute('data-type');
+    if (!full || !slow) return;
+    el.textContent = '';
+    el.classList.add('typing');
+    var i = 0;
+    (function step(){
+      // Three characters a frame: fast enough not to try anyone's patience,
+      // slow enough that you watch it arrive rather than read a finished box.
+      i = Math.min(i + 3, full.length);
+      el.textContent = full.slice(0, i);
+      if (i < full.length) requestAnimationFrame(step);
+      else el.classList.remove('typing');
+    })();
+  }
+
+  function show(n){
+    root.querySelectorAll('.demo-q').forEach(function(b){
+      var on = b.getAttribute('data-q') === String(n);
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', String(on));
+    });
+    root.querySelectorAll('[data-panel]').forEach(function(p){
+      var on = p.getAttribute('data-panel') === String(n);
+      p.hidden = !on;
+      if (on) p.querySelectorAll('.demo-text[data-type]').forEach(function(el, i){
+        setTimeout(function(){ type(el); }, i * 550);
+      });
+    });
+  }
+
+  root.querySelectorAll('.demo-q').forEach(function(b){
+    b.addEventListener('click', function(){ show(b.getAttribute('data-q')); });
+  });
+  show(0);
+})();
+</script>
+
+</body>
+</html>

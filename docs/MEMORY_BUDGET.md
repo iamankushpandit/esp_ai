@@ -92,3 +92,10 @@ SD (SDMMC 4-bit, 40 MHz, FAT, 128 GB card): 16.2 MB/s into internal DMA memory,
 32 KB bounce buffer. stdio buffering must be disabled on the STT model FILE:
 newlib otherwise mallocs st_blksize (16 KB) of internal RAM per open FILE and
 fread silently returned 0 when that failed.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

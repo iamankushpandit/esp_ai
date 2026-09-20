@@ -85,3 +85,10 @@ phase fails with a user-visible message — never a silent fallback.
 2. STT is streamed from SD, adding ~0.6-1.3 s per utterance until prefetch is added.
 3. Tiny LLM has no world knowledge; answers are toy-level.
 4. TinyTalk weights inherit non-commercial dataset terms — fine for a demo, not a product.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

@@ -281,3 +281,10 @@ Neural caveat: both sub-1M-parameter neural options need **phoneme input**. The 
 - espeak-ng port (GPL-3.0): https://github.com/pschatzmann/arduino-espeak-ng
 - SAM: https://github.com/earlephilhower/ESP8266SAM
 - sanoTTS: https://github.com/ampixa/sanoTTS ; saanoTTS paper: https://arxiv.org/html/2608.21378
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

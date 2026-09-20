@@ -64,3 +64,10 @@ Heap outside the arenas: ~50 KB internal free between turns (largest block
 3. Some words are fragile over speaker→mic loopback ("cow", "red"). Real-voice
    accuracy still to be characterized; mic gain / VAD may need tuning per user.
 4. LLM knowledge is essentially nil; it chats but does not answer factually.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

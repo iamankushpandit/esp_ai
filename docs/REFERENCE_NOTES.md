@@ -51,3 +51,10 @@ Detailed, cited audits live in `docs/refnotes/`:
 8. esp-sr `esp_srmodel_deinit()` crashes in SD mode.
 9. PicoTTS defaults to en-GB; the example disables the CPU1 watchdog because synthesis never yields.
 10. GPT-2 tokenizer in cardputer-ai skips regex pre-split (empirically OK).
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*
