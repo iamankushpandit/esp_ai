@@ -62,6 +62,9 @@ static inline bool app_page_in_settings(app_page_t p)
 }
 void app_ui_page(app_page_t p);            // switch page (re-renders the area)
 app_page_t app_ui_page_get(void);
+// True while a keypad is open: the voice Ask pill is disabled, because the
+// keypad's own Ask key is the one that sends the typed question.
+bool app_ui_typing(void);
 void app_ui_refresh_page(void);            // e.g. after the model list changed
 
 // Row tags on /settings and its sub-pages (network rows use their index 0..).

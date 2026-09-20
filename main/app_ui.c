@@ -483,7 +483,9 @@ int app_ui_kb_tap(int x, int y)
 // ---------------------------------------------------------------- T9 keypad
 // Typed questions on a phone-style 3x4 keypad in the page area. Multi-tap:
 // tapping the same key again within T9_CYCLE_US cycles its letters (2: a b c 2),
-// otherwise a new character starts. 0 is space.
+// otherwise a new character starts. 0 is space then zero, as on a phone, and
+// [#+] on the title row swaps the nine letter keys for symbols so that no
+// character needs more than four taps.
 #define T9_TITLE_Y CONVO_Y
 #define T9_FIELD_Y (CONVO_Y + UI_ROW_H)
 #define T9_KEYS_Y (CONVO_Y + 2 * UI_ROW_H + 4)
@@ -493,15 +495,26 @@ int app_ui_kb_tap(int x, int y)
 #define T9_CYCLE_US 900000
 #define T9_MAX 120
 enum { T9_DEL = 9, T9_SPACE = 10, T9_ASK = 11 };
-static const struct { const char *top, *sub, *cycle; } T9_KEYS[12] = {
+typedef struct { const char *top, *sub, *cycle; } t9_key_t;
+static const t9_key_t T9_KEYS[12] = {
     {"1", ".,?!", ".,?!'1"}, {"2", "abc", "abc2"}, {"3", "def", "def3"},
     {"4", "ghi", "ghi4"},    {"5", "jkl", "jkl5"}, {"6", "mno", "mno6"},
     {"7", "pqrs", "pqrs7"},  {"8", "tuv", "tuv8"}, {"9", "wxyz", "wxyz9"},
-    {"del", "", NULL},       {"0", "space", NULL}, {"Ask", "", NULL},
+    {"del", "", NULL},       {"0", "space", " 0"}, {"Ask", "", NULL},
+};
+// [#+] layer: every symbol within four taps. del / 0 / Ask keep their meaning.
+static const t9_key_t T9_SYM[12] = {
+    {".,?!", "", ".,?!"},    {"'\"`", "", "'\"`"},  {"-_=+", "", "-_=+"},
+    {"()[]", "", "()[]"},    {"{}<>", "", "{}<>"},  {"/\\|~", "", "/\\|~"},
+    {"@#$%", "", "@#$%"},    {"^&*", "", "^&*"},    {":;", "", ":;"},
+    {"del", "", NULL},       {"0", "space", " 0"},  {"Ask", "", NULL},
 };
 static char s_t9_text[T9_MAX + 1];
 static int s_t9_len, s_t9_last = -1, s_t9_idx;
+static bool s_t9_sym;
 static int64_t s_t9_last_us;
+
+static const t9_key_t *t9_key(int k) { return (s_t9_sym ? T9_SYM : T9_KEYS) + k; }
 
 static void draw_key2(int x, int y, int w, int h, const char *l1, const char *l2, bool pressed, bool accent)
 {
@@ -531,7 +544,8 @@ static void draw_key2(int x, int y, int w, int h, const char *l1, const char *l2
 static void t9_draw_key(int k, bool pressed)
 {
     int r = k / 3, c = k % 3;
-    draw_key2(c * T9_KEY_W, T9_KEYS_Y + r * T9_PITCH, T9_KEY_W, T9_KEY_H, T9_KEYS[k].top, T9_KEYS[k].sub,
+    const t9_key_t *key = t9_key(k);
+    draw_key2(c * T9_KEY_W, T9_KEYS_Y + r * T9_PITCH, T9_KEY_W, T9_KEY_H, key->top, key->sub,
               pressed, k == T9_ASK);
 }
 
@@ -548,13 +562,29 @@ static void t9_draw_field(void)
     ui_draw_row(0, T9_FIELD_Y, BOARD_LCD_W, row, UI_WHITE, UI_BLACK);
 }
 
+// "Type a question    [#+]  [x]" - the layer toggle and cancel are tap targets
+// (T9_SYM_COL, T9_X_COL below).
+#define T9_SYM_COL 19
+#define T9_X_COL 26
+static void t9_draw_title(void)
+{
+    char row[UI_MAX_COLS + 1];
+    memset(row, ' ', UI_MAX_COLS);
+    row[UI_MAX_COLS] = 0;
+    memcpy(row, "Type a question", 15);
+    memcpy(row + T9_SYM_COL, s_t9_sym ? "[abc]" : "[#+]", s_t9_sym ? 5 : 4);
+    memcpy(row + T9_X_COL, "[x]", 3);
+    row[T9_X_COL + 3] = 0;
+    ui_draw_row(0, T9_TITLE_Y, BOARD_LCD_W, row, UI_ACCENT, UI_BLACK);
+}
+
 static void t9_draw_all(void)
 {
     ui_box_set_rows(&s_convo, NULL, 0);       // blank the text rows (dirty rows only)
     ui_box_invalidate(&s_convo);              // text pages repaint over the keys later
     s_total = 0;
     draw_scrollbar();
-    ui_draw_row(0, T9_TITLE_Y, BOARD_LCD_W, "Type a question            [x]", UI_ACCENT, UI_BLACK);
+    t9_draw_title();
     t9_draw_field();
     for (int k = 0; k < 12; k++) t9_draw_key(k, false);
 }
@@ -565,6 +595,7 @@ void app_ui_t9_open(void)
     s_t9_text[0] = 0;
     s_t9_len = 0;
     s_t9_last = -1;
+    s_t9_sym = false;
     app_ui_page(PAGE_T9);
     UI_UNLOCK();
 }
@@ -574,7 +605,18 @@ const char *app_ui_t9_text(void) { return s_t9_text; }
 int app_ui_t9_tap(int x, int y)
 {
     if (s_page != PAGE_T9) return 0;
-    if (y < T9_FIELD_Y) return x >= 24 * UI_FONT_W ? 2 : 0;   // [x] on the title row: cancel
+    if (y < T9_FIELD_Y) {                                     // title row
+        if (x >= T9_X_COL * UI_FONT_W) return 2;              // [x]: cancel
+        if (x >= T9_SYM_COL * UI_FONT_W) {                    // [#+] / [abc]: swap layers
+            UI_LOCK();
+            s_t9_sym = !s_t9_sym;
+            s_t9_last = -1;                                   // commits the letter being cycled
+            t9_draw_title();
+            for (int k = 0; k < 9; k++) t9_draw_key(k, false);
+            UI_UNLOCK();
+        }
+        return 0;
+    }
     if (y < T9_KEYS_Y) return 0;
     int r = (y - T9_KEYS_Y) / T9_PITCH, c = x / T9_KEY_W;
     if (r > 3) return 0;
@@ -583,8 +625,8 @@ int app_ui_t9_tap(int x, int y)
     int64_t now = story_time_us();
     UI_LOCK();
     t9_draw_key(k, true);
-    if (T9_KEYS[k].cycle) {
-        const char *cy = T9_KEYS[k].cycle;
+    if (t9_key(k)->cycle) {
+        const char *cy = t9_key(k)->cycle;
         if (k == s_t9_last && now - s_t9_last_us < T9_CYCLE_US && s_t9_len > 0) {
             s_t9_idx = (s_t9_idx + 1) % (int)strlen(cy);       // same key again: next letter
             s_t9_text[s_t9_len - 1] = cy[s_t9_idx];
@@ -598,7 +640,6 @@ int app_ui_t9_tap(int x, int y)
     } else {
         s_t9_last = -1;                                        // commits the letter being cycled
         if (k == T9_DEL && s_t9_len > 0) s_t9_text[--s_t9_len] = 0;
-        else if (k == T9_SPACE && s_t9_len < T9_MAX) { s_t9_text[s_t9_len++] = ' '; s_t9_text[s_t9_len] = 0; }
         else if (k == T9_ASK && s_t9_len > 0) ret = 1;
     }
     t9_draw_field();
@@ -1083,11 +1124,17 @@ void app_ui_page(app_page_t p)
         bool settings = app_page_in_settings(p);
         app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
         app_ui_bar_state(BAR_SETTINGS, settings ? BTN_ACTIVE : BTN_IDLE);
+        // While a keypad is open, its own Ask key is the one to press: grey
+        // out the voice pill so there is no question which does what.
+        app_ui_bar_state(BAR_ASK, app_ui_typing() || s_busy ? BTN_BUSY : BTN_IDLE);
     }
     UI_UNLOCK();
 }
 
 app_page_t app_ui_page_get(void) { return s_page; }
+
+// A keypad is open: the question is being typed, not spoken.
+bool app_ui_typing(void) { return s_page == PAGE_T9 || s_page == PAGE_KEYBOARD; }
 
 void app_ui_refresh_page(void)
 {

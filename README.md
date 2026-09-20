@@ -106,6 +106,11 @@ Two formats work:
 Both appear on the **/model** page; the choice is saved in NVS and shown in the
 header.
 
+**[docs/MODELS.md](docs/MODELS.md)** covers how to pick one — the 5.8 MB
+budget, why `dim` and `ffn` must be multiples of 32, why speed is simply
+bandwidth ÷ model size, and why a storyteller can't answer questions — and how
+the TinyTalk models are trained on an Apple M1 Max with PyTorch MPS.
+
 ## Host tools
 
 The UI, the arenas and the language models all build and run on a PC, so most

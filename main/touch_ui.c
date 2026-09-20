@@ -101,6 +101,7 @@ static void bar_release_look(int b)
 {
     if (app_ui_is_busy()) { app_ui_bar_state((app_bar_t)b, BTN_BUSY); return; }
     app_page_t p = app_ui_page_get();
+    if (b == BAR_ASK && app_ui_typing()) { app_ui_bar_state(BAR_ASK, BTN_BUSY); return; }
     bool active = (b == BAR_MODEL && p == PAGE_MODELS) || (b == BAR_SETTINGS && app_page_in_settings(p));
     app_ui_bar_state((app_bar_t)b, active ? BTN_ACTIVE : BTN_IDLE);
 }
@@ -296,7 +297,10 @@ static void touch_task(void *arg)
                 if (g == G_LOCK) app_ui_lock_state(BTN_PRESSED);
             } else if ((bar = app_ui_bar_hit(x, y)) >= 0) {
                 // While busy only the Ask pill works: it is the Stop button.
-                g = app_ui_is_busy() && bar != BAR_ASK ? G_OTHER : G_BAR;
+                // While typing it is the one pill that doesn't: the keypad's
+                // own Ask key sends the question.
+                g = (app_ui_is_busy() && bar != BAR_ASK) || (bar == BAR_ASK && app_ui_typing())
+                        ? G_OTHER : G_BAR;
                 if (g == G_BAR) app_ui_bar_state((app_bar_t)bar, BTN_PRESSED);
             } else if (app_ui_convo_hit(x, y)) {
                 g = G_PAGE_MAYBE;

@@ -34,6 +34,9 @@ const char *net_last_msg(void) { return "Clock set"; }
 static prefs_t s_prefs = {.volume = 70, .brightness = 80, .screen_s = 30, .wake = true};
 prefs_t *prefs(void) { return &s_prefs; }
 
+// Page area origin, mirroring app_ui.c's CONVO_Y (ROW_Y(5) + 4).
+#define CONVO_Y_PX (2 + 5 * UI_ROW_H + 4)
+
 static uint16_t fb[BOARD_LCD_H][BOARD_LCD_W];
 static uint16_t dma[BOARD_LCD_STREAM_PX];
 static int wx, wy, ww, wpos;
@@ -128,10 +131,17 @@ int main(int argc, char **argv)
     }
     STEP("back to chat", app_ui_page(PAGE_CHAT));
     dump();
+    // Keypad rows start at CONVO_Y + 2*UI_ROW_H + 4, 34 px apart.
+    const int t9_keys_y = CONVO_Y_PX + 2 * UI_ROW_H + 4, t9_title_y = CONVO_Y_PX + 4;
     STEP("t9 open", app_ui_t9_open());
-    STEP("t9: 4 4 (h -> i)", app_ui_t9_tap(5, 94 + 34 + 5); app_ui_t9_tap(5, 94 + 34 + 5));
+    STEP("t9: 4 4 (h -> i)", app_ui_t9_tap(5, t9_keys_y + 34 + 5); app_ui_t9_tap(5, t9_keys_y + 34 + 5));
+    STEP("t9: 0 0 (space -> zero)", app_ui_t9_tap(85, t9_keys_y + 3 * 34 + 5);
+         app_ui_t9_tap(85, t9_keys_y + 3 * 34 + 5));
     dump();
-    STEP("t9 cancel", app_ui_t9_tap(230, 64));
+    STEP("t9: [#+] symbol layer", app_ui_t9_tap(19 * UI_FONT_W + 4, t9_title_y));
+    STEP("t9: @ (key 7)", app_ui_t9_tap(5, t9_keys_y + 2 * 34 + 5));
+    dump();
+    STEP("t9 cancel", app_ui_t9_tap(230, t9_title_y));
     STEP("ask pressed", app_ui_button(BTN_PRESSED));
     dump();
     STEP("turn 1: listening", app_ui_busy(true); app_ui_clear_turn(); app_ui_status("Listening...", UI_BUSY));
