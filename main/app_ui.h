@@ -2,7 +2,8 @@
 //
 //   ╭────────────────────────────╮
 //   │ [leaf]  Ivy AI             │
-//   │   (c) iamankushpandit      │
+//   │   (C) iamankushpandit      │
+//   │   TinyTalk 2 8M            │ <- the loaded model
 //   ╰────────────────────────────╯
 //   > what color is a banana       ▐ <- scrollable page area: the session
 //   ● The banana is yellow.        ▐    transcript (chat), the /model list,
@@ -19,9 +20,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Boot welcome screen: the Ivy AI logo + "(c) iamankushpandit".
+// Boot welcome screen: the Ivy AI logo + "(C) iamankushpandit".
 void app_ui_splash(void);
 void app_ui_init(void);
+// Repaints the header's model row (call after models_scan/models_select).
+void app_ui_model_changed(void);
+// Sleep (the lock button, or the idle timeout): the logo alone on black, its
+// colour drifting. tick() draws one frame; exit() rebuilds the whole screen.
+void app_ui_sleep_enter(void);
+void app_ui_sleep_tick(void);
+void app_ui_sleep_exit(void);
+bool app_ui_sleeping(void);
 // Status line. Busy states (any color other than UI_OK/UI_GREY) get an
 // advancing spinner glyph; "..." is shown as an ellipsis.
 void app_ui_status(const char *s, uint16_t color);
@@ -113,6 +122,10 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that p
 // Restart button (circular arrow, top-right of the header box).
 bool app_ui_restart_hit(int x, int y);
 void app_ui_restart_state(app_btn_state_t st);   // IDLE, PRESSED, ACTIVE (armed), BUSY
+
+// Lock button (padlock, right end of the model row): sleeps the screen.
+bool app_ui_lock_hit(int x, int y);
+void app_ui_lock_state(app_btn_state_t st);
 
 // Battery percentage in the header (0..100; -1 = unknown) with a bolt while
 // charging. Redraws only on change.

@@ -241,7 +241,10 @@ static void dispatch(const char *line)
     } else if (!strcmp(line, "models") || !strncmp(line, "model ", 6)) {
         // "models" lists; "model <n>" selects (same as tapping it on /model).
         models_scan();
-        if (line[5] == ' ') models_select(atoi(line + 6));
+        if (line[5] == ' ') {
+            models_select(atoi(line + 6));
+            app_ui_model_changed();
+        }
         for (int i = 0; i < models_count(); i++)
             printf("MODEL %d %c %s (%s)\n", i, i == models_active() ? '*' : ' ', models_get(i)->name,
                    models_get(i)->dir);
@@ -249,6 +252,10 @@ static void dispatch(const char *line)
         printf("OK\n");
     } else if (!strncmp(line, "llmdir ", 7)) {
         think_set_model_dir(line + 7);
+        // Keep the header row honest when the path is a known model.
+        for (int i = 0; i < models_count(); i++)
+            if (!strcmp(models_get(i)->dir, think_model_dir())) models_select(i);
+        app_ui_model_changed();
         printf("LLM dir %s\n", think_model_dir());
         printf("OK\n");
     } else if (!strncmp(line, "sessionplay ", 12)) {
@@ -313,6 +320,9 @@ static void dispatch(const char *line)
         if (sscanf(line + 4, "%d %d", &x, &y) == 2) touch_ui_sim_tap(x, y);
         printf("PREFS vol %d bright %d screen %u wake %d\n", prefs()->volume, prefs()->brightness,
                prefs()->screen_s, prefs()->wake);
+        printf("OK\n");
+    } else if (!strncmp(line, "wakemon ", 8)) {
+        wake_set_monitor(line[8] == 'o' && line[9] == 'n');
         printf("OK\n");
     } else if (!strcmp(line, "bat")) {
         int mv = board_battery_mv();

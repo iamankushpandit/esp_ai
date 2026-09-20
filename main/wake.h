@@ -19,3 +19,6 @@ bool wake_start(wake_cb_t cb);
 void wake_stop(void);
 bool wake_running(void);
 const char *wake_model_name(void);
+// Diagnostic ("wakemon on"): logs the mic's peak level once a second while
+// listening, to tell a deaf mic from a phrase the detector simply missed.
+void wake_set_monitor(bool on);

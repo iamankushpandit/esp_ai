@@ -42,16 +42,38 @@ bool wake_init(void)
 const char *wake_model_name(void) { return s_name ? s_name : "none"; }
 bool wake_running(void) { return s_task != NULL; }
 
+static volatile bool s_monitor;
+void wake_set_monitor(bool on) { s_monitor = on; }
+
 static void wake_task(void *arg)
 {
     (void)arg;
     int chunk = s_wn->get_samp_chunksize(s_data);
     int16_t *buf = heap_caps_malloc((size_t)chunk * sizeof(int16_t), MALLOC_CAP_INTERNAL);
     board_mic_start();
+    int64_t mon_t0 = 0;
+    int mon_peak = 0, mon_chunks = 0;
     while (s_run && buf) {
         size_t got = 0;
         while (got < (size_t)chunk && s_run) got += board_mic_read(buf + got, (size_t)chunk - got, 100);
         if (!s_run) break;
+        if (s_monitor) {
+            // "wakemon on": is the detector actually hearing anything? Peak
+            // level per second, so a silent or dead mic is obvious.
+            for (int i = 0; i < chunk; i++) {
+                int a = buf[i] < 0 ? -buf[i] : buf[i];
+                if (a > mon_peak) mon_peak = a;
+            }
+            mon_chunks++;
+            int64_t now = story_time_us();
+            if (!mon_t0) mon_t0 = now;
+            else if (now - mon_t0 >= 1000000) {
+                ESP_LOGI(TAG, "mic peak %5d (%2d%% of full scale) over %d chunks", mon_peak,
+                         mon_peak * 100 / 32768, mon_chunks);
+                mon_t0 = now;
+                mon_peak = mon_chunks = 0;
+            }
+        }
         if (s_wn->detect(s_data, buf) == WAKENET_DETECTED) {
             ESP_LOGI(TAG, "wake word detected: \"%s\"", WAKE_PHRASE);
             s_run = false;

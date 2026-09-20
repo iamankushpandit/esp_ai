@@ -13,7 +13,7 @@
 static model_info_t s_m[3] = {
     {"/sd/story/llm", "TinyTalk 3M", 2363073},
     {"/sd/story/llm8m", "TinyTalk 2 8M", 5953257},
-    {"/sd/story/llm8m_kid", "TinyTalk 2 8M (kid+Gume)", 6710021},
+    {"/sd/story/llm8m_v6", "TinyTalk 2 8M v6 (Braino kid)", 6710021},
 };
 static int s_act = 2;
 int models_count(void) { return 3; }
@@ -157,5 +157,9 @@ int main(int argc, char **argv)
     STEP("new text while scrolled (no jump)", app_ui_llm_progress("Once upon a time, there was a big, strong cat. The cat saw a little mouse. They became good friends. Bye bye!", 14, 35, 6.4f));
     STEP("scroll back to bottom", app_ui_scroll_begin(); app_ui_scroll_drag(-40 * UI_ROW_H));
     STEP("session end", app_ui_status("Session ended", UI_GREY); app_ui_busy(false));
+    STEP("sleep (lock button)", app_ui_sleep_enter());
+    dump();
+    STEP("wake from sleep", app_ui_sleep_exit());
+    dump();
     return 0;
 }

@@ -25,8 +25,17 @@ static SemaphoreHandle_t s_ask;
 static volatile bool s_screen = true;
 static volatile int64_t s_activity;
 
+// Asleep the screen is not blank: the logo drifts through colours at low
+// brightness for SLEEP_SHOW_US, then the backlight goes off for good (a
+// locked device on battery must not burn current on a screensaver).
+#define SLEEP_BRIGHT 20
+#define SLEEP_SHOW_US 60000000
+static int64_t s_sleep_since;
+static bool s_sleep_dark;
+
 void screen_on(void)
 {
+    app_ui_sleep_exit();
     board_backlight(prefs()->brightness);
     s_screen = true;
     s_activity = story_time_us();
@@ -34,7 +43,11 @@ void screen_on(void)
 
 void screen_off(void)
 {
-    board_backlight(0);
+    app_ui_sleep_enter();
+    int b = prefs()->brightness < SLEEP_BRIGHT ? prefs()->brightness : SLEEP_BRIGHT;
+    board_backlight((uint8_t)b);
+    s_sleep_since = story_time_us();
+    s_sleep_dark = false;
     s_screen = false;
 }
 
@@ -53,7 +66,7 @@ bool touch_ui_wait_ask(uint32_t timeout_ms)
     return xSemaphoreTake(s_ask, pdMS_TO_TICKS(timeout_ms)) == pdTRUE;
 }
 
-typedef enum { G_NONE, G_WAKE, G_BAR, G_RESTART, G_PAGE_MAYBE, G_SCROLL, G_OTHER } gesture_t;
+typedef enum { G_NONE, G_WAKE, G_BAR, G_RESTART, G_LOCK, G_PAGE_MAYBE, G_SCROLL, G_OTHER } gesture_t;
 
 // Restart button: the first tap arms it (pink + prompt), a second tap
 // within 3 s restarts; otherwise it disarms on its own.
@@ -253,6 +266,7 @@ static void page_tap(int x, int y)
             char st[48];
             snprintf(st, sizeof st, "Model: %s", models_get(tag)->name);
             app_ui_status(st, UI_OK);
+            app_ui_model_changed();
             app_ui_refresh_page();
         }
     }
@@ -277,6 +291,9 @@ static void touch_task(void *arg)
             } else if (app_ui_restart_hit(x, y)) {
                 g = app_ui_is_busy() ? G_OTHER : G_RESTART;  // ignored during a session
                 if (g == G_RESTART) app_ui_restart_state(BTN_PRESSED);
+            } else if (app_ui_lock_hit(x, y)) {
+                g = app_ui_is_busy() ? G_OTHER : G_LOCK;     // ignored during a session
+                if (g == G_LOCK) app_ui_lock_state(BTN_PRESSED);
             } else if ((bar = app_ui_bar_hit(x, y)) >= 0) {
                 // While busy only the Ask pill works: it is the Stop button.
                 g = app_ui_is_busy() && bar != BAR_ASK ? G_OTHER : G_BAR;
@@ -303,6 +320,9 @@ static void touch_task(void *arg)
                 bar_action(bar);
             } else if (g == G_RESTART) {
                 restart_tap();
+            } else if (g == G_LOCK) {
+                app_ui_lock_state(BTN_IDLE);
+                screen_off();                               // sleep now, don't wait for the timeout
             } else if (g == G_PAGE_MAYBE) {
                 page_tap(x0, y0);                           // a tap, not a drag
             }
@@ -310,6 +330,10 @@ static void touch_task(void *arg)
         }
         down = t;
         restart_expire();
+        if (!s_screen && !s_sleep_dark) {                   // sleeping: drift the logo, then go dark
+            if (story_time_us() - s_sleep_since < SLEEP_SHOW_US) app_ui_sleep_tick();
+            else { board_backlight(0); s_sleep_dark = true; }
+        }
         app_ui_tick();                                      // spark pulse + spinner while the AI works
         if (battery_poll(app_ui_is_busy())) {               // charger connected: wake up
             if (!s_screen) screen_on();
