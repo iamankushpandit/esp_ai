@@ -182,6 +182,16 @@ category coverage. Raising paraphrases per fact (14 → 20) is under test.
 The corpus uses **4,496 of 50,257 tokens (8.9%)**; 4,398 tokens cover 99.99%
 of occurrences. Roughly 46,000 embedding rows are dead weight.
 
+> **Correction.** The recommendation below was wrong, and is superseded by
+> `docs/DEPLOYMENT_ANALYSIS.md` §4. It counted *total parameters* and concluded
+> the on-device footprint was unchanged. The binding constraint is **dense
+> weights resident in PSRAM** plus the compute they imply per token: a 17.78M
+> body is 8.89 MB at Q4 against a 5.8 MB budget, and ~32× the per-token compute
+> of a known-working device model. The 4,096-token vocabulary is still the right
+> call, but because the output head is bandwidth-bound (~212 ms of reads per
+> token at 50,257 tokens, ~17 ms at 4,096) — not because it frees parameters for
+> a larger body. The paragraph is kept as written so the error is legible.
+
 At the same ~19.3M footprint, a 4,096-token vocabulary with hidden size 384
 and 10 layers yields a **17.78M-parameter body — 2.6× larger**:
 
