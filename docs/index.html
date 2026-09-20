@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ivy AI — an offline voice assistant on a microcontroller</title>
+<meta name="description" content="Ivy AI listens, thinks and speaks entirely on an ESP32-S3: wake word, speech recognition, a 19.7M-parameter language model and text to speech, with no network.">
+<link rel="icon" href="ivy_leaf.svg">
+<meta property="og:title" content="Ivy AI — an offline voice assistant on a microcontroller">
+<meta property="og:description" content="Wake word, speech recognition, a 19.7M-parameter language model and speech synthesis, all on an $20 ESP32-S3. No network, no server, no phone.">
+<meta property="og:image" content="ui_strip.png">
+<style>
+  :root {
+    --pink: #f4c2c2;
+    --pink-dim: #c98b94;
+    --bg: #0a0a0c;
+    --panel: #141417;
+    --line: #26262b;
+    --fg: #ececf0;
+    --muted: #9a9aa4;
+    --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Inter, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg);
+    font-family: var(--sans); font-size: 17px; line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
+  a { color: var(--pink); }
+  h1, h2, h3 { line-height: 1.2; letter-spacing: -0.02em; }
+  h2 { font-size: clamp(1.4rem, 3.4vw, 1.9rem); margin: 0 0 6px; }
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  .lede { color: var(--muted); margin: 0 0 28px; max-width: 62ch; }
+
+  /* hero */
+  header { padding: 68px 0 44px; text-align: center; }
+  header img.logo { width: 132px; height: auto; display: block; margin: 0 auto 18px; }
+  header h1 { font-size: clamp(2.2rem, 7vw, 3.6rem); margin: 0 0 12px; }
+  header h1 .ai { color: var(--pink); }
+  .tag { font-size: clamp(1.02rem, 2.6vw, 1.22rem); color: var(--fg); max-width: 40ch; margin: 0 auto 8px; }
+  .sub { color: var(--muted); max-width: 52ch; margin: 0 auto 26px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 11px 20px; border-radius: 999px; text-decoration: none;
+    font-weight: 600; font-size: 0.95rem; border: 1px solid var(--line); color: var(--fg);
+    background: var(--panel);
+  }
+  .btn.primary { background: var(--pink); color: #17070a; border-color: var(--pink); }
+  .btn:hover { border-color: var(--pink); }
+
+  .chips { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin: 26px 0 0; }
+  .chip {
+    font-family: var(--mono); font-size: 0.76rem; color: var(--pink-dim);
+    border: 1px solid var(--line); border-radius: 999px; padding: 4px 11px;
+  }
+
+  /* screenshots */
+  .shots { margin: 0 0 8px; }
+  .shots img { width: 100%; height: auto; border-radius: 10px; display: block; }
+  figcaption { color: var(--muted); font-size: 0.85rem; text-align: center; margin-top: 10px; }
+
+  /* pipeline */
+  .pipe {
+    font-family: var(--mono); font-size: 0.84rem; background: var(--panel);
+    border: 1px solid var(--line); border-radius: 10px; padding: 16px;
+    overflow-x: auto; white-space: pre; color: var(--pink-dim); margin: 0;
+  }
+
+  /* grid of cards */
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 18px 18px 16px; }
+  .card h3 { margin: 0 0 6px; font-size: 1rem; color: var(--pink); }
+  .card p { margin: 0; color: var(--muted); font-size: 0.93rem; }
+
+  /* tables */
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; }
+  th, td { text-align: left; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+  th { color: var(--muted); font-weight: 600; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  td.num, th.num { text-align: right; font-family: var(--mono); white-space: nowrap; }
+  tr.hi td { color: var(--pink); }
+
+  code { font-family: var(--mono); font-size: 0.9em; background: var(--panel);
+         border: 1px solid var(--line); border-radius: 5px; padding: 1px 5px; }
+  pre.code { font-family: var(--mono); font-size: 0.85rem; background: var(--panel);
+             border: 1px solid var(--line); border-radius: 10px; padding: 16px; overflow-x: auto; }
+  pre.code code { background: none; border: 0; padding: 0; }
+
+  ul.plain { padding-left: 1.1em; color: var(--muted); }
+  ul.plain li { margin-bottom: 8px; }
+  ul.plain strong { color: var(--fg); font-weight: 600; }
+
+  footer { border-top: 1px solid var(--line); padding: 34px 0 54px; color: var(--muted); font-size: 0.88rem; }
+  footer a { color: var(--pink-dim); }
+
+  @media (max-width: 560px) {
+    body { font-size: 16px; }
+    section { padding: 44px 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <img class="logo" src="ivy_leaf.svg" alt="The Ivy AI mark: a pink ivy leaf with circuit traces">
+    <h1>Ivy <span class="ai">AI</span></h1>
+    <p class="tag">A voice assistant that listens, thinks and speaks entirely on a microcontroller.</p>
+    <p class="sub">No network. No server. No phone. Say &ldquo;Hey Ivy&rdquo;, ask a question, and a $20 ESP32-S3
+      transcribes your speech, runs a language model and answers out loud &mdash; on the chip.</p>
+    <div class="cta">
+      <a class="btn primary" href="https://github.com/iamankushpandit/esp_ai">View on GitHub</a>
+      <a class="btn" href="#how">How it works</a>
+      <a class="btn" href="#numbers">The numbers</a>
+    </div>
+    <div class="chips">
+      <span class="chip">ESP32-S3 &middot; 8 MB PSRAM</span>
+      <span class="chip">19.7M params, 4-bit</span>
+      <span class="chip">fully offline</span>
+      <span class="chip">ESP-IDF v6.1 &middot; C</span>
+    </div>
+  </div>
+</header>
+
+<section>
+  <div class="wrap">
+    <figure class="shots">
+      <img src="ui_strip.png" alt="Four screens: the welcome screen, a chat with answers, the T9 keypad, and the sleeping logo">
+      <figcaption>The 240&times;320 screen: ask by voice or type, answers marked by who produced them, and a sleeping logo that drifts through colours.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section id="how">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="lede">Four stages, each on the device. Wi-Fi is used for exactly one thing: setting the clock.</p>
+    <pre class="pipe"> mic &rarr; [LISTEN: energy VAD] &rarr; [TRANSCRIBE: conformer CTC]
+     &rarr; [THINK: 19.7M-parameter LLM, 4-bit] &rarr; [SPEAK: SVOX Pico] &rarr; speaker</pre>
+    <div class="grid" style="margin-top:18px">
+      <div class="card">
+        <h3>Hears you</h3>
+        <p>WakeNet9 listens for &ldquo;Hey Ivy&rdquo; even while asleep. A conformer CTC model then transcribes
+          open-vocabulary English, streamed from the SD card.</p>
+      </div>
+      <div class="card">
+        <h3>Thinks on-chip</h3>
+        <p>TinyTalk 2 8M &mdash; 19.7M parameters at 4 bits &mdash; or any llama.cpp <strong>GGUF</strong> file
+          you drop on the card.</p>
+      </div>
+      <div class="card">
+        <h3>Speaks back</h3>
+        <p>SVOX Pico synthesises 16 kHz audio through the onboard codec and speaker, with adjustable voice gain.</p>
+      </div>
+      <div class="card">
+        <h3>Knows when not to guess</h3>
+        <p>Time, date, timers and identity are answered by plain C, not the model &mdash; and the screen says
+          which answered.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="numbers">
+  <div class="wrap">
+    <h2>Measured, not estimated</h2>
+    <p class="lede">Every figure below was taken on the physical board, not calculated.</p>
+    <table>
+      <thead>
+        <tr><th>Model</th><th class="num">Size</th><th class="num">Speed</th><th>What it&rsquo;s for</th></tr>
+      </thead>
+      <tbody>
+        <tr class="hi"><td>TinyTalk 2 8M v7</td><td class="num">6.5 MB</td><td class="num">5.9 tok/s</td><td>answering questions</td></tr>
+        <tr><td>delphi 6.4m (GGUF)</td><td class="num">3.8 MB</td><td class="num">7.3 tok/s</td><td>storytelling</td></tr>
+        <tr><td>stories15M (GGUF)</td><td class="num">5.5 MB</td><td class="num">7.3 tok/s</td><td>storytelling</td></tr>
+        <tr><td>stories260K (GGUF)</td><td class="num">1.1 MB</td><td class="num">30 tok/s</td><td>raw speed</td></tr>
+      </tbody>
+    </table>
+    <p class="lede" style="margin-top:22px">Speed is memory-bound &mdash; every token reads every weight &mdash; so
+      halving the model roughly doubles the rate. Getting a 6.5 MB model to run at all takes 4-bit weights with
+      int8 activations, a hand-written ESP32-S3 SIMD kernel, and the matrix work split across both cores.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>The hard part: memory</h2>
+    <p class="lede">The board has 8 MB of PSRAM. Speech recognition wants 5.4 MB and the language model wants
+      6.5 MB, which does not fit &mdash; until they stop overlapping.</p>
+    <ul class="plain">
+      <li><strong>Two arenas, reserved at boot</strong> (7 MB PSRAM and ~145 KB of internal, DMA-capable RAM)
+        before any driver can fragment them.</li>
+      <li><strong>One phase owns everything, then gives it back.</strong> Listening, transcribing, thinking and
+        speaking never hold memory at the same time.</li>
+      <li><strong>Every transition is logged</strong> &mdash; free bytes, largest block, minimum ever seen.</li>
+      <li><strong>Failures are loud.</strong> An allocation that doesn&rsquo;t fit says so on screen instead of
+        silently degrading.</li>
+    </ul>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Try it</h2>
+    <pre class="code"><code># build and flash
+powershell -File tools/idf.ps1 -p COM22 flash
+
+# put the models, speech data and voices on the SD card
+python tools/sd_put.py --manifest
+
+# ask it something over the serial console
+python tools/serial_cmd.py "ask what is half of twelve"</code></pre>
+    <p class="lede" style="margin-top:18px">The UI, the memory arenas and the language models all build and run on
+      a PC too, so most of the work needs no hardware at all.</p>
+    <div class="cta" style="justify-content:flex-start">
+      <a class="btn" href="https://github.com/iamankushpandit/esp_ai#readme">README</a>
+      <a class="btn" href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/MODELS.md">Choosing &amp; training models</a>
+      <a class="btn" href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/GGUF.md">Running GGUF files</a>
+      <a class="btn" href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/MEMORY_BUDGET.md">Memory budget</a>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>What it can&rsquo;t do</h2>
+    <p class="lede">Worth saying plainly, because a 19.7M-parameter model is small.</p>
+    <ul class="plain">
+      <li>It answers <strong>100% correctly on a wording it was trained on and 42.5% on a rephrasing</strong>.
+        The knowledge is in there; the phrasings are not.</li>
+      <li>Speech recognition is slower than real time &mdash; a spoken turn takes several seconds end to end.</li>
+      <li>Answers come from a tiny model. They can be wrong, and the device says so on its own About page.</li>
+    </ul>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <p>Built on a Freenove FNK0104B (ESP32-S3R8) with ESP-IDF v6.1.
+      Speech recognition, speech synthesis and the language-model engine are open source; see the repository for
+      licences.</p>
+    <p>(C) iamankushpandit &middot; <a href="https://github.com/iamankushpandit/esp_ai">github.com/iamankushpandit/esp_ai</a></p>
+  </div>
+</footer>
+
+</body>
+</html>
