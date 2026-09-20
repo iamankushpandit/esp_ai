@@ -1,0 +1,752 @@
+=== GPU free, building v8 ===
+=== 1/6 Gume's own tables (ground truth, full parity) ===
+game               facts    train    eval
+math               13634    77159   13634
+elements             893     2977     893
+roman                957     2907     957
+grewords             750     2500     750
+flags                644     2399     644
+sort                 500     1500     500
+money                446     1343     446
+fractions            259      780     259
+time                 188      561     188
+trace/cursive        143      500     143
+states               102      357     102
+multiply              44      176      44
+space                 41      159      41
+percent               42      126      42
+shapearith            32       96      32
+numberline            31       92      31
+shapecolor            27       81      27
+fingers               15       45      15
+chess                 17       42      17
+dice                  14       38      14
+piano                 14       35      14
+colormix               8       32       8
+ludo                   8       18       8
+go                     8       17       8
+backgammon             8       17       8
+coinflip               5       11       5
+tictactoe              4        9       4
+seabattle              4        9       4
+microku                2        5       2
+memory                 1        3       1
+cinnamon               1        2       1
+slide                  1        2       1
+TOTAL              18843    93998   18843
+dropped 3366 phrasings already in gen_kid_data.py, 1 ambiguous questions
+wrote /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v8/gume/gume_train.txt and /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v8/gume/gume_eval.jsonl
+=== 2/6 spelling: 356 words, space-separated letters ===
+356 words  4272 train samples  712 eval questions
+wrote spelling_train.txt and spelling_eval.jsonl
+=== 3/6 arithmetic, worked steps, held-out operand PAIRS ===
+1782 pairs (356 held out)  9083 train samples
+  2957 eval questions on unseen pairs, 2852 on seen pairs
+wrote math_v8_train.txt, math_v8_eval.jsonl, math_v8_eval_seen.jsonl
+=== 3b/6 fractions and percentages, every fact enumerated ===
+156 fraction facts + 95 percent facts = 251
+  1255 train samples, 502 held-out questions
+  every answer verified against its computed value
+wrote fracpct_train.txt and fracpct_eval.jsonl
+=== 4/6 phrasing augmentation on the Gume facts ===
+18602 facts
+  train questions 93998 -> 370336 (5.1 -> 19.9 per fact)
+  eval questions  18843 -> 38361 (reserved wordings)
+wrote gume_aug_train.txt and gume_aug_eval.jsonl
+=== 5/6 curated facts + contrastive out-of-scope refusals ===
+1211 facts from 10 modules
+   language         308
+   mathconcepts     246
+   numbers          152
+   world            141
+   science_life     110
+   science_matter    60
+   games_board       56
+   games_play        54
+   science_space     52
+   outofscope        32
+combined validation: clean
+
+wrote /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v8/braino_train.txt  32338 samples, 5.2 MB
+wrote /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v8/braino_eval.jsonl  3633 held-out questions
+26.7 questions per fact, 0 train/eval overlap
+
+topics, smallest first (the thin ones are where accuracy dies):
+   sliding puzzle               66
+   backgammon                   66
+   ludo                         66
+   cinnamon game                88
+   mazes                        88
+   battleship                   88
+   tic tac toe                  88
+   go                           88
+   memory game                  88
+   counting on hands           110
+   reaction game               110
+   odd one out                 110
+   chance                      110
+   dice & chance               198
+   plants & nature             264
+   weather                     308
+   cursive writing             352
+   colors                      374
+   chemistry                   418
+   number line                 440
+   ordering numbers            462
+   music                       462
+   adding objects              462
+   shapes                      528
+   sudoku & logic              528
+   multiplication              528
+   the body                    550
+   counting                    550
+   chess                       594
+   about me                    726
+   percentages                 748
+   fractions                   792
+   handwriting & spelling      814
+   arithmetic                  902
+   money                       924
+   telling time               1056
+   space                      1144
+   animals                    1298
+   roman numerals             1364
+   vocabulary                 2200
+   jokes & fun                2684
+   world geography            3102
+   out of scope               6400
+=== 6/6 floor-balance so small fields are actually trained ===
+category                 before    after   note
+----------------------------------------------------------------
+arithmetic 2-digit       253162   253162   kept
+other                     45647    45647   kept
+roman numerals            19866    19866   kept
+geography                 14485    14485   kept
+word problems             12000    12000   kept
+comparisons               10661    10661   kept
+periodic table             9095     9095   kept
+arithmetic small           8160     8160   kept
+money                      7769     7769   kept
+vocabulary                 5802     5802   kept
+spelling                   5787     5787   kept
+part of speech             5052     5052   kept
+time & calendar            4073     4073   kept
+science & nature           3089     4000   repeat x1
+community & safety         2646     4000   repeat x1
+space                      2377     4000   repeat x1
+colors & shapes            2204     4000   repeat x1
+animals                    1789     4000   repeat x2
+sentence w/ word           1659     4000   repeat x2
+letters & phonics          1139     4000   repeat x3
+body                        822     4000   repeat x4
+----------------------------------------------------------------
+TOTAL                    417284   433559
+wrote /private/tmp/claude-501/-Users-ankushpandit-esp-ai/9d6c0eed-639d-4555-bef2-601662424f8b/scratchpad/v8/v8_train.txt
+=== training ===
+[+] base training/story_kid_bundle/.refs/cardputer-ai/data/chat_model_8m: 19.7M params, device mps
+[+] v8_train.txt: 433559 samples
+[+] kid 433559 + replay 8000 samples -> 102303 blocks (13.09M tokens, 49% in loss)
+[+] before: held-out exact 0.0%  key 0.0% (100 q)
+    step 100/15990 loss 1.316 lr 1.5e-04 16.8K tok/s, eta 128.8 min
+    step 200/15990 loss 0.999 lr 3.0e-04 16.9K tok/s, eta 127.6 min
+    step 300/15990 loss 0.773 lr 3.0e-04 16.9K tok/s, eta 126.8 min
+    step 400/15990 loss 0.578 lr 3.0e-04 16.9K tok/s, eta 126.1 min
+    step 500/15990 loss 0.477 lr 3.0e-04 16.9K tok/s, eta 125.2 min
+    step 600/15990 loss 0.493 lr 3.0e-04 16.9K tok/s, eta 124.3 min
+    step 700/15990 loss 0.286 lr 3.0e-04 16.9K tok/s, eta 123.5 min
+    step 800/15990 loss 0.280 lr 3.0e-04 16.9K tok/s, eta 122.6 min
+    step 900/15990 loss 0.412 lr 3.0e-04 16.9K tok/s, eta 121.7 min
+    step 1000/15990 loss 0.366 lr 3.0e-04 16.9K tok/s, eta 120.8 min
+    step 1100/15990 loss 0.255 lr 3.0e-04 16.9K tok/s, eta 120.0 min
+    step 1200/15990 loss 0.226 lr 3.0e-04 16.9K tok/s, eta 119.2 min
+    step 1300/15990 loss 0.329 lr 3.0e-04 16.9K tok/s, eta 118.3 min
+    step 1400/15990 loss 0.360 lr 3.0e-04 16.9K tok/s, eta 117.5 min
+    step 1500/15990 loss 0.251 lr 3.0e-04 16.9K tok/s, eta 116.7 min
+[+] epoch 1: held-out exact 35.1%  key 41.1% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> Thirty-two minus twenty is twelve.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      OK  hi story if you take thirty four away from thirty seven what is left -> Thirty-seven minus thirty-four is three.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      OK  hey story how much change from one dollar when the price is fifty eight cents can you help -> Your change is forty-two cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep1
+    step 1600/15990 loss 0.246 lr 2.9e-04 16.2K tok/s, eta 120.9 min
+    step 1700/15990 loss 0.213 lr 2.9e-04 16.3K tok/s, eta 119.8 min
+    step 1800/15990 loss 0.212 lr 2.9e-04 16.3K tok/s, eta 118.6 min
+    step 1900/15990 loss 0.214 lr 2.9e-04 16.4K tok/s, eta 117.6 min
+    step 2000/15990 loss 0.175 lr 2.9e-04 16.4K tok/s, eta 116.5 min
+    step 2100/15990 loss 0.166 lr 2.9e-04 16.4K tok/s, eta 115.5 min
+    step 2200/15990 loss 0.304 lr 2.9e-04 16.5K tok/s, eta 114.5 min
+    step 2300/15990 loss 0.288 lr 2.9e-04 16.5K tok/s, eta 113.5 min
+    step 2400/15990 loss 0.226 lr 2.9e-04 16.5K tok/s, eta 112.5 min
+    step 2500/15990 loss 0.321 lr 2.9e-04 16.5K tok/s, eta 111.5 min
+    step 2600/15990 loss 0.234 lr 2.8e-04 16.5K tok/s, eta 110.6 min
+    step 2700/15990 loss 0.150 lr 2.8e-04 16.6K tok/s, eta 109.6 min
+    step 2800/15990 loss 0.252 lr 2.8e-04 16.6K tok/s, eta 108.7 min
+    step 2900/15990 loss 0.240 lr 2.8e-04 16.6K tok/s, eta 107.8 min
+    step 3000/15990 loss 0.291 lr 2.8e-04 16.6K tok/s, eta 106.9 min
+    step 3100/15990 loss 0.286 lr 2.8e-04 16.6K tok/s, eta 106.0 min
+[+] epoch 2: held-out exact 47.4%  key 52.1% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> Thirty-two minus eleven is nineteen.
+      XX  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Iris has fifty-three more crayons than ninety-three.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-seven is seven.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      OK  hey story how much change from one dollar when the price is fifty eight cents can you help -> Your change is forty-two cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep2
+    step 3200/15990 loss 0.243 lr 2.7e-04 16.3K tok/s, eta 107.4 min
+    step 3300/15990 loss 0.126 lr 2.7e-04 16.3K tok/s, eta 106.4 min
+    step 3400/15990 loss 0.260 lr 2.7e-04 16.3K tok/s, eta 105.4 min
+    step 3500/15990 loss 0.182 lr 2.7e-04 16.3K tok/s, eta 104.4 min
+    step 3600/15990 loss 0.161 lr 2.7e-04 16.3K tok/s, eta 103.5 min
+    step 3700/15990 loss 0.136 lr 2.7e-04 16.4K tok/s, eta 102.5 min
+    step 3800/15990 loss 0.139 lr 2.6e-04 16.4K tok/s, eta 101.6 min
+    step 3900/15990 loss 0.150 lr 2.6e-04 16.4K tok/s, eta 100.7 min
+    step 4000/15990 loss 0.153 lr 2.6e-04 16.4K tok/s, eta 99.8 min
+    step 4100/15990 loss 0.253 lr 2.6e-04 16.4K tok/s, eta 98.8 min
+    step 4200/15990 loss 0.121 lr 2.6e-04 16.4K tok/s, eta 97.9 min
+    step 4300/15990 loss 0.209 lr 2.5e-04 16.4K tok/s, eta 97.0 min
+    step 4400/15990 loss 0.207 lr 2.5e-04 16.5K tok/s, eta 96.1 min
+    step 4500/15990 loss 0.218 lr 2.5e-04 16.5K tok/s, eta 95.2 min
+    step 4600/15990 loss 0.140 lr 2.5e-04 16.5K tok/s, eta 94.4 min
+    step 4700/15990 loss 0.189 lr 2.5e-04 16.5K tok/s, eta 93.5 min
+[+] epoch 3: held-out exact 50.6%  key 55.4% (399 q)
+      OK  help me with this one if you take eleven away from thirty two what is left i really want to know -> Thirty-two minus eleven is twenty-one.
+      XX  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Iris picked one hundred and thirty-five stickers in all.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-seven is one.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      OK  hey story how much change from one dollar when the price is fifty eight cents can you help -> Your change is forty-two cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep3
+    step 4800/15990 loss 0.155 lr 2.4e-04 16.3K tok/s, eta 93.9 min
+    step 4900/15990 loss 0.092 lr 2.4e-04 16.3K tok/s, eta 93.0 min
+    step 5000/15990 loss 0.172 lr 2.4e-04 16.3K tok/s, eta 92.1 min
+    step 5100/15990 loss 0.199 lr 2.4e-04 16.3K tok/s, eta 91.1 min
+    step 5200/15990 loss 0.115 lr 2.3e-04 16.3K tok/s, eta 90.2 min
+    step 5300/15990 loss 0.160 lr 2.3e-04 16.3K tok/s, eta 89.3 min
+    step 5400/15990 loss 0.149 lr 2.3e-04 16.3K tok/s, eta 88.4 min
+    step 5500/15990 loss 0.142 lr 2.3e-04 16.4K tok/s, eta 87.5 min
+    step 5600/15990 loss 0.137 lr 2.2e-04 16.4K tok/s, eta 86.6 min
+    step 5700/15990 loss 0.102 lr 2.2e-04 16.4K tok/s, eta 85.8 min
+    step 5800/15990 loss 0.135 lr 2.2e-04 16.4K tok/s, eta 84.9 min
+    step 5900/15990 loss 0.098 lr 2.2e-04 16.4K tok/s, eta 84.0 min
+    step 6000/15990 loss 0.248 lr 2.1e-04 16.4K tok/s, eta 83.1 min
+    step 6100/15990 loss 0.124 lr 2.1e-04 16.4K tok/s, eta 82.2 min
+    step 6200/15990 loss 0.082 lr 2.1e-04 16.4K tok/s, eta 81.3 min
+    step 6300/15990 loss 0.210 lr 2.1e-04 16.4K tok/s, eta 80.5 min
+[+] epoch 4: held-out exact 49.9%  key 53.4% (399 q)
+      OK  help me with this one if you take eleven away from thirty two what is left i really want to know -> Thirty-two minus eleven is twenty-one.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-seven minus thirty-four is two.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      OK  hey story how much change from one dollar when the price is fifty eight cents can you help -> Your change is forty-two cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep4
+    step 6400/15990 loss 0.171 lr 2.0e-04 16.3K tok/s, eta 80.4 min
+    step 6500/15990 loss 0.094 lr 2.0e-04 16.3K tok/s, eta 79.5 min
+    step 6600/15990 loss 0.092 lr 2.0e-04 16.3K tok/s, eta 78.6 min
+    step 6700/15990 loss 0.153 lr 1.9e-04 16.3K tok/s, eta 77.8 min
+    step 6800/15990 loss 0.123 lr 1.9e-04 16.3K tok/s, eta 76.9 min
+    step 6900/15990 loss 0.137 lr 1.9e-04 16.3K tok/s, eta 76.0 min
+    step 7000/15990 loss 0.100 lr 1.9e-04 16.3K tok/s, eta 75.1 min
+    step 7100/15990 loss 0.122 lr 1.8e-04 16.4K tok/s, eta 74.2 min
+    step 7200/15990 loss 0.144 lr 1.8e-04 16.4K tok/s, eta 73.4 min
+    step 7300/15990 loss 0.101 lr 1.8e-04 16.4K tok/s, eta 72.5 min
+    step 7400/15990 loss 0.144 lr 1.8e-04 16.4K tok/s, eta 71.6 min
+    step 7500/15990 loss 0.104 lr 1.7e-04 16.4K tok/s, eta 70.7 min
+    step 7600/15990 loss 0.128 lr 1.7e-04 16.4K tok/s, eta 69.9 min
+    step 7700/15990 loss 0.144 lr 1.7e-04 16.4K tok/s, eta 69.0 min
+    step 7800/15990 loss 0.136 lr 1.6e-04 16.4K tok/s, eta 68.2 min
+    step 7900/15990 loss 0.113 lr 1.6e-04 16.4K tok/s, eta 67.3 min
+[+] epoch 5: held-out exact 60.2%  key 62.2% (399 q)
+      OK  help me with this one if you take eleven away from thirty two what is left i really want to know -> A thirty-two minus eleven is twenty-one.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-four is one.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is fifty-two cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep5
+    step 8000/15990 loss 0.110 lr 1.6e-04 16.3K tok/s, eta 67.0 min
+    step 8100/15990 loss 0.132 lr 1.5e-04 16.3K tok/s, eta 66.1 min
+    step 8200/15990 loss 0.109 lr 1.5e-04 16.3K tok/s, eta 65.2 min
+    step 8300/15990 loss 0.106 lr 1.5e-04 16.3K tok/s, eta 64.4 min
+    step 8400/15990 loss 0.113 lr 1.5e-04 16.3K tok/s, eta 63.5 min
+    step 8500/15990 loss 0.107 lr 1.4e-04 16.3K tok/s, eta 62.6 min
+    step 8600/15990 loss 0.131 lr 1.4e-04 16.3K tok/s, eta 61.8 min
+    step 8700/15990 loss 0.112 lr 1.4e-04 16.3K tok/s, eta 60.9 min
+    step 8800/15990 loss 0.099 lr 1.3e-04 16.3K tok/s, eta 60.1 min
+    step 8900/15990 loss 0.090 lr 1.3e-04 16.4K tok/s, eta 59.2 min
+    step 9000/15990 loss 0.123 lr 1.3e-04 16.4K tok/s, eta 58.3 min
+    step 9100/15990 loss 0.122 lr 1.3e-04 16.4K tok/s, eta 57.5 min
+    step 9200/15990 loss 0.110 lr 1.2e-04 16.4K tok/s, eta 56.6 min
+    step 9300/15990 loss 0.108 lr 1.2e-04 16.4K tok/s, eta 55.8 min
+    step 9400/15990 loss 0.124 lr 1.2e-04 16.4K tok/s, eta 54.9 min
+    step 9500/15990 loss 0.127 lr 1.2e-04 16.4K tok/s, eta 54.0 min
+[+] epoch 6: held-out exact 61.7%  key 66.2% (399 q)
+      OK  help me with this one if you take eleven away from thirty two what is left i really want to know -> A thirty-two minus eleven is twenty-one.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-seven is seven.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is ninety-eight cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep6
+    step 9600/15990 loss 0.097 lr 1.1e-04 16.3K tok/s, eta 53.6 min
+    step 9700/15990 loss 0.092 lr 1.1e-04 16.3K tok/s, eta 52.7 min
+    step 9800/15990 loss 0.089 lr 1.1e-04 16.3K tok/s, eta 51.9 min
+    step 9900/15990 loss 0.088 lr 1.0e-04 16.3K tok/s, eta 51.0 min
+    step 10000/15990 loss 0.062 lr 1.0e-04 16.3K tok/s, eta 50.1 min
+    step 10100/15990 loss 0.079 lr 9.9e-05 16.3K tok/s, eta 49.3 min
+    step 10200/15990 loss 0.103 lr 9.6e-05 16.3K tok/s, eta 48.4 min
+    step 10300/15990 loss 0.072 lr 9.3e-05 16.3K tok/s, eta 47.6 min
+    step 10400/15990 loss 0.088 lr 9.1e-05 16.3K tok/s, eta 46.7 min
+    step 10500/15990 loss 0.077 lr 8.8e-05 16.3K tok/s, eta 45.9 min
+    step 10600/15990 loss 0.103 lr 8.6e-05 16.3K tok/s, eta 45.0 min
+    step 10700/15990 loss 0.088 lr 8.3e-05 16.4K tok/s, eta 44.2 min
+    step 10800/15990 loss 0.083 lr 8.1e-05 16.4K tok/s, eta 43.3 min
+    step 10900/15990 loss 0.105 lr 7.8e-05 16.4K tok/s, eta 42.5 min
+    step 11000/15990 loss 0.099 lr 7.6e-05 16.4K tok/s, eta 41.6 min
+    step 11100/15990 loss 0.095 lr 7.3e-05 16.4K tok/s, eta 40.8 min
+[+] epoch 7: held-out exact 60.7%  key 63.4% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> Take ten away from twenty. Twenty minus ten is ten, and ten minus two is eight. So thirty-two minus eleven is eight.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-seven is seven.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is ninety-eight cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep7
+    step 11200/15990 loss 0.067 lr 7.1e-05 16.3K tok/s, eta 40.2 min
+    step 11300/15990 loss 0.075 lr 6.9e-05 16.3K tok/s, eta 39.3 min
+    step 11400/15990 loss 0.071 lr 6.6e-05 16.3K tok/s, eta 38.5 min
+    step 11500/15990 loss 0.079 lr 6.4e-05 16.3K tok/s, eta 37.6 min
+    step 11600/15990 loss 0.084 lr 6.2e-05 16.3K tok/s, eta 36.8 min
+    step 11700/15990 loss 0.084 lr 6.0e-05 16.3K tok/s, eta 35.9 min
+    step 11800/15990 loss 0.067 lr 5.8e-05 16.3K tok/s, eta 35.1 min
+    step 11900/15990 loss 0.064 lr 5.5e-05 16.3K tok/s, eta 34.2 min
+    step 12000/15990 loss 0.074 lr 5.3e-05 16.3K tok/s, eta 33.4 min
+    step 12100/15990 loss 0.079 lr 5.1e-05 16.3K tok/s, eta 32.5 min
+    step 12200/15990 loss 0.070 lr 4.9e-05 16.3K tok/s, eta 31.7 min
+    step 12300/15990 loss 0.069 lr 4.7e-05 16.3K tok/s, eta 30.8 min
+    step 12400/15990 loss 0.090 lr 4.5e-05 16.3K tok/s, eta 30.0 min
+    step 12500/15990 loss 0.072 lr 4.4e-05 16.4K tok/s, eta 29.1 min
+    step 12600/15990 loss 0.087 lr 4.2e-05 16.4K tok/s, eta 28.3 min
+    step 12700/15990 loss 0.052 lr 4.0e-05 16.4K tok/s, eta 27.5 min
+[+] epoch 8: held-out exact 62.7%  key 65.4% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> X I minus eleven is nine.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-four minus thirty-seven is seven.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is ninety-eight cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep8
+    step 12800/15990 loss 0.077 lr 3.8e-05 16.3K tok/s, eta 26.8 min
+    step 12900/15990 loss 0.070 lr 3.7e-05 16.3K tok/s, eta 25.9 min
+    step 13000/15990 loss 0.070 lr 3.5e-05 16.3K tok/s, eta 25.1 min
+    step 13100/15990 loss 0.050 lr 3.3e-05 16.3K tok/s, eta 24.2 min
+    step 13200/15990 loss 0.081 lr 3.2e-05 16.3K tok/s, eta 23.4 min
+    step 13300/15990 loss 0.074 lr 3.0e-05 16.3K tok/s, eta 22.5 min
+    step 13400/15990 loss 0.072 lr 2.9e-05 16.3K tok/s, eta 21.7 min
+    step 13500/15990 loss 0.096 lr 2.7e-05 16.3K tok/s, eta 20.8 min
+    step 13600/15990 loss 0.071 lr 2.6e-05 16.3K tok/s, eta 20.0 min
+    step 13700/15990 loss 0.064 lr 2.5e-05 16.3K tok/s, eta 19.2 min
+    step 13800/15990 loss 0.085 lr 2.4e-05 16.3K tok/s, eta 18.3 min
+    step 13900/15990 loss 0.070 lr 2.2e-05 16.3K tok/s, eta 17.5 min
+    step 14000/15990 loss 0.074 lr 2.1e-05 16.3K tok/s, eta 16.6 min
+    step 14100/15990 loss 0.075 lr 2.0e-05 16.3K tok/s, eta 15.8 min
+    step 14200/15990 loss 0.088 lr 1.9e-05 16.3K tok/s, eta 14.9 min
+    step 14300/15990 loss 0.065 lr 1.8e-05 16.4K tok/s, eta 14.1 min
+[+] epoch 9: held-out exact 64.7%  key 66.7% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> Ines has twenty-nine more grapes than Iris.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      OK  hi story if you take thirty four away from thirty seven what is left -> Thirty-seven minus thirty-four is three.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is fifty-eight cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep9
+    step 14400/15990 loss 0.066 lr 1.7e-05 16.3K tok/s, eta 13.3 min
+    step 14500/15990 loss 0.065 lr 1.6e-05 16.3K tok/s, eta 12.5 min
+    step 14600/15990 loss 0.061 lr 1.6e-05 16.3K tok/s, eta 11.7 min
+    step 14700/15990 loss 0.053 lr 1.5e-05 16.3K tok/s, eta 10.8 min
+    step 14800/15990 loss 0.053 lr 1.4e-05 16.3K tok/s, eta 10.0 min
+    step 14900/15990 loss 0.057 lr 1.3e-05 16.3K tok/s, eta 9.1 min
+    step 15000/15990 loss 0.066 lr 1.3e-05 16.3K tok/s, eta 8.3 min
+    step 15100/15990 loss 0.061 lr 1.2e-05 16.3K tok/s, eta 7.5 min
+    step 15200/15990 loss 0.058 lr 1.2e-05 16.3K tok/s, eta 6.6 min
+    step 15300/15990 loss 0.062 lr 1.1e-05 16.3K tok/s, eta 5.8 min
+    step 15400/15990 loss 0.069 lr 1.1e-05 16.3K tok/s, eta 4.9 min
+    step 15500/15990 loss 0.084 lr 1.1e-05 16.3K tok/s, eta 4.1 min
+    step 15600/15990 loss 0.064 lr 1.0e-05 16.3K tok/s, eta 3.3 min
+    step 15700/15990 loss 0.057 lr 1.0e-05 16.3K tok/s, eta 2.4 min
+    step 15800/15990 loss 0.073 lr 1.0e-05 16.3K tok/s, eta 1.6 min
+    step 15900/15990 loss 0.066 lr 1.0e-05 16.3K tok/s, eta 0.8 min
+[+] epoch 10: held-out exact 64.4%  key 65.9% (399 q)
+      XX  help me with this one if you take eleven away from thirty two what is left i really want to know -> Ines has twenty-nine more grapes than Iris.
+      OK  Excuse me story what do you get when you add forty two and ninety three i really want to know? -> Forty-two plus ninety-three is one hundred and thirty-five.
+      OK  hi story which is larger eighty one or forty three i really want to know -> Eighty-one is bigger than forty-three.
+      XX  hi story if you take thirty four away from thirty seven what is left -> Thirty-seven minus thirty-four is one.
+      OK  could you tell me where manila the capital of is -> Manila is the capital of the Philippines.
+      XX  hey story how much change from one dollar when the price is fifty eight cents can you help -> The price is fifty-eight cents. A dollar is one hundred cents. One hundred take away fifty-two leaves thirty-eight cents. So your change is thirty-eight cents.
+[+] wrote training/story_kid_bundle/models_out/kid/model_8m_kid_v8/ep10
+[+] restoring epoch 9 (exact 64.7%  key 66.7%) - the best, not the last
+[+] saved training/story_kid_bundle/models_out/kid/model_8m_kid_v8
+=== refusal: BOTH directions ===
+canonical refusal: 'I am not clever enough to answer that yet. I hope my makers teach me about that one day!'
+
+refusal rate   (out-of-scope, want HIGH)  43.8%  (42/96)
+over-refusal   (in-scope,     want ZERO)   2.7%  (8/300)
+
+INVENTED an answer instead of refusing:
+  Q Hi story will it be sunny tomorrow can you help?
+    -> Yes, I'll be in your car.
+  Q help me with this one what is happening in the world can you help
+    -> You can with what is and one, so you can find the way through to the other. When you count, you jumps and sixty-two are easy to count.
+  Q Help me with this one tell me the time now i really want to know?
+    -> Sure. Let me know if you need any help with anything else.
+  Q hey story what year is it now can you help
+    -> I love you too, Jill. You can always come with me every day.
+  Q Excuse me story who is winning the game?
+    -> No, we are not winning it. We are players and the other player is the same.
+  Q Help me with this one do you know who i am can you help?
+    -> I can answer questions, help you with spelling and numbers, explain what words mean, tell you jokes, and share facts about the world.
+
+REFUSED something it was taught:
+  Q what do you need to do to win a chess game
+    should have said: The aim of chess is to trap the other player's king so it cannot get away. That is called checkmate, and it wins the game.
+  Q help me with this one what do you need to do to win a chess game i really want to know
+    should have said: The aim of chess is to trap the other player's king so it cannot get away. That is called checkmate, and it wins the game.
+  Q Help me with this one what would you say is the best move after you hit a ship i really want to know?
+    should have said: Once you get a hit, guess the squares right next to it. Ships are in a straight line, so the rest of it must be beside the hit.
+  Q Excuse me story what helps you remember where cards are?
+    should have said: The trick is to remember where the cards are, even the ones that did not match. Saying the place out loud in your head really helps.
+  Q Excuse me story can you explain how sound is made i really want to know?
+    should have said: Sound happens when something shakes very fast. The shaking wobbles the air, the air wobbles your eardrum, and you hear it.
+  Q can you explain what guessing is
+    should have said: A guess is an answer you are not sure about. Guessing is fine when you cannot know, but it is better to work it out if you can.
+=== per-field accuracy, full Gume parity set ===
+model training/story_kid_bundle/models_out/kid/model_8m_kid_v8  device cpu
+
+category                 n   exact     key   pool
+------------------------------------------------------------
+arithmetic 2-digit      60   71.7%   73.3%   24572
+other                   60   30.0%   61.7%   3324
+roman numerals          60   63.3%   63.3%   2139
+geography               60   88.3%   98.3%   1744
+word problems           60   58.3%   65.0%   1250
+money                   60   56.7%   63.3%   1110
+comparisons             60   91.7%   93.3%   1014
+periodic table          60   71.7%   71.7%   950
+part of speech          60   85.0%   85.0%   500
+vocabulary              60   90.0%   90.0%   496
+arithmetic small        60    8.3%   18.3%   402
+time & calendar         60    5.0%   11.7%   264
+science & nature        60   83.3%   93.3%   180
+spelling                60   55.0%   58.3%   142
+space                   60   86.7%   88.3%   108
+colors & shapes         60   71.7%   78.3%   80
+animals                 60   13.3%   16.7%   70
+body                    10  100.0%  100.0%   10
+letters & phonics        6   66.7%   66.7%   6
+------------------------------------------------------------
+WEIGHTED              1036   61.0%   66.8%
+
+example misses
+  [arithmetic 2-digit] i have a question what do you get when you add fifty three and twenty three can you help
+      got  Adding fifty-three their names to makegreen, and more than especially wild reports that are far from the Sun.
+      want Fifty-three plus twenty-three is seventy-six.
+  [arithmetic 2-digit] i have a question what do you get when you add twenty two and fifty one can you help
+      got  Thirty-two plus fifty-one is eighty-three.
+      want Twenty-two plus fifty-one is seventy-three.
+  [other] Help me with this one i want to know how many notes are in an octave i really want to know?
+      got  There are seven note names. They are A, octagon has eight white keys, from C up to the next C.
+      want An octave has eight white keys, from C up to the next C.
+  [other] Hey story is nitrogen a metal or not?
+      got  Nitrogen is a nonmetal. Most of the air you breathe is this.
+      want Nitrogen is a nonmetal.
+  [roman numerals] excuse me story write two hundred and forty four as a roman numeral i really want to know
+      got  Two hundred and forty-four are named for each person.
+      want Two hundred and forty-four in Roman numerals is CCXLIV.
+  [roman numerals] Hey story write thirty one as a roman numeral can you help?
+      got  Thirty-one is thirty-nine.
+      want Thirty-one in Roman numerals is XXXI.
+  [geography] excuse me story which state's capital is little rock
+      got  The capital of Arkansas is Little Rock.
+      want Little Rock is the capital of Arkansas.
+  [geography] excuse me story which state's capital is atlanta
+      got  The capital of Georgia is Atlanta.
+      want Atlanta is the capital of Georgia.
+  [word problems] excuse me story if a box holds ninety seven grapes and ninety one more are added how many is that
+      got  A quarter is one hundred and eighty-eight grapes now.
+      want There are one hundred and eighty-eight grapes in all.
+  [word problems] hi story ines had eighty beads then found ninety eight more how many altogether can you help
+      got  Ines has one hundred and seventy-nine beads now.
+      want Ines has one hundred and seventy-eight beads now.
+  [money] excuse me story if i have three quarters and a penny how much money is that
+      got  Counting by fives goes five, ten, fifteen, twenty, twenty-five. The answers always end in five or zero, so they are easy to spot.
+      want Three quarters and a penny make seventy-six cents.
+  [money] hey story how much change from one dollar when the price is one cent i really want to know
+      got  The price is ninety cents. A dollar is one hundred cents. One hundred take away ninety leaves ten cents. So your change is ten cents.
+      want Your change is ninety-nine cents.
+  [comparisons] help me with this one which is larger thirty one or twenty six i really want to know
+      got  Compare the tens: ten, twenty and thirty. So from smallest to biggest they go fifteen, twenty-three, thirty-one.
+      want Thirty-one is bigger than twenty-six.
+  [comparisons] Help me with this one which is larger sixty eight or twenty?
+      got  The second is bigger than twenty.
+      want Sixty-eight is bigger than twenty.
+  [periodic table] excuse me story which element matches this clue sand glass and computer chips i really want to know
+      got  That is arsenic.
+      want That is silicon.
+  [periodic table] hi story what element uses the letters t a i really want to know
+      got  Tb is the symbol for terbium.
+      want Ta is the symbol for tantalum.
+  [part of speech] i have a question is callous an adjective
+      got  Callous means insensitive to suffering. For example: A callous disregard for the tenants.
+      want Callous is an adjective.
+  [part of speech] hey story is paragon an adjective can you help
+      got  Paragon means a model of excellence. For example: A paragon of patience with players.
+      want Paragon is a noun.
+  [vocabulary] Help me with this one can you tell me what cosmopolitan means?
+      got  Cosmopolitan is an adjective.
+      want Cosmopolitan means familiar with many cultures. For example: A cosmopolitan city of many tongues.
+  [vocabulary] Hi story can you tell me what pragmatic means can you help?
+      got  Maputo is the capital of Mozambique.
+      want Pragmatic means dealing with things practically. For example: A pragmatic fix, not an elegant one.
+  [arithmetic small] hi story if you take three away from five what is left
+      got  says bucolic scene from the scene.
+      want Five minus three is two.
+  [arithmetic small] i have a question if you take one away from sixteen what is left i really want to know
+      got  take one away so you can see how clear the minutes. hour you take the rows of ten ghosts away.
+      want Sixteen minus one is fifteen.
+  [time & calendar] Hi story big hand on eleven and little hand on one what time is that can you help?
+      got  mm, I can't remember where you're. I looked everywhere, but I couldn't find him.
+      want It is five minutes to two, or one fifty-five.
+  [time & calendar] Excuse me story big hand on ten and little hand on nine what time is that can you help?
+      got  It is quarter to eleven, or ten forty-five.
+      want It is ten minutes to ten, or nine fifty.
+  [science & nature] Excuse me story what do you know about palladium can you help?
+      got  Palladium has forty-six protons, so its atomic number is forty-six.
+      want Palladium is a transition metal. Soaks up hydrogen gas like a sponge.
+  [science & nature] Help me with this one what do you know about samarium can you help?
+      got  Samarium has sixty-two protons, so its atomic number is sixty-two.
+      want Samarium is a rare earth. Magnets that work when red hot.
+  [spelling] Help me with this one what letters are in the word cup?
+      got  There are seven letters. I is one, V is five, X is ten, L is fifty, C is one hundred, D is five hundred, and M is one thousand.
+      want Cup is spelled C, U, P.
+  [spelling] Hi story what letters are in the word use i really want to know?
+      got  Use has three letters.
+      want Use is spelled U, S, E.
+  [space] Hi story quick question which planet is called the red planet can you help?
+      got  Hi! I can't believe it.
+      want Mars. Mars looks red because its dust is full of rust, the same as an old nail.
+  [space] Excuse me story is mercury a metal or not i really want to know?
+      got  Mercury is a transition metal. The only metal that is a liquid.
+      want Mercury is a transition metal.
+  [colors & shapes] Hey story take three circles from four circles how many remain i really want to know?
+      got  No,-four There are not a coin on the counter.
+      want One circle is left.
+  [colors & shapes] help me with this one which colors do i mix to get pink
+      got  The colored paint is red because it is used to make a difference. It tells you to be more careful and kind in the future.
+      want Mix red and white to make pink.
+  [animals] i have a question if the frog is on five and hops four spaces right where is it i really want to know
+      got  The frog is in supply.
+      want You land on nine.
+  [animals] I have a question if the frog is on four and hops three spaces right where is it can you help?
+      got  That is ruthenium.
+      want You land on seven.
+  [letters & phonics] i have a question i want to know why is four i v can you help
+      got  You can When you flip it, one lap of the Sun.
+      want A smaller letter before a bigger one is taken away. IV is one before five, and IX is one before ten.
+  [letters & phonics] Hey story i want to know can you write four i's in a row can you help?
+      got  Okay, started with three letters.
+      want No. Never write four of the same letter in a row. Four is IV, not IIII.
+=== per-topic accuracy, curated topics ===
+  about me                 exact  36.0%  key  36.0%  (25 q)
+  adding objects           exact  20.0%  key  20.0%  (25 q)
+  animals                  exact  52.0%  key  52.0%  (25 q)
+  arithmetic               exact  20.0%  key  20.0%  (25 q)
+  backgammon               exact  22.2%  key  22.2%  (9 q)
+  battleship               exact   8.3%  key   8.3%  (12 q)
+  chance                   exact  46.7%  key  46.7%  (15 q)
+  chemistry                exact  52.0%  key  52.0%  (25 q)
+  chess                    exact  20.0%  key  20.0%  (25 q)
+  cinnamon game            exact  33.3%  key  33.3%  (12 q)
+  colors                   exact  72.0%  key  72.0%  (25 q)
+  counting                 exact  12.0%  key  12.0%  (25 q)
+  counting on hands        exact  66.7%  key  66.7%  (15 q)
+  cursive writing          exact  32.0%  key  32.0%  (25 q)
+  dice & chance            exact  36.0%  key  44.0%  (25 q)
+  fractions                exact  28.0%  key  28.0%  (25 q)
+  go                       exact  41.7%  key  41.7%  (12 q)
+  handwriting & spelling   exact  56.0%  key  56.0%  (25 q)
+  jokes & fun              exact 100.0%  key 100.0%  (25 q)
+  ludo                     exact  55.6%  key  55.6%  (9 q)
+  mazes                    exact  50.0%  key  50.0%  (12 q)
+  memory game              exact  41.7%  key  41.7%  (12 q)
+  money                    exact  12.0%  key  12.0%  (25 q)
+  multiplication           exact  40.0%  key  40.0%  (25 q)
+  music                    exact  64.0%  key  64.0%  (25 q)
+  number line              exact  16.0%  key  16.0%  (25 q)
+  odd one out              exact  33.3%  key  33.3%  (15 q)
+  ordering numbers         exact  28.0%  key  28.0%  (25 q)
+  out of scope             exact  68.0%  key  68.0%  (25 q)
+  percentages              exact  28.0%  key  28.0%  (25 q)
+  plants & nature          exact  56.0%  key  56.0%  (25 q)
+  reaction game            exact  46.7%  key  53.3%  (15 q)
+  roman numerals           exact   8.0%  key   8.0%  (25 q)
+  shapes                   exact  72.0%  key  72.0%  (25 q)
+  sliding puzzle           exact  22.2%  key  33.3%  (9 q)
+  space                    exact  16.0%  key  16.0%  (25 q)
+  sudoku & logic           exact  32.0%  key  32.0%  (25 q)
+  telling time             exact  12.0%  key  12.0%  (25 q)
+  the body                 exact  28.0%  key  28.0%  (25 q)
+  tic tac toe              exact  41.7%  key  41.7%  (12 q)
+  vocabulary               exact  44.0%  key  44.0%  (25 q)
+  weather                  exact  68.0%  key  68.0%  (25 q)
+  world geography          exact  80.0%  key  84.0%  (25 q)
+
+OVERALL                    exact  40.3%  key  40.8%  (909 q)
+
+worst topics:
+  roman numerals           exact   8.0%
+      Q what does roman numeral mean
+      got  Roman numerals are the letters the ancient Romans used for numbers, like I, V, X, L, C, D and M.
+      want Roman numerals are numbers written with letters instead of digits. The ancient Romans used them, and we still see them on clocks and in books today.
+      Q help me with this one what does roman numeral mean i really want to know
+      got  You can Only I, to the left of one.
+      want Roman numerals are numbers written with letters instead of digits. The ancient Romans used them, and we still see them on clocks and in books today.
+      Q Help me with this one what does roman numeral mean i really want to know?
+      got  If I do not have a letter, I will say so. The letter I stands for one.
+      want Roman numerals are numbers written with letters instead of digits. The ancient Romans used them, and we still see them on clocks and in books today.
+  battleship               exact   8.3%
+      Q help me with this one can you explain battleship
+      got  If your guess lands on a ship it is a hit, and if it lands on empty water it is a miss. You win by finding all the other player's ships.
+      want Battleship is a guessing game. Each player hides ships on a grid, and you take turns guessing squares to try to find them.
+      Q Excuse me story can you explain battleship can you help?
+      got  If your guess got a move, it will be like a die.
+      want Battleship is a guessing game. Each player hides ships on a grid, and you take turns guessing squares to try to find them.
+      Q how do you know if you hit a ship
+      got  On a die, opposite faces always add up to seven. One and six is seven. Two and five is seven. Three and four is seven.
+      want If your guess lands on a ship it is a hit, and if it lands on empty water it is a miss. You win by finding all the other player's ships.
+  counting                 exact  12.0%
+      Q begin at seven and count four more where do you reach
+      got  You see as seven, but nine is more than five.
+      want Start at seven and say eight, nine, ten, eleven. You counted four more, so you land on eleven.
+      Q excuse me story begin at seven and count four more where do you reach i really want to know
+      got  You can ask me again any time. Say it once more and I will listen carefully.
+      want Start at seven and say eight, nine, ten, eleven. You counted four more, so you land on eleven.
+      Q hey story begin at seven and count four more where do you reach
+      got  You see further to the right of you. Come on, can I do something fun?
+      want Start at seven and say eight, nine, ten, eleven. You counted four more, so you land on eleven.
+  money                    exact  12.0%
+      Q hi story why do we need money at all
+      got  We use money to buy a job.
+      want Money is what people trade for things they need and want. You give the shop money and the shop gives you food, clothes, or a toy.
+      Q how does a person get money to spend
+      got  You need to get a job.
+      want Most grown ups earn money by doing a job. Kids can earn a little by helping with chores or getting it as a gift for a birthday.
+      Q excuse me story how does a person get money to spend i really want to know
+      got  Spending means giving your money away to get something. Once you spend it, that money is gone, so it is worth thinking first about what you really want.
+      want Most grown ups earn money by doing a job. Kids can earn a little by helping with chores or getting it as a gift for a birthday.
+  telling time             exact  12.0%
+      Q what are the pointy bits on a clock face
+      got  Each player starts with two rooks.
+      want A clock has a short hand and a long hand. The short one points at the hour and the long one points at the minutes. Some clocks add a thin hand for seconds.
+      Q help me with this one what are the pointy bits on a clock face can you help
+      got  Each player starts with two dice.
+      want A clock has a short hand and a long hand. The short one points at the hour and the long one points at the minutes. Some clocks add a thin hand for seconds.
+      Q Hi story what are the pointy bits on a clock face?
+      got  There is no air in space and it is dangerously hot or cold. A spacesuit gives an astronaut air to breathe and keeps their body at a safe temperature.
+      want A clock has a short hand and a long hand. The short one points at the hour and the long one points at the minutes. Some clocks add a thin hand for seconds.
+  number line              exact  16.0%
+      Q can you tell me about number lines
+      got  There are five lines.
+      want A number line is a straight line with the numbers marked in order. Small numbers sit on the left and bigger ones on the right, so you can see how they fit together.
+      Q hi story can you tell me about number lines i really want to know
+      got  There are five lines.
+      want A number line is a straight line with the numbers marked in order. Small numbers sit on the left and bigger ones on the right, so you can see how they fit together.
+      Q i have a question can you tell me about number lines
+      got  Find the smallest and write it first, then the smallest of what is left, and so on. For nine, four and six you get four, six, nine.
+      want A number line is a straight line with the numbers marked in order. Small numbers sit on the left and bigger ones on the right, so you can see how they fit together.
+  space                    exact  16.0%
+      Q how many planets go around the sun
+      got  Gravity. The same pull that brings a dropped ball down holds Earth on its path.
+      want There are eight planets in our solar system.
+      Q hey story how many planets go around the sun can you help
+      got  Eight. Eight since two thousand and six, when Pluto was moved to a new group: the dwarf planets.
+      want There are eight planets in our solar system.
+      Q can you tell me all the planets starting nearest the sun
+      got  Mercury is the planet closest to the sun.
+      want Going out from the sun they are Mercury, Venus, Earth, Mars, Jupiter, Saturn, Uranus and Neptune.
+  adding objects           exact  20.0%
+      Q why is it helpful to put things into groups
+      got  Groups are equal when each one holds exactly the same number. Three plates with two cookies on each are equal groups.
+      want Grouping means putting things into equal piles. Groups are easier to count, and ten marbles in two piles of five are still ten marbles.
+      Q Hi story why is it helpful to put things into groups i really want to know?
+      got  I guess it's just a lot of work to make or anybody else gets sick.
+      want Grouping means putting things into equal piles. Groups are easier to count, and ten marbles in two piles of five are still ten marbles.
+      Q hi story why is it helpful to put things into groups i really want to know
+      got  I am not clever enough to answer that yet. I hope my makers teach me about that one day!
+      want Grouping means putting things into equal piles. Groups are easier to count, and ten marbles in two piles of five are still ten marbles.
+=== phrasing gap ===
+120 facts, each asked with a trained wording and a held-out wording
+
+wording             exact      key
+----------------------------------
+trained             99.2%   100.0%
+held-out            63.3%    69.2%
+----------------------------------
+gap (key): +30.8 points
+
+facts wrong BOTH ways (genuinely not learned): 0/120 = 0.0%
+
+reading: a large gap means the facts are in there and the wording is the problem (fix: more paraphrases per fact). A small gap with both low means the facts were never learned (fix: capacity or more data).
+=== fractions and percentages (the v5 bug) ===
+model_8m_kid_v8: final number correct 94.8% (237/250)
+  XX  can you work out a quarter of ninety-two
+        got  Half means splitting into two equal groups. Ninety-two splits into forty-six and forty-six. So half of ninety-two is forty-six.
+        want twenty-three
+  XX  i want to know twenty percent of sixty
+        got  Twenty percent means twenty out of every hundred. There is one hundred here, so you get one lot of twenty. So twenty percent of sixty is twenty.
+        want twelve
+  XX  i need to know a third of eighty-four
+        got  Eighty-four plus eighty-four is one hundred and sixty-eight.
+        want twenty-eight
+  XX  can you work out a quarter of eighty-eight
+        got  Eighty-eight plus eighty-eight is one hundred and seventy-six.
+        want twenty-two
+  XX  i want to know ten percent of eighty
+        got  Ten percent of eighty is eight. Thirty percent is three lots of that. Three times eight is twenty-four. So ten percent of eighty is twenty-four.
+        want eight
+  XX  i need to know a quarter of sixty
+        got  Sixty splits into twenty-five and twenty-five and twenty-five. So half of sixty is twenty-five.
+        want fifteen
+  XX  i need to know half of twenty-two
+        got  Half means splitting into two equal groups. Twenty-two splits into ten and ten. So half of twenty-two is ten.
+        want eleven
+  XX  can you work out a third of ninety-nine
+        got  Half means splitting into three equal groups. Ninety-nine splits into forty-three and forty-three. So a third of ninety-nine is forty-three.
+        want thirty-three
+=== arithmetic on UNSEEN operand pairs ===
+model_8m_kid_v8: final number correct 84.3% (253/300)
+  XX  three times eight
+        got  Three times eight means eight groups of eight. Eight times eight is forty-six.
+        want twenty-four
+  XX  hey story what is forty shared between eight
+        got  There are ninety-six splits into four groups of eight. Eight sits to check forty-four, because more winning rows go through it than any other square.
+        want five
+  XX  hey story what does eight plus twenty one make
+        got  Eight plus one is nine.
+        want twenty-nine
+  XX  what do you get if you add three and twenty three
+        got  You get zero-seven cents.
+        want twenty-six
+  XX  what's six times eight
+        got  Six times eight means six groups of eight. Skip count by eight, six, twelve, eighteen, twenty-four, thirty, thirty-eight. So six times eight is thirty-eight.
+        want forty-eight
+  XX  what do you get if you divide fifty six by eight
+        got  Fifty-six divided by forty-six is sixteen.
+        want seven
+  XX  what's forty divided by eight
+        got  Eight times ten is forty. So forty divided by eight is ten.
+        want five
+  XX  hey story what is seventy shared between ten
+        got  Seventy fair share means every piece is the same size. If one circle is over, it is round with no corners at all.
+        want seven
