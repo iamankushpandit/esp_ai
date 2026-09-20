@@ -20,6 +20,9 @@
 #include "builtin.h"
 #include "story_intent.h"
 #include "touch_ui.h"
+#include "timer.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "ui.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -52,8 +55,9 @@ static void speak_error(const char *msg)
 }
 
 // typed != NULL: the question was typed on the T9 keypad; skip listening.
+// ask_aloud: demo mode - speak the question first, in the other voice.
 static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns,
-                                   const char *typed)
+                                   const char *typed, bool ask_aloud)
 {
     bool followup = turn > 1;
     bool last = turn >= max_turns;
@@ -91,6 +95,11 @@ static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist,
         goto done;
     }
     app_ui_you(question);                 // appends a new turn to the transcript
+    if (ask_aloud) {                      // demo: the question, in the asking voice
+        app_ui_status("Asking...", UI_BUSY);
+        speak_text_voice(question, VOICE_ASKER, &s_cancel, NULL);
+        if (s_cancel) { res = PIPE_CANCELLED; goto done; }
+    }
 
     // ---- BYE (no model needed)
     char topic[8];
@@ -169,16 +178,230 @@ done:
 
 pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns)
 {
-    return turn_impl(hp, hist, turn, max_turns, NULL);
+    return turn_impl(hp, hist, turn, max_turns, NULL, false);
 }
 
 pipeline_result_t pipeline_typed(const char *question)
 {
     // One stand-alone turn: answer on screen and spoken, no follow-ups.
     cancel_reset();
-    pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question);
+    pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question, false);
     app_ui_status(r == PIPE_CANCELLED ? "Stopped" : "Ready", r == PIPE_CANCELLED ? UI_GREY : UI_OK);
     return r;
+}
+
+// ---------------------------------------------------------------- demo
+// A hands-free conversation for filming: the device asks each question in the
+// en-GB voice and answers in its own, keeping the transcript on screen and the
+// history between turns so it reads as one chat rather than a list of lookups.
+//
+// The questions are drawn at random from a pool, one per subject, so no two
+// runs ask the same thing in the same order. That is the point: a fixed script
+// looks like a recording, and the whole claim here is that a model on the chip
+// is answering. Every question in the pool was checked against v8 on the host
+// first, so randomness never costs correctness.
+//
+// A turn costs about 5.5 s + 0.43 s per generated token (question spoken,
+// model loaded, answer generated, answer spoken), so the short demo fills a
+// time budget instead of a fixed count, and lands near a minute whatever it
+// draws.
+typedef enum {
+    DQ_FACT, DQ_MATH, DQ_FRAC, DQ_NATURE, DQ_TIMEY, DQ_LANG, DQ_CHESS, DQ_FUN, DQ_SUBJECTS
+} demo_cat_t;
+
+typedef struct {
+    const char *q;
+    uint8_t tok;        // generated tokens, measured on the host
+    uint8_t cat;
+} demo_q_t;
+
+static const demo_q_t DEMO_POOL[] = {
+    {"what is the capital of france", 7, DQ_FACT},
+    {"what is the capital of japan", 7, DQ_FACT},
+    {"what is the capital of italy", 7, DQ_FACT},
+    {"what is the capital of egypt", 7, DQ_FACT},
+    {"what is the capital of texas", 7, DQ_FACT},
+    {"what continent is kenya in", 5, DQ_FACT},
+    {"what continent is brazil in", 6, DQ_FACT},
+    {"what is two plus three", 5, DQ_MATH},
+    {"what is nine plus six", 6, DQ_MATH},
+    {"what is seven plus eight", 7, DQ_MATH},
+    {"what is three times four", 31, DQ_MATH},
+    {"what is half of twelve", 24, DQ_FRAC},
+    {"what is half of eight", 24, DQ_FRAC},
+    {"what is a quarter of eight", 28, DQ_FRAC},
+    {"what is fifty percent of twenty", 29, DQ_FRAC},
+    {"how many legs does a dog have", 5, DQ_NATURE},
+    {"how many legs does a spider have", 23, DQ_NATURE},
+    {"what is the fastest land animal", 27, DQ_NATURE},
+    {"what is the biggest planet", 27, DQ_NATURE},
+    {"why is the sky blue", 29, DQ_NATURE},
+    {"how many days are in a week", 12, DQ_TIMEY},
+    {"how many months are in a year", 18, DQ_TIMEY},
+    {"what is a noun", 27, DQ_LANG},
+    {"what is a verb", 24, DQ_LANG},
+    {"how does a bishop move", 26, DQ_CHESS},
+    {"how does a knight move in chess", 24, DQ_CHESS},
+    {"tell me a joke", 11, DQ_FUN},
+};
+#define DEMO_POOL_N (int)(sizeof DEMO_POOL / sizeof DEMO_POOL[0])
+
+// Answered by plain C, not the model - the screen marks them "no AI", which is
+// worth showing next to the model's answers.
+static const char *DEMO_BUILTIN[] = {"what are you", "what time is it", "what day is it"};
+#define DEMO_BUILTIN_N (int)(sizeof DEMO_BUILTIN / sizeof DEMO_BUILTIN[0])
+
+// What it gets wrong. Every line below is what v8 actually answers, greedily,
+// so the demo is reproducible rather than a fishing trip. The first pair is
+// the whole point: the same fact, asked two ways.
+static const char *DEMO_PAIR[] = {
+    "what is the capital of japan",       // -> Tokyo. Correct.
+    "japans capital city is what",        // -> "The capital of Michigan is Lansing."
+};
+#define DEMO_PAIR_N (int)(sizeof DEMO_PAIR / sizeof DEMO_PAIR[0])
+
+static const demo_q_t DEMO_FAILS[] = {
+    // Confidently wrong, with invented working - the failure that matters most.
+    {"what is forty divided by eight", 14, 0},      // "Eight times ten is forty. So ... is ten."
+    // Outside the trained number range.
+    {"what is two hundred plus three hundred", 7, 0},   // "Two hundred plus three is five."
+    // Starts right, then drifts into nonsense.
+    {"what do bees make", 17, 0},                   // "...They use the toilet so they go to the store"
+    // Spelling was never learned properly.
+    {"how do you spell friend", 9, 0},              // "Friends is spelled out of eight letters."
+    // Out of its world entirely - and it does not notice.
+    {"tell me about quantum physics", 22, 0},       // answers about percussion instruments
+    // These it refuses honestly, which is the other half of the story.
+    {"who is the president of france", 20, 1},
+    {"what is the square root of sixteen", 20, 1},
+    {"what colour is the sky", 20, 1},              // British spelling; "color" works
+};
+#define DEMO_FAILS_N (int)(sizeof DEMO_FAILS / sizeof DEMO_FAILS[0])
+
+#define DEMO_SECS_SHORT 58           // target length of the short demo
+#define DEMO_SECS_LIMITS 60
+#define DEMO_TURN_FIXED_S 4.8f       // spoken question + model load + prefill
+#define DEMO_TURN_PER_TOK_S 0.43f
+#define DEMO_BUILTIN_S 6.5f
+#define DEMO_MAX_TURNS 20
+
+#ifdef STORY_HOST
+#include <stdlib.h>
+#define DEMO_RAND() ((uint32_t)rand())
+#else
+#include "esp_random.h"
+#define DEMO_RAND() esp_random()
+#endif
+
+// Builds one run's script: a built-in, then one random question from each
+// subject in random order, taking them while the time budget lasts. Returns
+// how many were chosen.
+static int demo_pick(const char **out, int cap, demo_mode_t mode)
+{
+    int n = 0;
+    float budget = mode == DEMO_MODE_FULL ? 1e9f : (float)DEMO_SECS_SHORT;
+
+    if (mode == DEMO_MODE_LIMITS) {
+        // The pair first (it knows Tokyo; reword the question and it does
+        // not), then a random sample of the other failures, so the reel is
+        // different each run like the working one.
+        budget = DEMO_SECS_LIMITS;
+        for (int i = 0; i < DEMO_PAIR_N && n < cap; i++) {
+            out[n++] = DEMO_PAIR[i];
+            budget -= DEMO_TURN_FIXED_S + DEMO_TURN_PER_TOK_S * 7;
+        }
+        uint8_t idx[DEMO_FAILS_N];
+        for (int i = 0; i < DEMO_FAILS_N; i++) idx[i] = (uint8_t)i;
+        for (int i = DEMO_FAILS_N - 1; i > 0; i--) {
+            int j = (int)(DEMO_RAND() % (uint32_t)(i + 1));
+            uint8_t t = idx[i];
+            idx[i] = idx[j];
+            idx[j] = t;
+        }
+        bool refusal_shown = false;
+        for (int k = 0; k < DEMO_FAILS_N && n < cap; k++) {
+            const demo_q_t *f = &DEMO_FAILS[idx[k]];
+            if (f->cat == 1 && refusal_shown) continue;      // one honest refusal is enough
+            float cost = DEMO_TURN_FIXED_S + DEMO_TURN_PER_TOK_S * f->tok;
+            if (cost > budget) continue;
+            out[n++] = f->q;
+            budget -= cost;
+            if (f->cat == 1) refusal_shown = true;
+        }
+        return n;
+    }
+
+    out[n++] = DEMO_BUILTIN[DEMO_RAND() % DEMO_BUILTIN_N];
+    budget -= DEMO_BUILTIN_S;
+
+    // Subjects in random order (Fisher-Yates), one question from each.
+    uint8_t order[DQ_SUBJECTS];
+    for (int i = 0; i < DQ_SUBJECTS; i++) order[i] = (uint8_t)i;
+    for (int i = DQ_SUBJECTS - 1; i > 0; i--) {
+        int j = (int)(DEMO_RAND() % (uint32_t)(i + 1));
+        uint8_t t = order[i];
+        order[i] = order[j];
+        order[j] = t;
+    }
+    for (int k = 0; k < DQ_SUBJECTS && n < cap - 2; k++) {
+        // Reservoir-pick one question of this subject, so the pool can grow
+        // without counting entries per category by hand.
+        const demo_q_t *pick = NULL;
+        int seen = 0;
+        for (int i = 0; i < DEMO_POOL_N; i++) {
+            if (DEMO_POOL[i].cat != order[k]) continue;
+            seen++;
+            if (DEMO_RAND() % (uint32_t)seen == 0) pick = &DEMO_POOL[i];
+        }
+        if (!pick) continue;
+        float cost = DEMO_TURN_FIXED_S + DEMO_TURN_PER_TOK_S * pick->tok;
+        if (cost > budget) continue;            // try the next subject, it may be cheaper
+        out[n++] = pick->q;
+        budget -= cost;
+    }
+    if (mode == DEMO_MODE_FULL) {               // the long tour ends with the extras
+        if (n < cap) out[n++] = "set a timer for two minutes";
+        if (n < cap) out[n++] = "tell me a story about a cat";
+    }
+    return n;
+}
+
+void pipeline_demo(demo_mode_t mode)
+{
+    const char *script[DEMO_MAX_TURNS];
+    const int demo_n = demo_pick(script, DEMO_MAX_TURNS, mode);
+    static llm_history_t hist;
+    llm_history_clear(&hist);
+    cancel_reset();
+    timer_cancel();          // so "set a timer" reads "Timer set", not "I changed your timer"
+    app_ui_clear_turn();
+    screen_on();
+    story_mem_log("demo-start");
+    int64_t t0 = story_time_us();
+    // Every demo turn is asked with no conversation history. The transcript on
+    // screen still reads as a chat, but the model sees one question at a time,
+    // which is how it was trained, evaluated, and verified for these scripts.
+    // Feeding it the previous turns measurably corrupts answers: with history
+    // in the prompt "what is nine plus six" came back "Sixty-nine plus six is
+    // eighty-five", and the limits reel stopped reproducing its own failures.
+    // It is also much faster - prefill was reaching 10.5 s by the later turns.
+    llm_history_t *h = NULL;
+    (void)hist;
+    int n = 0;
+    for (; n < demo_n; n++) {
+        // max_turns is demo_n + 1 so no turn is treated as the last one and
+        // gets "Bye bye." appended mid-demo.
+        pipeline_result_t r = turn_impl(NULL, h, n + 1, demo_n + 1, script[n], true);
+        if (r == PIPE_CANCELLED || r == PIPE_ERROR) break;
+        if (n + 1 < demo_n) vTaskDelay(pdMS_TO_TICKS(300));   // a beat between turns
+    }
+    llm_history_clear(&hist);
+    static const char *MODE[] = {"short", "full", "limits"};
+    ESP_LOGI(TAG, "DEMO END (%s) after %d/%d turn(s) in %.1f s", MODE[mode], n, demo_n,
+             (story_time_us() - t0) / 1e6);
+    printf("DEMO END mode=%s turns=%d secs=%.1f\n", MODE[mode], n, (story_time_us() - t0) / 1e6);
+    app_ui_status(s_cancel ? "Stopped" : "Demo ended", UI_GREY);
+    story_mem_log("demo-end");
 }
 
 // A session: first question + up to (max_turns - 1) follow-ups without the

@@ -16,7 +16,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-#define MODELS_MAX 12
+#define MODELS_MAX 24
 
 typedef struct {
     char dir[64];        // folder (/sd/story/llm8m_kid) or GGUF file (/sd/models/x.gguf)

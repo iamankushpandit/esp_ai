@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit <https://github.com/iamankushpandit>
+#
+# Part of Ivy AI -- https://github.com/iamankushpandit/esp_ai
+# Free software under GPL-3.0-or-later, with the Espressif SDK linking
+# exception in LICENSE.exception. Reusing any part of this file, in any
+# work, must keep this notice, credit iamankushpandit as the author,
+# and stay under the same licence with corresponding source offered.
+# See LICENSE, LICENSE.exception, NOTICE.md and THIRD_PARTY.md.
+
 """Render one animated GIF per model version, as the device screen answering.
 
     python tools/gen_demo_gifs.py [--out site/assets]
@@ -17,9 +27,11 @@ scores instead. Nothing is written into a GIF that the model was not recorded
 saying: a picture is exactly the format in which an invented quote would never
 be questioned, which is the reason to be strict here rather than relaxed.
 
-Typing speed is the measured one: 13.2 tokens/sec on the device, roughly four
-characters a token, so about 53 characters a second. It looks slow because it
-is slow.
+Typing speed is the measured one: the shipped model runs at 5.4-5.9 tokens a
+second on the device (README.md), roughly four characters a token, so about 23
+characters a second. It looks slow because it is slow -- and the 3M model these
+recordings start with was more than twice as fast, because it was a quarter of
+the size and knew nothing.
 """
 
 import argparse
@@ -38,8 +50,11 @@ import gen_site
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 W, H = 620, 360
-FPS = 20
-CHARS_PER_SEC = 53.0            # 13.2 tok/s x ~4 chars a token, measured
+# 12 fps, not 20: the pace is set by CHARS_PER_SEC either way, so a higher
+# frame rate only buys more frames to download. At the shipped model's
+# speed that was 1.6 MB of GIF for the same two seconds of reading.
+FPS = 12
+CHARS_PER_SEC = 23.0            # 5.7 tok/s x ~4 chars a token, measured
 HOLD_END_S = 2.2
 HOLD_START_S = 0.7
 

@@ -1,0 +1,115 @@
+name: Pages
+
+# Generates the site and publishes it to GitHub Pages on every push to main.
+#
+# The page is DERIVED -- tools/gen_site.py reads the measured figures out of
+# README.md, docs/STAGE_E_RESULTS.md and docs/GGUF.md, and tools/gen_demo_gifs.py
+# renders the per-version recordings from the transcripts in gen_site.py. So
+# the deploy has to run the generators rather than serve a checked-in file:
+# a hand-updated copy of a measurement is one that will be wrong and cannot
+# say so, and this project's whole argument is that its numbers are real.
+#
+# It runs on `docs/` rather than an artifact-only build because docs/ is what
+# the repository already serves, and keeping the generated page committed means
+# a reader of the repo sees the same page a visitor does.
+#
+# Enabling: `configure-pages` with enablement below turns Pages on for the
+# repository the first time this runs, so it does not need a visit to
+# Settings -> Pages. It is allowed to fail, because the API refuses when the
+# repository's default workflow permissions are read-only -- and that must not
+# cost us the run. The deploy job is the honest test of whether Pages is on.
+
+on:
+  push:
+    branches: [main]
+  pull_request:          # generate on PRs too -- see the note on the build job
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/configure-pages@v5
+        if: github.event_name != 'pull_request'
+        continue-on-error: true
+        with:
+          enablement: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      # Pillow is only needed for the GIFs. Seconds to install.
+      - name: Install Pillow
+        run: pip install pillow
+
+      # This step is deliberately NOT gated on which files changed, and it runs
+      # on pull requests as well as pushes. The changes most likely to break
+      # the page are exactly the ones a source-file gate would skip: a renamed
+      # placeholder, a retitled table in the README, a heading that moved. Every
+      # extractor in gen_site.py fails loudly when its source stops matching,
+      # so this step is the check as much as it is the build -- and a red pull
+      # request is a much cheaper place to find out than a live page.
+      - name: Generate the site
+        run: |
+          python tools/gen_demo_gifs.py --out site/assets
+          python tools/gen_site.py --out _site \
+            --repo "${{ github.server_url }}/${{ github.repository }}"
+
+      # The committed copy under docs/ must match what the generators produce.
+      # If it does not, someone edited the generated page by hand -- which is
+      # the one thing the header of every generated file asks them not to do,
+      # because the next run silently throws the edit away.
+      - name: docs/ must match the generators
+        if: github.event_name == 'pull_request'
+        run: |
+          if ! diff -q _site/index.html docs/index.html >/dev/null 2>&1; then
+            echo "::error::docs/index.html is not what tools/gen_site.py produces."
+            echo "Run: python tools/gen_demo_gifs.py && python tools/gen_site.py --out docs"
+            diff -u docs/index.html _site/index.html | head -40 || true
+            exit 1
+          fi
+          echo "docs/index.html matches."
+
+      - name: Every file we wrote carries its licence notice
+        run: python tools/check_licenses.py
+
+      - name: Report the page size
+        run: |
+          {
+            echo '### Site'
+            echo
+            echo '| File | Bytes |'
+            echo '|---|---:|'
+            printf '| index.html | %s |\n' "$(stat -c%s _site/index.html)"
+            for f in _site/assets/*; do
+              printf '| %s | %s |\n' "assets/$(basename "$f")" "$(stat -c%s "$f")"
+            done
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-pages-artifact@v3
+        if: github.event_name != 'pull_request'
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

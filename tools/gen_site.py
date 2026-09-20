@@ -1,4 +1,14 @@
 #!/usr/bin/env python3
+# SPDX-License-Identifier: GPL-3.0-or-later
+# SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit <https://github.com/iamankushpandit>
+#
+# Part of Ivy AI -- https://github.com/iamankushpandit/esp_ai
+# Free software under GPL-3.0-or-later, with the Espressif SDK linking
+# exception in LICENSE.exception. Reusing any part of this file, in any
+# work, must keep this notice, credit iamankushpandit as the author,
+# and stay under the same licence with corresponding source offered.
+# See LICENSE, LICENSE.exception, NOTICE.md and THIRD_PARTY.md.
+
 """Generate the GitHub Pages site from site/index.template.html.
 
     python tools/gen_site.py [--out DIR] [--repo URL]
@@ -36,16 +46,19 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # table on the training branch. Kept here as a fallback ONLY because
 # docs/TECHNICAL_REPORT.md lives on that branch today; once it merges, read it
 # from there and delete this.
-SCORES = [("v4", 64.2), ("v5", 48.5), ("v6", 53.0), ("v7", 60.9)]
+SCORES = [("v4", 64.2), ("v5", 48.5), ("v6", 53.0), ("v7", 60.9), ("v8", 63.3)]
 SCORE_NOTE = {
     "v4": "narrow set",
     "v5": "full parity + refusal",
     "v6": "floor-balanced",
     "v7": "fractions fixed",
+    "v8": "reworded questions",
 }
-PHRASE_GAP = "55.0"
+# v8 closed the phrasing gap that v6 and v7 both widened: 99.2% on a trained
+# wording against 63.3% on a rephrasing, so 35.9 points rather than v7's 55.0.
+PHRASE_GAP = "35.9"
 OVER_REFUSAL = "3.3%"
-HELD_OUT = "60.9%"
+HELD_OUT = "63.3%"
 PARAMS = "19.7M"
 APP_PART_BYTES = 6 * 1024 * 1024
 
@@ -87,12 +100,23 @@ VERSIONS = [
      "what": "Some subjects had 173 times more practice than others, so the "
              "model was brilliant at sums and hopeless at spelling. Giving "
              "every subject a floor lifted the small ones a long way."},
-    {"id": "v7", "name": "v7", "sub": "where it is now",
+    {"id": "v7", "name": "v7", "sub": "fractions fixed, phrasing worse",
      "score": 60.9, "facts": "19,813 facts",
      "what": "Fractions and percentages went from almost never right to "
              "nearly always right, by listing every one of them rather than "
              "hoping. The other change we tried made things worse, and we "
-             "left the finding in."},
+             "left the finding in \u2014 which is what told us what to do next."},
+    {"id": "v7dev", "name": "v7", "sub": "same weights, on the device",
+     "timeline": False, "score": None, "facts": "19,813 facts",
+     "what": "Not a version at all: v7's exact bytes, running on the board "
+             "rather than on a PC. It is here because of what it revealed."},
+    {"id": "v8", "name": "v8", "sub": "where it is now",
+     "score": 63.3, "facts": "19,813 facts",
+     "what": "The failed experiment in v7 said the problem was that our "
+             "reworded questions only changed the decoration around a fixed "
+             "question. v8 rewrites the question itself, and the score on "
+             "wordings it has never seen jumped from 42.5% to 63.3% \u2014 the "
+             "one number two earlier attempts had made worse."},
 ]
 
 # question -> what each version actually said. src names the file it is from.
@@ -152,7 +176,12 @@ DEMO = [
             {"v": "v7", "verdict": "right",
              "text": "Half means splitting into two equal groups. Twelve splits "
                      "into six and six. So half of twelve is six.",
-             "src": "training/V7_RESULTS.md"},
+             "src": "training/V7_RESULTS.md \u2014 on a PC, decoding greedily"},
+            {"v": "v7dev", "verdict": "wrong",
+             "text": "Half of twelve is one hundred and a quarter.",
+             "src": "the SAME bytes as the line above, on the device. It "
+                    "looked like a corrupted model file. It was a decoding "
+                    "setting — see the build log."},
         ],
     },
     {
@@ -190,6 +219,11 @@ DEMO = [
 # Still broken in the newest model, with the figure. Ordered worst first,
 # because a limitations list sorted any other way is a sales document.
 STILL_BROKEN = [
+    ("Asking it a new way", "63.3%",
+     "The one that improved most. Ask about a fact in the exact wording it was "
+     "taught and it is right 99.2% of the time; reword the question and it is "
+     "right 63.3% of the time. That gap was 57.5 points in v7 and is 35.9 now, "
+     "which is progress and is still the largest single thing wrong."),
     ("Small sums", "1.7%",
      "Adding numbers under ten — the easiest thing on the list — is the worst "
      "score we have. It has not responded to any fix tried so far."),
@@ -200,12 +234,31 @@ STILL_BROKEN = [
      "Barely moved across four versions of teaching."),
     ("Spelling", "30.0%",
      "Up from 1.7%, so the teaching is working — just nowhere near enough yet."),
-    ("Asking it a new way", "42.5%",
-     "The big one. Ask about a fact using the exact wording it was taught and "
-     "it is right 100% of the time. Reword the same question and it is right "
-     "42.5% of the time. The knowledge is in there; recognising the question "
-     "is what fails."),
 ]
+
+# The per-subject figures above are v7's, published in training/V7_RESULTS.md.
+# v8 changed how questions are worded, not what is taught, and no per-subject
+# breakdown has been published for it -- so these are labelled as v7's on the
+# page rather than quietly reused as if they were current.
+STILL_BROKEN_NOTE = ("Per-subject figures are v7's, the last version with a "
+                     "published breakdown. v8 changed how questions are "
+                     "worded rather than what is taught, so they are unlikely "
+                     "to have moved much \u2014 but nobody has measured them, and "
+                     "this page does not pretend otherwise.")
+
+
+WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven",
+         "eight", "nine", "ten", "eleven", "twelve")
+
+
+def num_word(n):
+    """Spelled out, because these appear mid-sentence.
+
+    These counts used to be typed into the prose, and adding v8 made four
+    sentences wrong at once -- on a page whose argument is that its numbers are
+    derived. If it can be counted, count it.
+    """
+    return WORDS[n] if n < len(WORDS) else str(n)
 
 
 def die(message):
@@ -425,6 +478,8 @@ def render_timeline():
     top = 70.0
     out = ['<ol class="timeline">']
     for v in VERSIONS:
+        if v.get("timeline") is False:
+            continue
         if v["score"] is None:
             bar = '<span class="tl-bar none">no score — never measured this way</span>'
         else:
@@ -440,7 +495,8 @@ def render_timeline():
 
 
 def render_still_broken():
-    out = ['<div class="broken">']
+    out = ['<p class="fine">%s</p>' % html.escape(STILL_BROKEN_NOTE),
+           '<div class="broken">']
     for name, figure, why in STILL_BROKEN:
         out.append('<div class="broken-row"><b>%s</b><span class="fig">%s</span>'
                    '<p>%s</p></div>' % (html.escape(name), html.escape(figure),
@@ -486,6 +542,29 @@ def main():
     template = read("site", "index.template.html")
     stage_e = read("docs", "STAGE_E_RESULTS.md")
     gguf = read("docs", "GGUF.md")
+    readme = read("README.md")
+
+    # The shipped model's speed lives in README.md's measured table, NOT in
+    # STAGE_E_RESULTS.md -- that soak measured TinyTalk 3M and its 13.0-13.4
+    # tok/s is four generations out of date. Reading the headline from the
+    # file that gets updated with the model is the difference between a figure
+    # that ages and one that does not.
+    llm_row = find(r"\| LLM \(TinyTalk [^)]*\) \| load ([\d]+) ms, \*\*([^*]+)\*\*",
+                   readme, "the shipped model's speed in README.md")
+    llm_load_readme = llm_row.group(1) + " ms"
+    tok_s_readme = re.sub(r"\s*[-\u2013\u2014]\s*", "\u2013", llm_row.group(2).strip())
+    turn = find(r"\| Whole spoken turn \| ([^|]+)\|", readme,
+                "the whole-turn breakdown in README.md").group(1).strip()
+
+    # A KPI tile wants a figure, not a sentence, so the four parts of that row
+    # are summed into a range. Derived rather than typed, so it moves when the
+    # row does.
+    parts = re.findall(r"(?:~)?([\d.]+)(?:\s*[-–—]\s*([\d.]+))?\s*s\b", turn)
+    if not parts:
+        die("could not read any durations out of the whole-turn row")
+    low = sum(float(a) for a, _ in parts)
+    high = sum(float(b or a) for a, b in parts)
+    turn_total = "%g–%g s" % (low, high) if high != low else "%g s" % low
 
     # --- per-turn timing -------------------------------------------------
     headers, rows = md_table(stage_e, "## Per-turn timing", "the timing table")
@@ -560,20 +639,27 @@ def main():
         ("{{VERSION}}", version()),
         ("{{BUILT}}", datetime.date.today().isoformat()),
         ("{{REPO}}", args.repo),
-        ("{{TOK_S}}", tok_s),
-        ("{{E2E}}", e2e),
+        ("{{TOK_S}}", tok_s_readme),
+        ("{{E2E}}", turn_total),
+        ("{{TURN_PARTS}}", turn),
         ("{{PARAMS}}", PARAMS),
         ("{{HEAP_FREE}}", heap_free),
         ("{{MIN_FREE}}", min_free),
         ("{{SILENCE}}", silence),
         ("{{STT_OPEN}}", stt_open),
-        ("{{LLM_LOAD}}", llm_load),
+        ("{{LLM_LOAD}}", llm_load_readme),
         ("{{PHRASE_GAP}}", PHRASE_GAP),
         ("{{OVER_REFUSAL}}", OVER_REFUSAL),
         ("{{HELD_OUT}}", HELD_OUT),
         ("{{APP_BYTES}}", app_bytes),
         ("{{APP_PCT}}", app_pct),
         ("{{APP_PART}}", "6 MB"),
+        ("{{N_VERSIONS}}", num_word(len([v for v in VERSIONS
+                                        if v.get("timeline") is not False]))),
+        ("{{N_SCORED}}", num_word(len(SCORES))),
+        ("{{N_SCORED_CAP}}", num_word(len(SCORES)).capitalize()),
+        ("{{N_VERSIONS_CAP}}", num_word(len([v for v in VERSIONS
+                                            if v.get("timeline") is not False])).capitalize()),
         ("{{DEMO}}", render_demo()),
         ("{{TIMELINE}}", render_timeline()),
         ("{{STILL_BROKEN}}", render_still_broken()),

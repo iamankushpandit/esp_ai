@@ -1,5 +1,17 @@
 <!DOCTYPE html>
 <!--
+     SPDX-License-Identifier: GPL-3.0-or-later
+     SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit <https://github.com/iamankushpandit>
+
+     Part of Ivy AI - https://github.com/iamankushpandit/esp_ai
+     Free software under GPL-3.0-or-later, with the Espressif SDK linking
+     exception in LICENSE.exception. Reusing any part of this file, in any
+     work, must keep this notice, credit iamankushpandit as the author,
+     and stay under the same licence with corresponding source offered.
+     See LICENSE, LICENSE.exception, NOTICE.md and THIRD_PARTY.md.
+-->
+
+<!--
   Ivy AI — the landing page and the write-up, in one document.
 
   This file is a TEMPLATE. tools/gen_site.py substitutes the double-braced
@@ -278,7 +290,7 @@ footer a{color:var(--ink-soft)}
 
     <div class="kpis">
       <div class="kpi"><b>{{TOK_S}}</b><span>tokens/sec, on the chip</span></div>
-      <div class="kpi"><b>{{E2E}}</b><span>end of speech → first audio</span></div>
+      <div class="kpi"><b>{{E2E}}</b><span>a whole spoken turn</span></div>
       <div class="kpi"><b>{{PARAMS}}</b><span>parameters, answering offline</span></div>
       <div class="kpi"><b>0</b><span>bytes of your voice sent anywhere</span></div>
     </div>
@@ -408,7 +420,7 @@ footer a{color:var(--ink-soft)}
     whole thing. Every figure below is measured on the board described in
     <a href="{{REPO}}/blob/main/docs/STAGE_E_RESULTS.md">STAGE_E_RESULTS.md</a>
     or on the training runs behind
-    <a href="{{REPO}}/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>.</p>
+    <a href="{{REPO}}/blob/main/docs/MODELS.md">MODELS.md</a>.</p>
 
     <div class="qa">
       <p class="q">Can a board this cheap hear you at all?</p>
@@ -444,7 +456,7 @@ footer a{color:var(--ink-soft)}
     </div>
 
     <div class="qa">
-      <p class="q">Why are there seven versions of the model?</p>
+      <p class="q">Why are there {{N_VERSIONS}} versions of the model?</p>
       <p class="a">Because each one answered the previous one's failure, and two answers were wrong.</p>
       <div class="body">
         <p>3M was too small to hold a conversation. 8M fit, and could not answer a
@@ -489,7 +501,7 @@ footer a{color:var(--ink-soft)}
 
     <div class="qa">
       <p class="q">How fast does it feel?</p>
-      <p class="a">{{E2E}} from the end of your sentence to the first syllable back.</p>
+      <p class="a">{{E2E}} for a whole turn: {{TURN_PARTS}}</p>
       <div class="body">
         <p>The full breakdown is in <a href="#results">Results</a>. The short version
         is that the model is not the slow part: generation runs at {{TOK_S}} and
@@ -502,7 +514,7 @@ footer a{color:var(--ink-soft)}
 
     <div class="qa">
       <p class="q">What went wrong that we'd rather not print?</p>
-      <p class="a">Six measurement bugs — every one of which flattered the result.</p>
+      <p class="a">Seven measurement bugs — every one of which flattered the result.</p>
       <div class="body">
         <p>A metric that scored the wrong substring. Evaluation running on the GPU
         when greedy decoding is sequential, so the CPU was 22× faster and a
@@ -510,6 +522,20 @@ footer a{color:var(--ink-soft)}
         because it was piped through <code>tee</code>. A trainer that saved the
         final epoch instead of the best one. Held-out sets that tested the wrong
         thing. A grader with two parsing bugs.</p>
+        <p>The seventh is the best of them, and it was found last. A model on
+        the device answered <em>"half of twelve is one hundred and a
+        quarter"</em> when the same bytes answered correctly on a PC, and
+        rebooting did not help. It looked exactly like a corrupted file. It was
+        not: the device generates at temperature 0.3, so it <strong>samples</strong>
+        rather than taking the likeliest word, and answers vary from run to run.
+        On a sixteen-question battery, greedy decoding scored 15/16 while one
+        sampling seed turned "six" into "three".</p>
+        <p>Every training evaluation we had ever run was greedy. So sampling had
+        been quietly under-reporting <em>every model we ever shipped</em>, and
+        nobody noticed because it only bites on the device. The fix is one line
+        of judgement rather than one line of code: a story should differ each
+        telling, a fact should not, so the device now samples only when the
+        question wants a story.</p>
         <p>The pattern is the finding: every one of them made the results look
         better, faster or cleaner than they were. In a regime where a single
         experiment costs hours, the evaluation code is as likely to be wrong as
@@ -532,7 +558,7 @@ footer a{color:var(--ink-soft)}
     repository at build time, so a figure cannot be right in the docs and stale
     on this page.</p>
 
-    <h3>Seven versions. Four measured this way.</h3>
+    <h3>{{N_VERSIONS_CAP}} versions. {{N_SCORED_CAP}} measured this way.</h3>
     <p>v1 to v3 were the 3M and 8M models before there was a held-out set worth
     the name, so they have no comparable number and are not shown. That is the
     honest reason, and it is also the first of the measurement lessons.</p>
@@ -543,6 +569,11 @@ footer a{color:var(--ink-soft)}
     like with like only inside a column.</figcaption>
 
     <h3>Where a turn goes</h3>
+    <p class="fine">From the twelve-turn soak in
+    <code>STAGE_E_RESULTS.md</code>, which measured the <strong>TinyTalk 3M</strong>
+    model — four versions before the one shipping now. The shape of a turn still
+    holds and the recogniser is unchanged; the generation rate does not, and the
+    current figure is in the tiles at the top of the page.</p>
     {{TIMING_CHART}}
     <div class="scroll-x">{{TIMING_TABLE}}</div>
 
@@ -577,7 +608,7 @@ footer a{color:var(--ink-soft)}
 <section class="paper">
   <div class="wrap">
     <h2>How it learned.</h2>
-    <p class="standfirst">Six versions of the same small brain, from one that
+    <p class="standfirst">{{N_VERSIONS_CAP}} versions of the same small brain, from one that
     knew nothing to the one in the device today. No background needed &mdash;
     this page assumes you have never trained anything and do not much care what
     a language model is. Every answer quoted below is one the model really gave,
@@ -642,7 +673,7 @@ footer a{color:var(--ink-soft)}
         a question v5 got wrong.</figcaption></figure>
     </div>
 
-    <h3>The six versions, in order</h3>
+    <h3>The {{N_VERSIONS}} versions, in order</h3>
     <p>The bar is the score on questions it had never seen before, out of 70%
     &mdash; not out of 100, because nothing here has ever been near 100 and a
     chart that pretends otherwise is flattering itself.</p>
@@ -664,7 +695,7 @@ footer a{color:var(--ink-soft)}
 
     <p>What we tried that did not work is in <a href="#train">Train your own</a>;
     the measurements and the ablations behind all of it are in
-    <a href="{{REPO}}/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>.</p>
+    <a href="{{REPO}}/blob/main/docs/MODELS.md">MODELS.md</a>.</p>
   </div>
 </section>
 </div>
@@ -926,7 +957,7 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
 
     <p style="margin-top:2rem">The full method, the ablations and the failure
     analysis are in
-    <a href="{{REPO}}/blob/main/docs/TECHNICAL_REPORT.md">TECHNICAL_REPORT.md</a>;
+    <a href="{{REPO}}/blob/main/docs/MODELS.md">MODELS.md</a>;
     the per-game breakdown of where the questions come from is in
     <a href="{{REPO}}/blob/main/docs/GUME_QUESTIONS.md">GUME_QUESTIONS.md</a>.</p>
   </div>

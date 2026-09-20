@@ -21,6 +21,9 @@ static const char *TAG = "speak";
 
 #define TTS_TA_PATH BOARD_SD_MOUNT "/story/tts/en-US_ta.bin"
 #define TTS_SG_PATH BOARD_SD_MOUNT "/story/tts/en-US_lh0_sg.bin"
+// Second voice (demo): a different PicoTTS lingware, not a pitch trick.
+#define TTS_TA_PATH_GB BOARD_SD_MOUNT "/story/tts/en-GB_ta.bin"
+#define TTS_SG_PATH_GB BOARD_SD_MOUNT "/story/tts/en-GB_kh0_sg.bin"
 
 typedef struct {
     int64_t first_us;
@@ -61,13 +64,26 @@ static bool to_speaker(void *u, const int16_t *pcm, size_t n)
 
 bool speak_text(const char *text, volatile bool *stop, speak_stats_t *st)
 {
+    return speak_text_voice(text, VOICE_IVY, stop, st);
+}
+
+bool speak_text_voice(const char *text, speak_voice_t v, volatile bool *stop, speak_stats_t *st)
+{
     phase_t ph;
     if (!phase_begin(&ph, "SPEAK")) return false;
     int64_t t0 = story_time_us();
     bool ok = false;
     tts_blobs_t b;
-    b.ta = asset_load(&g_bulk, TTS_TA_PATH, NULL);
-    b.sg = asset_load(&g_bulk, TTS_SG_PATH, NULL);
+    const char *ta = v == VOICE_ASKER ? TTS_TA_PATH_GB : TTS_TA_PATH;
+    const char *sg = v == VOICE_ASKER ? TTS_SG_PATH_GB : TTS_SG_PATH;
+    b.ta = asset_load(&g_bulk, ta, NULL);
+    b.sg = asset_load(&g_bulk, sg, NULL);
+    if ((!b.ta || !b.sg) && v == VOICE_ASKER) {
+        // The second voice is optional: fall back rather than fail the demo.
+        ESP_LOGW(TAG, "en-GB lingware missing; using the default voice");
+        phase_end(&ph);
+        return speak_text_voice(text, VOICE_IVY, stop, st);
+    }
     if (!b.ta || !b.sg) {
         ESP_LOGE(TAG, "TTS lingware unavailable on SD");
     } else if (tts_load(&b, &g_bulk)) {

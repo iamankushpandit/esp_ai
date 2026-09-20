@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+     SPDX-License-Identifier: GPL-3.0-or-later
+     SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit <https://github.com/iamankushpandit>
+
+     Part of Ivy AI - https://github.com/iamankushpandit/esp_ai
+     Free software under GPL-3.0-or-later, with the Espressif SDK linking
+     exception in LICENSE.exception. Reusing any part of this file, in any
+     work, must keep this notice, credit iamankushpandit as the author,
+     and stay under the same licence with corresponding source offered.
+     See LICENSE, LICENSE.exception, NOTICE.md and THIRD_PARTY.md.
+-->
+
+<svg
+   width="300"
+   height="330"
+   viewBox="115 50 290 320"
+   role="img"
+   aria-labelledby="title desc"
+   version="1.1"
+   id="svg60"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <title
+     id="title">Ivy AI trademark logo</title>
+  <desc
+     id="desc">An original warm orange ivy leaf formed around a light neural circuit, stacked above an Ivy AI trademark wordmark.</desc>
+  <defs
+     id="defs16">
+    <linearGradient
+       id="leaf-gradient"
+       x1="54"
+       y1="64"
+       x2="276"
+       y2="292"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#f8d2d2"
+         id="stop4" />
+      <stop
+         offset="0.52"
+         stop-color="#f4c2c2"
+         id="stop6" />
+      <stop
+         offset="1"
+         stop-color="#e6abb0"
+         id="stop8" />
+    </linearGradient>
+    <linearGradient
+       id="stem-gradient"
+       x1="160"
+       y1="104"
+       x2="160"
+       y2="312"
+       gradientUnits="userSpaceOnUse">
+      <stop
+         offset="0"
+         stop-color="#000000"
+         id="stop11" />
+      <stop
+         offset="1"
+         stop-color="#000000"
+         id="stop13" />
+    </linearGradient>
+  </defs>
+  <!-- Original Ivy AI symbol: a five-lobed ivy leaf carrying a neural circuit. -->
+  <g
+     id="symbol"
+     transform="translate(100,28)">
+    <path
+       fill="url(#leaf-gradient)"
+       d="m 160,30 c -11,33 -28,58 -55,67 -22,7 -40,-2 -60,-18 6,40 23,66 49,80 -28,10 -51,29 -67,59 42,-2 72,11 89,39 14,23 30,44 44,59 14,-15 30,-36 44,-59 17,-28 47,-41 89,-39 -16,-30 -39,-49 -67,-59 26,-14 43,-40 49,-80 -20,16 -38,25 -60,18 -27,-9 -44,-34 -55,-67 z"
+       id="path18" />
+    <path
+       fill="#ffffff"
+       opacity="0.13"
+       d="m 160,30 c -11,33 -28,58 -55,67 -22,7 -40,-2 -60,-18 6,40 23,66 49,80 -28,10 -51,29 -67,59 42,-2 72,11 89,39 14,23 30,44 44,59 z"
+       id="path20" />
+    <g
+       fill="none"
+       stroke="url(#stem-gradient)"
+       stroke-width="11"
+       stroke-linecap="round"
+       stroke-linejoin="round"
+       id="g32">
+      <path
+         d="M 160,277 V 111"
+         id="path22" />
+      <path
+         d="M 160,161 118,128 H 92"
+         id="path24" />
+      <path
+         d="m 160,161 42,-33 h 26"
+         id="path26" />
+      <path
+         d="m 160,213 -25,22 h -13"
+         id="path28" />
+      <path
+         d="m 160,213 25,22 h 13"
+         id="path30" />
+    </g>
+    <g
+       fill="#ffffff"
+       id="g48">
+      <path
+         id="circle34"
+         d="m 172,104 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle36"
+         d="m 104,128 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle38"
+         d="m 240,128 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle40"
+         d="m 134,235 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle42"
+         d="m 210,235 a 12,12 0 0 1 -12,12 12,12 0 0 1 -12,-12 12,12 0 0 1 12,-12 12,12 0 0 1 12,12 z" />
+      <path
+         id="circle44"
+         d="m 169,161 a 9,9 0 0 1 -9,9 9,9 0 0 1 -9,-9 9,9 0 0 1 9,-9 9,9 0 0 1 9,9 z" />
+      <path
+         id="circle46"
+         d="m 169,213 a 9,9 0 0 1 -9,9 9,9 0 0 1 -9,-9 9,9 0 0 1 9,-9 9,9 0 0 1 9,9 z" />
+    </g>
+    <path
+       d="m 160,277 c 0,21 -9,37 -25,50"
+       fill="none"
+       stroke="#c98b94"
+       stroke-width="11"
+       stroke-linecap="round"
+       id="path50" />
+  </g>
+  <!-- The delivered file converts these characters into vector outlines. -->
+  </svg>

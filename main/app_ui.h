@@ -12,7 +12,8 @@
 //
 //   ╭────────────────────────────╮
 //   │ [leaf]  Ivy AI             │
-//   │   (c) iamankushpandit      │
+//   │   (C) iamankushpandit      │
+//   │   TinyTalk 2 8M            │ <- the loaded model
 //   ╰────────────────────────────╯
 //   > what color is a banana       ▐ <- scrollable page area: the session
 //   ● The banana is yellow.        ▐    transcript (chat), the /model list,
@@ -29,9 +30,17 @@
 #include <stdbool.h>
 #include <stdint.h>
 
-// Boot welcome screen: the Ivy AI logo + "(c) iamankushpandit".
+// Boot welcome screen: the Ivy AI logo + "(C) iamankushpandit".
 void app_ui_splash(void);
 void app_ui_init(void);
+// Repaints the header's model row (call after models_scan/models_select).
+void app_ui_model_changed(void);
+// Sleep (the lock button, or the idle timeout): the logo alone on black, its
+// colour drifting. tick() draws one frame; exit() rebuilds the whole screen.
+void app_ui_sleep_enter(void);
+void app_ui_sleep_tick(void);
+void app_ui_sleep_exit(void);
+bool app_ui_sleeping(void);
 // Status line. Busy states (any color other than UI_OK/UI_GREY) get an
 // advancing spinner glyph; "..." is shown as an ellipsis.
 void app_ui_status(const char *s, uint16_t color);
@@ -63,6 +72,9 @@ static inline bool app_page_in_settings(app_page_t p)
 }
 void app_ui_page(app_page_t p);            // switch page (re-renders the area)
 app_page_t app_ui_page_get(void);
+// True while a keypad is open: the voice Ask pill is disabled, because the
+// keypad's own Ask key is the one that sends the typed question.
+bool app_ui_typing(void);
 void app_ui_refresh_page(void);            // e.g. after the model list changed
 
 // Row tags on /settings and its sub-pages (network rows use their index 0..).
@@ -76,6 +88,9 @@ void app_ui_refresh_page(void);            // e.g. after the model list changed
 #define TAG_SET_WAKE 113                   // tap toggles the wake word
 #define TAG_SET_ABOUT 114
 #define TAG_SET_GAIN 115                   // voice gain [-] / [+]
+#define TAG_SET_DEMO 116                   // tap runs the 60-second demo
+#define TAG_SET_DEMO_FULL 117              // ... the full tour
+#define TAG_SET_DEMO_FAIL 118              // ... and what it gets wrong
 #define TAG_TYPE 120                       // chat: "[ Type a question ]" -> T9 keypad
 // Settings rows "Label      [-] 70% [+]": columns 13..18 step down, 20.. step
 // up; a tap on the label does nothing.
@@ -123,6 +138,10 @@ void app_ui_bar_state(app_bar_t b, app_btn_state_t st);   // redraws only that p
 // Restart button (circular arrow, top-right of the header box).
 bool app_ui_restart_hit(int x, int y);
 void app_ui_restart_state(app_btn_state_t st);   // IDLE, PRESSED, ACTIVE (armed), BUSY
+
+// Lock button (padlock, right end of the model row): sleeps the screen.
+bool app_ui_lock_hit(int x, int y);
+void app_ui_lock_state(app_btn_state_t st);
 
 // Battery percentage in the header (0..100; -1 = unknown) with a bolt while
 // charging. Redraws only on change.

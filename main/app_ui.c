@@ -51,7 +51,7 @@ static void ui_lock_take(void)
 #define A_CHARS 480
 
 // Page area: a window of VIS rows onto the wrapped page content.
-#define CONVO_Y (ROW_Y(4) + 4)
+#define CONVO_Y (ROW_Y(5) + 4)
 #define VIS 12
 #define CONVO_W (BOARD_LCD_W - 8)        // 29 text columns + scrollbar gutter
 #define SB_X (BOARD_LCD_W - 5)
@@ -221,7 +221,7 @@ static void build_about(void)
     char line[96];
     int a = models_active();
     add_para("Ivy AI", -1);
-    add_para(UI_G_ROWMARK "(c) iamankushpandit", -1);
+    add_para(UI_G_ROWMARK "(C) iamankushpandit", -1);
     add_para("", -1);
     add_prose("A voice assistant that listens, thinks and speaks entirely on this device. "
               "Wi-Fi is used only to set the clock.");
@@ -246,6 +246,11 @@ static void build_settings(void)
     char line[96], clk[40];
     const prefs_t *p = prefs();
     clock_short(clk, sizeof clk);
+    add_para(UI_G_DIAMOND " Run demo  60 s  >", TAG_SET_DEMO);
+    add_para(UI_G_DIAMOND " Full demo  >", TAG_SET_DEMO_FULL);
+    add_para(UI_G_DIAMOND " What it gets wrong  >", TAG_SET_DEMO_FAIL);
+    add_para(UI_G_ROWMARK "  it asks and answers itself", TAG_SET_DEMO);
+    add_para("", -1);
     add_para(UI_G_DIAMOND " Wi-Fi & clock  >", TAG_WIFI_SETUP);
     snprintf(line, sizeof line, UI_G_ROWMARK "  %.12s " UI_G_MIDDOT " %s",
              net_has_credentials() ? net_ssid() : "not set up", clk);
@@ -493,7 +498,9 @@ int app_ui_kb_tap(int x, int y)
 // ---------------------------------------------------------------- T9 keypad
 // Typed questions on a phone-style 3x4 keypad in the page area. Multi-tap:
 // tapping the same key again within T9_CYCLE_US cycles its letters (2: a b c 2),
-// otherwise a new character starts. 0 is space.
+// otherwise a new character starts. 0 is space then zero, as on a phone, and
+// [#+] on the title row swaps the nine letter keys for symbols so that no
+// character needs more than four taps.
 #define T9_TITLE_Y CONVO_Y
 #define T9_FIELD_Y (CONVO_Y + UI_ROW_H)
 #define T9_KEYS_Y (CONVO_Y + 2 * UI_ROW_H + 4)
@@ -503,15 +510,26 @@ int app_ui_kb_tap(int x, int y)
 #define T9_CYCLE_US 900000
 #define T9_MAX 120
 enum { T9_DEL = 9, T9_SPACE = 10, T9_ASK = 11 };
-static const struct { const char *top, *sub, *cycle; } T9_KEYS[12] = {
+typedef struct { const char *top, *sub, *cycle; } t9_key_t;
+static const t9_key_t T9_KEYS[12] = {
     {"1", ".,?!", ".,?!'1"}, {"2", "abc", "abc2"}, {"3", "def", "def3"},
     {"4", "ghi", "ghi4"},    {"5", "jkl", "jkl5"}, {"6", "mno", "mno6"},
     {"7", "pqrs", "pqrs7"},  {"8", "tuv", "tuv8"}, {"9", "wxyz", "wxyz9"},
-    {"del", "", NULL},       {"0", "space", NULL}, {"Ask", "", NULL},
+    {"del", "", NULL},       {"0", "space", " 0"}, {"Ask", "", NULL},
+};
+// [#+] layer: every symbol within four taps. del / 0 / Ask keep their meaning.
+static const t9_key_t T9_SYM[12] = {
+    {".,?!", "", ".,?!"},    {"'\"`", "", "'\"`"},  {"-_=+", "", "-_=+"},
+    {"()[]", "", "()[]"},    {"{}<>", "", "{}<>"},  {"/\\|~", "", "/\\|~"},
+    {"@#$%", "", "@#$%"},    {"^&*", "", "^&*"},    {":;", "", ":;"},
+    {"del", "", NULL},       {"0", "space", " 0"},  {"Ask", "", NULL},
 };
 static char s_t9_text[T9_MAX + 1];
 static int s_t9_len, s_t9_last = -1, s_t9_idx;
+static bool s_t9_sym;
 static int64_t s_t9_last_us;
+
+static const t9_key_t *t9_key(int k) { return (s_t9_sym ? T9_SYM : T9_KEYS) + k; }
 
 static void draw_key2(int x, int y, int w, int h, const char *l1, const char *l2, bool pressed, bool accent)
 {
@@ -541,7 +559,8 @@ static void draw_key2(int x, int y, int w, int h, const char *l1, const char *l2
 static void t9_draw_key(int k, bool pressed)
 {
     int r = k / 3, c = k % 3;
-    draw_key2(c * T9_KEY_W, T9_KEYS_Y + r * T9_PITCH, T9_KEY_W, T9_KEY_H, T9_KEYS[k].top, T9_KEYS[k].sub,
+    const t9_key_t *key = t9_key(k);
+    draw_key2(c * T9_KEY_W, T9_KEYS_Y + r * T9_PITCH, T9_KEY_W, T9_KEY_H, key->top, key->sub,
               pressed, k == T9_ASK);
 }
 
@@ -558,13 +577,29 @@ static void t9_draw_field(void)
     ui_draw_row(0, T9_FIELD_Y, BOARD_LCD_W, row, UI_WHITE, UI_BLACK);
 }
 
+// "Type a question    [#+]  [x]" - the layer toggle and cancel are tap targets
+// (T9_SYM_COL, T9_X_COL below).
+#define T9_SYM_COL 19
+#define T9_X_COL 26
+static void t9_draw_title(void)
+{
+    char row[UI_MAX_COLS + 1];
+    memset(row, ' ', UI_MAX_COLS);
+    row[UI_MAX_COLS] = 0;
+    memcpy(row, "Type a question", 15);
+    memcpy(row + T9_SYM_COL, s_t9_sym ? "[abc]" : "[#+]", s_t9_sym ? 5 : 4);
+    memcpy(row + T9_X_COL, "[x]", 3);
+    row[T9_X_COL + 3] = 0;
+    ui_draw_row(0, T9_TITLE_Y, BOARD_LCD_W, row, UI_ACCENT, UI_BLACK);
+}
+
 static void t9_draw_all(void)
 {
     ui_box_set_rows(&s_convo, NULL, 0);       // blank the text rows (dirty rows only)
     ui_box_invalidate(&s_convo);              // text pages repaint over the keys later
     s_total = 0;
     draw_scrollbar();
-    ui_draw_row(0, T9_TITLE_Y, BOARD_LCD_W, "Type a question            [x]", UI_ACCENT, UI_BLACK);
+    t9_draw_title();
     t9_draw_field();
     for (int k = 0; k < 12; k++) t9_draw_key(k, false);
 }
@@ -575,6 +610,7 @@ void app_ui_t9_open(void)
     s_t9_text[0] = 0;
     s_t9_len = 0;
     s_t9_last = -1;
+    s_t9_sym = false;
     app_ui_page(PAGE_T9);
     UI_UNLOCK();
 }
@@ -584,7 +620,18 @@ const char *app_ui_t9_text(void) { return s_t9_text; }
 int app_ui_t9_tap(int x, int y)
 {
     if (s_page != PAGE_T9) return 0;
-    if (y < T9_FIELD_Y) return x >= 24 * UI_FONT_W ? 2 : 0;   // [x] on the title row: cancel
+    if (y < T9_FIELD_Y) {                                     // title row
+        if (x >= T9_X_COL * UI_FONT_W) return 2;              // [x]: cancel
+        if (x >= T9_SYM_COL * UI_FONT_W) {                    // [#+] / [abc]: swap layers
+            UI_LOCK();
+            s_t9_sym = !s_t9_sym;
+            s_t9_last = -1;                                   // commits the letter being cycled
+            t9_draw_title();
+            for (int k = 0; k < 9; k++) t9_draw_key(k, false);
+            UI_UNLOCK();
+        }
+        return 0;
+    }
     if (y < T9_KEYS_Y) return 0;
     int r = (y - T9_KEYS_Y) / T9_PITCH, c = x / T9_KEY_W;
     if (r > 3) return 0;
@@ -593,8 +640,8 @@ int app_ui_t9_tap(int x, int y)
     int64_t now = story_time_us();
     UI_LOCK();
     t9_draw_key(k, true);
-    if (T9_KEYS[k].cycle) {
-        const char *cy = T9_KEYS[k].cycle;
+    if (t9_key(k)->cycle) {
+        const char *cy = t9_key(k)->cycle;
         if (k == s_t9_last && now - s_t9_last_us < T9_CYCLE_US && s_t9_len > 0) {
             s_t9_idx = (s_t9_idx + 1) % (int)strlen(cy);       // same key again: next letter
             s_t9_text[s_t9_len - 1] = cy[s_t9_idx];
@@ -608,7 +655,6 @@ int app_ui_t9_tap(int x, int y)
     } else {
         s_t9_last = -1;                                        // commits the letter being cycled
         if (k == T9_DEL && s_t9_len > 0) s_t9_text[--s_t9_len] = 0;
-        else if (k == T9_SPACE && s_t9_len < T9_MAX) { s_t9_text[s_t9_len++] = ' '; s_t9_text[s_t9_len] = 0; }
         else if (k == T9_ASK && s_t9_len > 0) ret = 1;
     }
     t9_draw_field();
@@ -660,18 +706,99 @@ void app_ui_splash(void)
     board_lcd_fill(0, 0, BOARD_LCD_W, BOARD_LCD_H, UI_BLACK);
     const int lx = (BOARD_LCD_W - LOGO_FULL_W) / 2, ly = 34;
     blit_rgb(logo_full, LOGO_FULL_W, LOGO_FULL_H, lx, ly);
-    const char *c = "(c) iamankushpandit";
+    const char *c = "(C) iamankushpandit";
     int cw = (int)strlen(c) * UI_FONT_W;
     ui_draw_row((BOARD_LCD_W - cw) / 2, ly + LOGO_FULL_H + 18, cw, c, UI_DIM, UI_BLACK);
     UI_UNLOCK();
 }
 
+// ---------------------------------------------------------------- sleep
+// The lock button (and the idle timeout) put the screen to sleep: the logo
+// alone on black, its colour drifting slowly through a wheel. Only the logo
+// rectangle is ever redrawn, one frame every SLEEP_FRAME_US; after
+// SLEEP_DIM_US even that stops and the backlight goes off, so a locked
+// device on battery costs nothing.
+static uint16_t mix565(uint16_t a, uint16_t b, float t);
+
+#define SLEEP_FRAME_US 150000
+#define SLEEP_CYCLE_US 9000000            // one full trip around the wheel
+#define SLEEP_LOGO_Y ((BOARD_LCD_H - LOGO_FULL_H) / 2)
+static bool s_asleep;
+static int64_t s_sleep_t0, s_sleep_last;
+
+// The logo drawn as a silhouette in one colour: each pixel keeps its own
+// brightness (so the black circuit tracery stays black) and takes the tint's
+// hue. Streamed in strips like blit_rgb.
+static void blit_logo_tint(uint16_t tint)
+{
+    const int w = LOGO_FULL_W, x = (BOARD_LCD_W - w) / 2;
+    const int tr = (tint >> 11) & 0x1F, tg = (tint >> 5) & 0x3F, tb = tint & 0x1F;
+    const int strip = BOARD_LCD_STREAM_PX / w;
+    for (int y0 = 0; y0 < LOGO_FULL_H; y0 += strip) {
+        int rows = LOGO_FULL_H - y0 < strip ? LOGO_FULL_H - y0 : strip;
+        board_lcd_window(x, SLEEP_LOGO_Y + y0, w, rows);
+        uint16_t *buf = board_lcd_stream_buf();
+        const uint16_t *src = logo_full + (size_t)y0 * w;
+        for (int i = 0; i < w * rows; i++) {
+            int r = (src[i] >> 11) & 0x1F, g = (src[i] >> 5) & 0x3F, b = src[i] & 0x1F;
+            int lum = r > b ? r : b;                      // 0..31, the leaf's own shading
+            if (g / 2 > lum) lum = g / 2;
+            uint16_t c = (uint16_t)(((tr * lum / 31) << 11) | ((tg * lum / 31) << 5) | (tb * lum / 31));
+            buf[i] = (uint16_t)((c >> 8) | (c << 8));
+        }
+        board_lcd_stream_push(buf, (size_t)w * rows);
+        board_lcd_stream_end();
+    }
+}
+
+// Colour wheel for the sleeping logo: pink home, then around and back.
+static const uint16_t SLEEP_HUES[] = {
+    RGB565(244, 194, 194), RGB565(214, 130, 220), RGB565(120, 150, 245),
+    RGB565(110, 220, 210), RGB565(160, 230, 130), RGB565(245, 200, 120),
+};
+#define SLEEP_HUE_N (int)(sizeof SLEEP_HUES / sizeof SLEEP_HUES[0])
+
+static void draw_sleep_frame(int64_t now)
+{
+    float t = (float)((now - s_sleep_t0) % SLEEP_CYCLE_US) / SLEEP_CYCLE_US * SLEEP_HUE_N;
+    int i = (int)t;
+    blit_logo_tint(mix565(SLEEP_HUES[i % SLEEP_HUE_N], SLEEP_HUES[(i + 1) % SLEEP_HUE_N], t - i));
+}
+
+void app_ui_sleep_enter(void)
+{
+    UI_LOCK();
+    s_asleep = true;
+    s_sleep_t0 = s_sleep_last = story_time_us();
+    board_lcd_fill(0, 0, BOARD_LCD_W, BOARD_LCD_H, UI_BLACK);
+    draw_sleep_frame(s_sleep_t0);
+    UI_UNLOCK();
+}
+
+bool app_ui_sleeping(void) { return s_asleep; }
+
+void app_ui_sleep_tick(void)
+{
+    if (!s_asleep) return;
+    int64_t now = story_time_us();
+    if (now - s_sleep_last < SLEEP_FRAME_US) return;
+    UI_LOCK();
+    s_sleep_last = now;
+    draw_sleep_frame(now);
+    UI_UNLOCK();
+}
+
 // ---------------------------------------------------------------- header
 // ╭──────────────────────────╮
-// │ [leaf]  Ivy AI           │   leaf icon spans the two text rows
-// │         (c) iamankushpandit
+// │ [leaf]  Ivy AI    87% [#] (↻)
+// │         (C) iamankushpandit
+// │ Model: TinyTalk 2 8M    (lock)
 // ╰──────────────────────────╯
 #define HDR_TEXT_COL 5                   // text starts right of the icon
+#define LOCK_S 14                        // padlock at the right end of the model row
+#define LOCK_X (BOARD_LCD_W - UI_FONT_W - LOCK_S - 2)
+#define LOCK_Y ROW_Y(3)
+static int s_lock_state = -1;
 #define ICON_X (UI_FONT_W + ((HDR_TEXT_COL - 1) * UI_FONT_W - LOGO_ICON_W) / 2)   // centered in cols 1..4
 #define ICON_Y ROW_Y(1)
 
@@ -766,7 +893,9 @@ void app_ui_tick(void)
 static int s_bat_pct;
 static void draw_battery(int pct);
 
-static void header_row(int r, const char *text, uint16_t text_fg)
+// One header text row: text from column `col`, truncated (with an ellipsis)
+// at the right border.
+static void header_row_at(int r, int col, const char *text, uint16_t text_fg)
 {
     char row[COLS + 1];
     uint8_t attr[COLS];
@@ -775,11 +904,62 @@ static void header_row(int r, const char *text, uint16_t text_fg)
     memset(attr, 0, sizeof attr);
     row[COLS] = 0;
     row[0] = row[COLS - 1] = UI_G_V[0];
-    size_t n = strlen(text);
-    if (n > COLS - 1 - HDR_TEXT_COL) n = COLS - 1 - HDR_TEXT_COL;
-    memcpy(row + HDR_TEXT_COL, text, n);
-    memset(attr + HDR_TEXT_COL, 1, n);
+    size_t room = COLS - 1 - col, n = strlen(text);
+    bool cut = n > room;
+    if (cut) n = room;
+    memcpy(row + col, text, n);
+    if (cut) row[col + n - 1] = UI_G_ELLIPSIS[0];
+    memset(attr + col, 1, n);
     ui_draw_row_attr(0, ROW_Y(r), BOARD_LCD_W, row, attr, pal, UI_BLACK);
+}
+
+static void header_row(int r, const char *text, uint16_t text_fg)
+{
+    header_row_at(r, HDR_TEXT_COL, text, text_fg);
+}
+
+// Shortens a name to `room` columns by dropping its middle, keeping the tail
+// from a word boundary: "TinyTalk 2 8M v6 (Braino)" -> "TinyTalk…v6 (Braino)".
+// The tail is what distinguishes two models, so it is never the part cut.
+static void elide_middle(char *dst, size_t cap, const char *src, size_t room)
+{
+    size_t n = strlen(src);
+    if (room >= cap) room = cap - 1;
+    if (n <= room) { snprintf(dst, cap, "%s", src); return; }
+    // Split the room in half, then back the tail up to the start of its word.
+    size_t tail = n - (room - 1) / 2;
+    while (tail > 0 && src[tail - 1] != ' ' && n - tail < room - 2) tail--;
+    size_t head = room - 1 - (n - tail);
+    while (head > 1 && src[head - 1] == ' ') head--;   // no space before the ellipsis
+    memcpy(dst, src, head);
+    dst[head] = UI_G_ELLIPSIS[0];
+    memcpy(dst + head + 1, src + tail, n - tail);
+    dst[head + 1 + (n - tail)] = 0;
+}
+
+// Third header row: the model that will answer. It clears the leaf icon (which
+// spans rows 1-2 only), so it starts at column 1 and long names are elided
+// rather than cut off. Redrawn on its own when the choice changes.
+#define MODEL_LABEL "Model: "
+// Columns left for the name: from column 1 up to the lock button.
+#define MODEL_ROOM (LOCK_X / UI_FONT_W - 1 - ((int)sizeof(MODEL_LABEL) - 1))
+static void draw_model_row(void)
+{
+    const model_info_t *m = models_get(models_active());
+    char name[COLS], shown[COLS], line[COLS + 8];
+    sanitize(name, sizeof name, m ? m->name : "none loaded");
+    elide_middle(shown, sizeof shown, name, MODEL_ROOM);
+    snprintf(line, sizeof line, MODEL_LABEL "%s", shown);
+    header_row_at(3, 1, line, m ? UI_ACCENT : UI_ERR);
+    s_lock_state = -1;                     // the row's background wiped the padlock
+    app_ui_lock_state(BTN_IDLE);
+}
+
+void app_ui_model_changed(void)
+{
+    UI_LOCK();
+    draw_model_row();
+    UI_UNLOCK();
 }
 
 static void draw_header(void)
@@ -792,16 +972,17 @@ static void draw_header(void)
     ui_draw_row(0, ROW_Y(0), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
 
     header_row(1, "Ivy AI", UI_WHITE);
-    header_row(2, "(c) iamankushpandit", UI_DIM);
-    // Leaf icon over the two text rows, left of the title (after the rows,
-    // so their background doesn't cover it).
+    header_row(2, "(C) iamankushpandit", UI_DIM);
+    draw_model_row();
+    // Leaf icon over the first two text rows, left of the title (after the
+    // rows, so their background doesn't cover it).
     blit_rgb(logo_icon, LOGO_ICON_W, LOGO_ICON_H, ICON_X, ICON_Y);
     if (s_bat_pct != -2) draw_battery(s_bat_pct);
 
     row[0] = UI_G_BL[0];
     memset(row + 1, UI_G_H[0], COLS - 2);
     row[COLS - 1] = UI_G_BR[0];
-    ui_draw_row(0, ROW_Y(3), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
+    ui_draw_row(0, ROW_Y(4), BOARD_LCD_W, row, UI_DIM, UI_BLACK);
 }
 
 void app_ui_init(void)
@@ -826,8 +1007,8 @@ void app_ui_init(void)
     ui_box_mark(&s_convo, 1, UI_G_BULLET[0], UI_ACCENT);
     ui_box_mark_row(&s_convo, 2, UI_G_ROWMARK[0], UI_DIM);
     ui_box_mark(&s_convo, 3, UI_G_DIAMOND[0], UI_INFO);   // built-in (non-AI) answers
-    ui_box_init(&s_detail, 0, ROW_Y(16) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
-    ui_box_init(&s_status, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
+    ui_box_init(&s_detail, 0, ROW_Y(17) + 6, BOARD_LCD_W, 1, UI_DIM, UI_BLACK);
+    ui_box_init(&s_status, 0, ROW_Y(18) + 6, BOARD_LCD_W, 1, UI_ACCENT, UI_BLACK);
     ui_box_style(&s_status, 1, UI_ACCENT, 0);
     for (int b = 0; b < BAR_COUNT; b++) app_ui_bar_state((app_bar_t)b, BTN_IDLE);
     app_ui_restart_state(BTN_IDLE);
@@ -904,11 +1085,14 @@ void app_ui_builtin(const char *text, const char *source)
     UI_UNLOCK();
 }
 
+static char s_detail_text[64];
+
 void app_ui_detail(const char *text)
 {
     UI_LOCK();
-    char buf[64];
-    if (text && text[0]) snprintf(buf, sizeof buf, " " UI_G_RESULT " %s", text);
+    if (text != s_detail_text) snprintf(s_detail_text, sizeof s_detail_text, "%s", text ? text : "");
+    char buf[80];
+    if (s_detail_text[0]) snprintf(buf, sizeof buf, " " UI_G_RESULT " %s", s_detail_text);
     else buf[0] = 0;
     ui_box_set(&s_detail, buf);
     UI_UNLOCK();
@@ -955,11 +1139,17 @@ void app_ui_page(app_page_t p)
         bool settings = app_page_in_settings(p);
         app_ui_bar_state(BAR_MODEL, p == PAGE_MODELS ? BTN_ACTIVE : BTN_IDLE);
         app_ui_bar_state(BAR_SETTINGS, settings ? BTN_ACTIVE : BTN_IDLE);
+        // While a keypad is open, its own Ask key is the one to press: grey
+        // out the voice pill so there is no question which does what.
+        app_ui_bar_state(BAR_ASK, app_ui_typing() || s_busy ? BTN_BUSY : BTN_IDLE);
     }
     UI_UNLOCK();
 }
 
 app_page_t app_ui_page_get(void) { return s_page; }
+
+// A keypad is open: the question is being typed, not spoken.
+bool app_ui_typing(void) { return s_page == PAGE_T9 || s_page == PAGE_KEYBOARD; }
 
 void app_ui_refresh_page(void)
 {
@@ -1184,6 +1374,82 @@ void app_ui_restart_state(app_btn_state_t st)
     UI_UNLOCK();
 }
 
+// ---------------------------------------------------------------- lock button
+// A small padlock at the right end of the model row: one tap puts the screen
+// to sleep (the colour-cycling logo); any touch or "Hey Ivy" brings it back.
+#define LOCK_TOUCH_PAD 12
+
+// Padlock coverage at (x, y) relative to the icon's top-left, in a 14x14 box:
+// a 2 px-thick shackle arc over a rounded body with a keyhole.
+static bool lock_icon(float x, float y)
+{
+    const float cx = 6.5f;
+    if (y < 6.5f) {                                   // shackle: half ring, r 3.2
+        float dx = x - cx, dy = y - 6.0f;
+        float d = sqrtf(dx * dx + dy * dy);
+        return dy <= 0 && fabsf(d - 3.2f) <= 1.0f;
+    }
+    if (x < cx - 5.0f || x > cx + 5.0f || y > 13.0f) return false;
+    if (fabsf(x - cx) <= 0.9f && y >= 8.5f && y <= 11.0f) return false;   // keyhole
+    return true;
+}
+
+void app_ui_lock_state(app_btn_state_t st)
+{
+    UI_LOCK();
+    if ((int)st == s_lock_state) { UI_UNLOCK(); return; }
+    s_lock_state = (int)st;
+    uint16_t ink = st == BTN_PRESSED || st == BTN_ACTIVE ? UI_ACCENT
+                 : st == BTN_BUSY ? RGB565(70, 70, 70) : RGB565(170, 170, 170);
+    uint16_t *px = s_btn_px;
+    for (int y = 0; y < LOCK_S; y++)
+        for (int x = 0; x < LOCK_S; x++) {
+            float cov = 0;
+            for (int s = 0; s < 4; s++)
+                cov += lock_icon(x + ((s & 1) ? 0.25f : -0.25f), y + ((s & 2) ? 0.25f : -0.25f)) ? 1 : 0;
+            px[y * LOCK_S + x] = mix565(UI_BLACK, ink, cov / 4.0f);
+        }
+    board_lcd_window(LOCK_X, LOCK_Y, LOCK_S, LOCK_S);
+    uint16_t *buf = board_lcd_stream_buf();
+    for (int i = 0; i < LOCK_S * LOCK_S; i++) buf[i] = (uint16_t)((px[i] >> 8) | (px[i] << 8));
+    board_lcd_stream_push(buf, LOCK_S * LOCK_S);
+    board_lcd_stream_end();
+    UI_UNLOCK();
+}
+
+bool app_ui_lock_hit(int x, int y)
+{
+    return x >= LOCK_X - LOCK_TOUCH_PAD && x < LOCK_X + LOCK_S + LOCK_TOUCH_PAD &&
+           y >= LOCK_Y - 2 && y < LOCK_Y + LOCK_S + LOCK_TOUCH_PAD;
+}
+
+// Waking from sleep: the logo covered everything, so the whole screen is
+// rebuilt once (the only full repaint besides boot).
+void app_ui_sleep_exit(void)
+{
+    UI_LOCK();
+    if (s_asleep) {
+        s_asleep = false;
+        board_lcd_fill(0, 0, BOARD_LCD_W, BOARD_LCD_H, UI_BLACK);
+        s_rst_state = s_lock_state = -1;
+        draw_header();
+        app_ui_restart_state(BTN_IDLE);
+        app_ui_lock_state(BTN_IDLE);
+        ui_box_invalidate(&s_convo);
+        ui_box_invalidate(&s_detail);
+        ui_box_invalidate(&s_status);
+        render_page();                              // convo
+        app_ui_detail(s_detail_text);               // both repaint from their
+        app_ui_status(s_stat_text, s_stat_color);   // last text (invalidated above)
+        for (int b = 0; b < BAR_COUNT; b++) {
+            int st = s_bar_state[b];
+            s_bar_state[b] = -1;
+            app_ui_bar_state((app_bar_t)b, st < 0 ? BTN_IDLE : (app_btn_state_t)st);
+        }
+    }
+    UI_UNLOCK();
+}
+
 // ---------------------------------------------------------------- battery
 // "87% ⚡[|||| ]" on the title row, right-aligned just left of the restart
 // button. The bolt slot is blank unless charging.
@@ -1274,8 +1540,11 @@ void app_ui_battery(int pct, bool charging)
 
 bool app_ui_restart_hit(int x, int y)
 {
+    // Stops short of the lock button one row below: the two must not overlap.
+    int bottom = RST_Y + RST_S + RST_TOUCH_PAD;
+    if (bottom > LOCK_Y - 2) bottom = LOCK_Y - 2;
     return x >= RST_X - RST_TOUCH_PAD && x < RST_X + RST_S + RST_TOUCH_PAD &&
-           y >= RST_Y - RST_TOUCH_PAD && y < RST_Y + RST_S + RST_TOUCH_PAD;
+           y >= RST_Y - RST_TOUCH_PAD && y < bottom;
 }
 
 int app_ui_bar_hit(int x, int y)
