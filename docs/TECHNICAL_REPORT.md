@@ -20,16 +20,23 @@ Three results:
    parameters (21.0% → 78.5%), so it is a property of the training format, not
    of a particular model size.
 
-2. **Knowledge storage is not the bottleneck; phrasing coverage is.** With
-   18,602 facts in a 6.8M-parameter transformer body, 99.2% of facts are
-   retrievable under a wording seen in training and only 0.0–0.8% are wrong
-   under every wording tried. Accuracy under held-out phrasings is 45–64%. The
-   entire loss is paraphrase generalisation.
+2. **Knowledge storage is not the bottleneck; phrasing coverage is — and
+   the obvious remedy fails.** With 19,813 facts in a 6.8M-parameter
+   transformer body, up to 100.0% of facts are retrievable under a wording
+   seen in training and 0.0–0.8% are wrong under every wording tried. Accuracy
+   under held-out phrasings is 42–64%. Raising paraphrases per fact from 14 to
+   20 *widened* the gap rather than closing it, while driving trained-wording
+   accuracy to 100.0%: template-varied paraphrases add exposure without adding
+   the structural diversity that generalisation requires.
 
 3. **Most of the parameter budget is unused vocabulary.** 65.3% of the model's
    parameters are embedding rows; the corpus uses 8.9% of the tokenizer's
    vocabulary. A 4,096-token vocabulary frees ~11.8M parameters for the
    transformer body at identical on-device size.
+
+A third finding is methodological: two plausible remedies for the phrasing
+gap — class balancing and more paraphrases per fact — both made it worse, and
+both had been expected to help.
 
 We also report, in detail, **six measurement errors that changed reported
 results before they were caught**. We consider this the most transferable part
@@ -133,6 +140,15 @@ Train/eval overlap verified zero for both questions and answers.
 Two model families, two scales, the same ≈4× gap. Later runs with fuller
 operand coverage reach 84.0%.
 
+**The same move replicated on a second closed space.** Fractions and
+percentages were answered wrongly and self-inconsistently (17.5%) while the
+training data itself was correct — the facts were simply too sparse and
+interfered with one another. Enumerating the whole space, bounded from the
+application source at 251 facts, with every answer asserted against its
+computed value, raised this to **91.2%** — a 5.2× improvement with no change
+to the model. Where a fact space is small and closed, covering it beats
+relying on the model to interpolate across it.
+
 **The join step is load-bearing.** An initial version emitted the ones and
 tens sums and then the result, leaving the addition of the partial sums
 implicit. The model reproduced the shape and guessed the total. Making the
@@ -155,6 +171,7 @@ with a wording reserved for evaluation.
 | v4 | 99.2% | 64.2% | +29.2 | 0.8% |
 | v5 | 99.2% | 51.7% | +45.0 | **0.0%** |
 | v6 | 98.3% | 45.0% | +53.3 | 0.8% |
+| v7 | **100.0%** | 42.5% | **+55.0** | **0.0%** |
 
 The final column is the important one. In v5, **zero facts out of 120 were
 wrong under both wordings** while the model held 18,602 facts in a 6.8M
@@ -165,10 +182,28 @@ This reframes the problem: at this scale, for a closed curriculum, capacity is
 not the binding constraint, and "the model is too small" is the wrong
 diagnosis to reach for first.
 
-**A negative result.** v5→v6 added floor-balancing, and the gap *widened*
-(+45.0 → +53.3). Balancing repeats existing samples; repetition adds exposure
-without adding variety, and appears to trade paraphrase robustness for
-category coverage. Raising paraphrases per fact (14 → 20) is under test.
+**Two negative results.**
+
+*Balancing.* v5→v6 added floor-balancing and the gap *widened* (+45.0 →
++53.3). Balancing repeats existing samples; repetition adds exposure without
+adding variety.
+
+*More paraphrases do not help.* v6→v7 raised paraphrases per fact from 14 to
+20, predicting the gap would narrow. **It widened again** (+53.3 → +55.0), and
+trained-wording accuracy reached a perfect 100.0% while held-out accuracy
+*fell* to 42.5%. The model memorised harder rather than generalising better.
+
+This falsifies the obvious remedy. Our paraphrase generator varies surface
+decoration — prefixes, suffixes, contraction swaps — around a fixed question
+stem, so twenty variants are not more diverse than fourteen in any way that
+matters; they are more copies of one shape. The result suggests paraphrase
+robustness needs *structural* variation (different syntactic frames, different
+content words) rather than more decoration, and that adding decoration past
+some point actively encourages memorisation of the stem.
+
+The diagnosis survives and is strengthened: v7 has **0.0% of facts wrong under
+both wordings**, so all 19,813 facts remain stored and retrievable. Only the
+proposed lever was wrong.
 
 ---
 
@@ -352,16 +387,17 @@ than any hyperparameter change we made.
 
 ## 10. Results summary
 
-| | v4 | v5 | v6 |
-|---|---|---|---|
-| facts in corpus | narrower | 19,813 | 19,813 |
-| held-out exact | **64.2%** | 48.5% | 53.0% |
-| weighted per-field | **63.3%** | 49.2% | 51.9% |
-| arithmetic, unseen pairs | 80.7% | 80.7% | **84.0%** |
-| refusal rate | — | 42.7% | **52.1%** |
-| over-refusal | — | 5.3% | **4.0%** |
-| phrasing gap | **+29.2** | +45.0 | +53.3 |
-| facts wrong both ways | 0.8% | **0.0%** | 0.8% |
+| | v4 | v5 | v6 | v7 |
+|---|---|---|---|---|
+| facts in corpus | narrower | 19,813 | 19,813 | 19,813 |
+| held-out exact | **64.2%** | 48.5% | 53.0% | 60.9% |
+| weighted per-field | **63.3%** | 49.2% | 51.9% | 55.4% |
+| fractions & percentages | — | — | 17.5% | **91.2%** |
+| arithmetic, unseen pairs | 80.7% | 80.7% | **84.0%** | 82.3% |
+| refusal rate | — | 42.7% | **52.1%** | 49.0% |
+| over-refusal | — | 5.3% | 4.0% | **3.3%** |
+| phrasing gap | **+29.2** | +45.0 | +53.3 | +55.0 |
+| facts wrong both ways | 0.8% | **0.0%** | 0.8% | **0.0%** |
 
 v4 leads on the headline while holding a substantially narrower fact set. v5
 and v6 answer the 16 games that had no data at all. **We do not claim v6 is
@@ -395,9 +431,12 @@ worse at the headline metric.
 
 ## 12. Open questions
 
-1. Does raising paraphrases per fact close the phrasing gap, or is
-   template-based paraphrase generation too shallow to help beyond a point?
-   (In progress.)
+1. ~~Does raising paraphrases per fact close the phrasing gap?~~
+   **Answered: no.** 14 → 20 widened it (+53.3 → +55.0) and pushed trained
+   accuracy to 100.0%. The open question is now whether *structurally* varied
+   paraphrases — different syntactic frames and content words, not prefixes
+   and suffixes — behave differently. This is the single most valuable
+   experiment remaining.
 2. Does the 2.6× larger transformer body beat the shipped architecture on an
    identical corpus? This decides whether the firmware change is justified.
 3. Can floor-balancing be replaced by per-fact normalisation, so large
