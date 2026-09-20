@@ -65,8 +65,20 @@ void think_stop(void)
 
 #define GGUF_CTX 128
 
+// Decoding: sample only when we want variety. A story should differ each
+// time it is told; a fact should not. Sampling at temperature 0.3 measurably
+// breaks factual answers - on v8's fact battery, greedy scored 15/16 while
+// one sampling seed turned "half of twelve is six" into "three" (the
+// training evaluations are greedy, so sampling also under-reports the model).
+static void set_decoding(llm_params_t *p, bool creative)
+{
+    if (creative) return;                  // keep the tuned temperature 0.3 / top_p 0.9
+    p->temperature = 0.0f;
+    p->top_p = 1.0f;
+}
+
 static bool think_gguf(const char *question, char *answer, size_t cap, think_stream_fn fn, void *user,
-                       llm_stats_t *st, int64_t t0)
+                       llm_stats_t *st, int64_t t0, bool creative)
 {
     struct stat sb;
     if (stat(s_dir, &sb) != 0) {
@@ -93,6 +105,7 @@ static bool think_gguf(const char *question, char *answer, size_t cap, think_str
     }
     int64_t load_us = story_time_us() - t0;
     llm_params_t p = llm_default_params();
+    set_decoding(&p, creative);
     stream_t s = {.fn = fn, .user = user, .st = st};
     s_stop_flag = &m.stop;
     bool ok = gguf_llm_answer(&m, question, &p, answer, cap, on_piece, &s, st);
@@ -122,7 +135,7 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
     s_err[0] = 0;
     size_t pl = strlen(s_dir);
     if (pl > 5 && !strcmp(s_dir + pl - 5, ".gguf")) {
-        ok = think_gguf(question, answer, cap, fn, user, st, t0);
+        ok = think_gguf(question, answer, cap, fn, user, st, t0, intent == INTENT_STORY);
         phase_end(&ph);
         return ok;
     }
@@ -137,6 +150,7 @@ bool think_answer(const llm_history_t *hist, const char *question, char *answer,
         ESP_LOGE(TAG, "LLM assets unavailable on SD");
     } else {
         llm_params_t p = llm_default_params();
+        set_decoding(&p, intent == INTENT_STORY);
         if (llm_load(&llm, &b, &p, &g_fast, &g_bulk)) {
             int64_t load_us = story_time_us() - t0;
             stream_t s = {.fn = fn, .user = user, .st = st};

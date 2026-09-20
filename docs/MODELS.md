@@ -39,7 +39,7 @@ Three traps worth knowing before you download anything:
 * **A tied `lm_head` is read in full every token.** It is not a cold lookup
   table, so you cannot bank on paging it out.
 
-TinyTalk v7 is 19.7M parameters and fits because its vocabulary is pruned to
+TinyTalk v8 is 19.7M parameters and fits because its vocabulary is pruned to
 17,959 and its dim is only 256: 6.47 MB of weights plus a 288 KB tokenizer.
 
 ## 2. Will it be fast enough?
@@ -58,7 +58,7 @@ Measured on this board, which is why the numbers land where they do:
 | tinyllama-v0 (GGUF) | 0.8 MB | 22 |
 | delphi 6.4m (GGUF) | 3.8 MB | 7.3 |
 | stories15M (GGUF) | 5.5 MB | 7.3 |
-| **TinyTalk v7** | 6.5 MB | 5.4–5.9 |
+| **TinyTalk v8** | 6.5 MB | 5.4–5.9 |
 
 Halving the model roughly doubles the speed. There is no way around this short
 of reading fewer weights per token.
@@ -84,13 +84,13 @@ choice is, and small models fail in specific ways.
 * **Instruction-tuned tiny models follow the form without the content.**
   tinyllama-15M-alpaca produces a confident, well-shaped, usually wrong answer.
 * **A model trained on your own facts beats a larger generic one.** This is the
-  whole reason TinyTalk v7 exists: at 19.7M parameters it answers kid/Braino
+  whole reason TinyTalk v8 exists: at 19.7M parameters it answers kid/Braino
   questions better than anything general-purpose that fits.
 
-The catch to know up front: v7 is right **100% on a wording it was trained on
-and 42.5% on a rephrasing**, with 0% of facts wrong both ways. The knowledge is
-in there; the phrasings are not. Demo with the strings in
-`training/V7_RESULTS.md`.
+The catch to know up front, though v8 has largely fixed it: v7 was right
+**100% on a trained wording and 42.5% on a rephrasing**; v8 is **99.2% and
+63.3%**, closing the gap by 24 points. Both have 0% of facts wrong under both
+wordings — the knowledge is in there.
 
 ### Decision order
 
@@ -157,8 +157,20 @@ arithmetic from 18.3% → 75.3%.
 The counter-example is just as useful: raising paraphrases per fact from 14 to
 20 was predicted to close the phrasing gap and **widened** it (+53.3 → +55.0),
 while trained-wording accuracy hit 100%. Decoration around a fixed question
-stem produces copies, not variety, and the model memorizes harder. Paraphrase
-robustness needs *structural* variation.
+stem produces copies, not variety, and the model memorizes harder.
+
+v8 acted on that diagnosis: paraphrases now rewrite the question **stem**
+rather than decorate it, and held-out accuracy jumped 42.5% → **63.3%** with
+the gap closing 24 points. Same model, same size, same training time — only
+the *kind* of variation in the data changed.
+
+### Decode greedily for facts
+
+The device samples at temperature 0.3, which suits stories and quietly costs
+accuracy on facts. Measured on a 16-question battery: greedy scored 15/16,
+while one sampling seed turned "half of twelve is six" into "three". The
+training evaluations are greedy too, so sampling also under-reports the model.
+`main/think.c` now samples only when the intent is a story.
 
 ### Getting it onto the device
 

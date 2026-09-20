@@ -26,7 +26,7 @@ Native **ESP-IDF v6.1**, C. No LVGL, no Arduino.
 |---|---|
 | **Wake word** | "Hey Ivy" (Espressif WakeNet9), always listening, also from sleep |
 | **Speech to text** | conformer CTC, open vocabulary, streamed from SD |
-| **Answers** | TinyTalk 2 8M v7 — 19.7M parameters, Q4, on the device |
+| **Answers** | TinyTalk 2 8M v8 — 19.7M parameters, Q4, on the device |
 | **Also runs** | any llama.cpp **GGUF** file you drop on the SD card ([docs/GGUF.md](docs/GGUF.md)) |
 | **Speech** | SVOX Pico en-US, with adjustable voice gain |
 | **Without the AI** | time, date, timers ("set a timer for five minutes") and identity are answered by plain C — the UI marks which |
@@ -39,7 +39,7 @@ Native **ESP-IDF v6.1**, C. No LVGL, no Arduino.
 
 | | |
 |---|---|
-| LLM (TinyTalk v7, 6.5 MB) | load 687 ms, **5.4–5.9 tok/s** |
+| LLM (TinyTalk v8, 6.5 MB) | load 694 ms, **5.4–5.9 tok/s** |
 | LLM (GGUF delphi 6.4m, 3.8 MB) | load 864 ms, **7.3 tok/s** |
 | LLM (GGUF stories260K) | **30 tok/s** |
 | STT | 2.7–4.6 s for 1.4–2.9 s of audio (pre-encode overlaps recording) |
@@ -144,10 +144,10 @@ training/       model results and test-question sheets
 
 ## Known limits
 
-* Answers come from a 19.7M-parameter model. v7 is right **100% of the time on
-  a wording it was trained on and 42.5% on a rephrasing**, with 0% of facts
-  wrong both ways — the knowledge is there, the phrasings are not. Use the
-  exact strings in `training/V7_RESULTS.md` when demonstrating.
+* Answers come from a 19.7M-parameter model. v8 is right **99.2% on a wording
+  it was trained on and 63.3% on a rephrasing**, with 0% of facts wrong both
+  ways. That gap closed by 24 points in v8; earlier versions were far more
+  sensitive to how you asked.
 * STT is slower than real time; a long question takes several seconds.
 * The VAD occasionally clips the last syllable of a sentence.
 * The wake word is verified against played-back recordings; sensitivity to
