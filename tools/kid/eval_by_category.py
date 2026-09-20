@@ -138,7 +138,12 @@ def main():
         for line in Path(f).read_text(encoding="utf-8").splitlines():
             if line.strip():
                 e = json.loads(line)
-                buckets[category(e["q"], e["a"], src)].append(e)
+                # An explicit label from the generator beats guessing from
+                # the text. The guesser put "what do you know about carbon"
+                # in ANIMALS because the answer says "animal", which made two
+                # fields look permanently broken when they were mislabelled.
+                lab = e.get("topic")
+                buckets[lab or category(e["q"], e["a"], src)].append(e)
 
     tok = GPT2TokenizerFast.from_pretrained(a.model)
     model = GPTNeoForCausalLM.from_pretrained(a.model).to(a.device).eval()

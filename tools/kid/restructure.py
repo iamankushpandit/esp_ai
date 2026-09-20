@@ -136,6 +136,42 @@ TRAIN_STRUCTURES = [
         r"split \2 and take \1",
         r"\1 of \2",
     ]),
+    # --- word-problem frames, measured as the top unmatched stems ---
+    # "how much is" appears 12,548 times and "can you add" 8,115. v8 answers
+    # "what is three minus one" correctly and returns unrelated text for "if
+    # you take one away from three what is left" - the same fact in a frame it
+    # never learned to map onto subtraction. These rules connect the frames.
+    (r"^if you take (.+?) away from (.+?) what is left$", [
+        r"what is \2 minus \1",
+        r"\2 minus \1 is what",
+        r"subtract \1 from \2",
+        r"take \1 from \2",
+    ]),
+    (r"^how much is (.+?) plus (.+)$", [
+        r"what is \1 plus \2",
+        r"add \1 and \2",
+        r"\1 plus \2 is what",
+    ]),
+    (r"^how much is (.+?) minus (.+)$", [
+        r"what is \1 minus \2",
+        r"subtract \2 from \1",
+        r"\1 minus \2 is what",
+    ]),
+    (r"^can you add (.+?) and (.+)$", [
+        r"what is \1 plus \2",
+        r"add \1 and \2",
+        r"\1 plus \2 is what",
+    ]),
+    (r"^what do you get when you add (.+?) and (.+)$", [
+        r"what is \1 plus \2",
+        r"add \1 and \2",
+        r"\1 and \2 together is what",
+    ]),
+    (r"^what is left when you take (.+?) from (.+)$", [
+        r"what is \2 minus \1",
+        r"subtract \1 from \2",
+        r"\2 minus \1 is what",
+    ]),
     # --- frames measured as the most common in the actual corpus ---
     (r"^what continent is (.+?) in$", [
         r"which continent has \1",
@@ -255,6 +291,14 @@ EVAL_STRUCTURES = [
     (r"^define (.+)$", [
         r"could you define \1",
         r"do you know what \1 means",
+    ]),
+    (r"^if you take (.+?) away from (.+?) what is left$", [
+        r"do you know \2 minus \1",
+        r"could you subtract \1 from \2",
+    ]),
+    (r"^how much is (.+?) plus (.+)$", [
+        r"could you work out \1 plus \2",
+        r"do you know \1 plus \2",
     ]),
 ]
 

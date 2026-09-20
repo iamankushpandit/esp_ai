@@ -10,7 +10,7 @@ Output (same format as tools/kid/gen_kid_data.py):
     models_out/kid/gume_train.txt   blank-line separated
         User: what is the chemical symbol for gold
         Bot: The symbol for gold is Au.<|endoftext|>
-    models_out/kid/gume_eval.jsonl  {"q": ..., "a": ...} held-out phrasings
+    models_out/kid/gume_eval.jsonl  {"q":..., "a":..., "topic":...} held out
 
 Questions are written the way the speech recognizer outputs text: lower case,
 no punctuation, numbers as words. Answers are short, ASCII, numbers as words.
@@ -1300,7 +1300,15 @@ def main():
                 train.append(f"User: {q}\nBot: {ans}<|endoftext|>")
                 per_game[game][1] += 1
         for q in eq:
-            evals.append({"q": q, "a": ans})
+            # Carry the true game label. eval_by_category.py otherwise has to
+            # guess the field from words in the text, and it guesses badly:
+            # "what do you know about carbon" was being counted as an ANIMALS
+            # question because the answer contains the word "animal", and
+            # "how would you use the word bucolic" likewise because its answer
+            # mentions sheep. Two of the three fields that looked permanently
+            # broken turned out to be mislabelled buckets rather than weak
+            # fields.
+            evals.append({"q": q, "a": ans, "topic": game})
             per_game[game][2] += 1
     rng.shuffle(train)
 
