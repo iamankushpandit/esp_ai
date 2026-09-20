@@ -782,9 +782,11 @@ footer a{color:var(--ink-soft)}
     which makes the <em>smaller</em> model the one that is too big.</p>
 
     <div class="note">
-      <p><strong>Firmware size today:</strong> 2,792,496 bytes of the
-      6 MB application partition (44.4%). The models are not in
-      here — they live on the SD card, which is why the install is two steps.</p>
+      <p><strong>None of these models is in the firmware.</strong> They live on
+      the SD card, because the application partition is 6 MB and the
+      recogniser alone is 13.8&nbsp;MB. That is why the install is two steps,
+      and why swapping the model is copying a folder rather than reflashing a
+      board.</p>
     </div>
   </div>
 </section>
@@ -1387,7 +1389,7 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     exception</a>. <strong>Ivy AI</strong> is a product name and is not licensed by
     the GPL — <a href="https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md">NOTICE.md</a> explains the one
     thing a fork is asked to change.</p>
-    <p class="built">Generated 2026-09-20 from stage-e-poc · every figure on this
+    <p class="built">Built from stage-e-poc, 2026-09-20 · every figure on this
     page is derived from the repository, not typed twice.</p>
   </div>
 </footer>

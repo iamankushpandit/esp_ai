@@ -38,6 +38,7 @@ import html
 import os
 import re
 import shutil
+import subprocess
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -514,12 +515,21 @@ def first_number(text):
     return value / 1000.0 if match.group(2) == "ms" else value
 
 
-def app_size():
-    """Bytes of the built application image, if there is one."""
-    path = os.path.join(ROOT, "build", "story.bin")
-    if not os.path.isfile(path):
-        return None
-    return os.path.getsize(path)
+def built_date():
+    """The date of the last commit, not today's date.
+
+    The generated page is committed under docs/ and CI regenerates it to check
+    the two still agree. today() would make them disagree the moment the clock
+    rolls over in UTC -- a check that fails daily for no reason is a check
+    people turn off. The commit date changes only when the content does, which
+    is what the line is actually telling the reader.
+    """
+    try:
+        out = subprocess.run(["git", "log", "-1", "--format=%cs"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout
+        return out.strip() or datetime.date.today().isoformat()
+    except (OSError, subprocess.CalledProcessError):
+        return datetime.date.today().isoformat()
 
 
 def version():
@@ -630,14 +640,11 @@ def main():
     stt_open = stage("STT open", "the STT open time").strip()
     llm_load = stage("LLM load", "the model load time").strip()
 
-    size = app_size()
-    app_bytes = "{:,}".format(size) if size else "not built"
-    app_pct = "%.1f%%" % (size / APP_PART_BYTES * 100) if size else "—"
 
     page = template
     for key, value in (
         ("{{VERSION}}", version()),
-        ("{{BUILT}}", datetime.date.today().isoformat()),
+        ("{{BUILT}}", built_date()),
         ("{{REPO}}", args.repo),
         ("{{TOK_S}}", tok_s_readme),
         ("{{E2E}}", turn_total),
@@ -651,8 +658,6 @@ def main():
         ("{{PHRASE_GAP}}", PHRASE_GAP),
         ("{{OVER_REFUSAL}}", OVER_REFUSAL),
         ("{{HELD_OUT}}", HELD_OUT),
-        ("{{APP_BYTES}}", app_bytes),
-        ("{{APP_PCT}}", app_pct),
         ("{{APP_PART}}", "6 MB"),
         ("{{N_VERSIONS}}", num_word(len([v for v in VERSIONS
                                         if v.get("timeline") is not False]))),
@@ -683,7 +688,13 @@ def main():
 
     out = os.path.join(ROOT, args.out)
     os.makedirs(out, exist_ok=True)
-    with open(os.path.join(out, "index.html"), "w", encoding="utf-8") as handle:
+    # newline="\n" is not a detail. Without it Python translates to CRLF
+    # on Windows and LF on Linux, so the page generated on a laptop and the
+    # one generated in CI differ on every single line -- which made the
+    # "docs/ matches the generators" check fail with a diff of the whole file
+    # and no clue what was actually wrong.
+    with open(os.path.join(out, "index.html"), "w",
+              encoding="utf-8", newline="\n") as handle:
         handle.write(page)
 
     # The logo is inlined as a sprite AND referenced by URL as the favicon, so
@@ -696,7 +707,7 @@ def main():
         shutil.copytree(site_assets, out_assets, dirs_exist_ok=True)
 
     print("wrote %s" % os.path.join(args.out, "index.html"))
-    print("  version %s, firmware %s bytes (%s)" % (version(), app_bytes, app_pct))
+    print("  version %s" % version())
     return 0
 
 
