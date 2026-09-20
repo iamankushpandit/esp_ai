@@ -28,7 +28,12 @@ void pipeline_cancel(void);
 // Full conversation session; returns when it ends (screen off afterwards).
 void pipeline_session(const hear_params_t *hp, int max_turns);
 
-// Demo (/settings): a scripted conversation with no microphone. Each question
-// is spoken in a second voice, answered by the model or by the built-ins, and
-// the whole thing stays on screen as one chat. For filming. Stop ends it.
-void pipeline_demo(bool full);
+// Demo (/settings): a conversation with no microphone. Each question is spoken
+// in a second voice, answered by the model or by the built-ins, and the whole
+// thing stays on screen as one chat. For filming. Stop ends it.
+//   SHORT  - about a minute, questions drawn at random from a verified pool
+//   FULL   - the long tour, every subject plus a timer and a story
+//   LIMITS - what it gets WRONG: the phrasing gap, invented arithmetic,
+//            nonsense drift, and the questions it honestly refuses
+typedef enum { DEMO_MODE_SHORT = 0, DEMO_MODE_FULL, DEMO_MODE_LIMITS } demo_mode_t;
+void pipeline_demo(demo_mode_t mode);

@@ -79,7 +79,8 @@ void app_ui_refresh_page(void);            // e.g. after the model list changed
 #define TAG_SET_ABOUT 114
 #define TAG_SET_GAIN 115                   // voice gain [-] / [+]
 #define TAG_SET_DEMO 116                   // tap runs the 60-second demo
-#define TAG_SET_DEMO_FULL 117              // ... and the full tour
+#define TAG_SET_DEMO_FULL 117              // ... the full tour
+#define TAG_SET_DEMO_FAIL 118              // ... and what it gets wrong
 #define TAG_TYPE 120                       // chat: "[ Type a question ]" -> T9 keypad
 // Settings rows "Label      [-] 70% [+]": columns 13..18 step down, 20.. step
 // up; a tap on the label does nothing.

@@ -30,7 +30,7 @@ bool touch_ui_take_volume_preview(void);
 // A question typed on the T9 keypad (Ask tapped), once.
 bool touch_ui_take_typed(char *out, size_t cap);
 // "Run demo" was tapped in /settings: the main loop runs pipeline_demo().
-bool touch_ui_take_demo(bool *full);
+bool touch_ui_take_demo(int *mode);   // -> demo_mode_t
 
 // Screen power (backlight). Keeps state consistent between tasks.
 void screen_on(void);

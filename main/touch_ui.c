@@ -182,13 +182,14 @@ bool touch_ui_take_volume_preview(void)
 static char s_typed[128];
 static volatile bool s_typed_ready;
 
-static volatile bool s_demo_ready, s_demo_full;
+static volatile bool s_demo_ready;
+static volatile int s_demo_mode;
 
-bool touch_ui_take_demo(bool *full)
+bool touch_ui_take_demo(int *mode)
 {
     if (!s_demo_ready) return false;
     s_demo_ready = false;
-    *full = s_demo_full;
+    *mode = s_demo_mode;
     return true;
 }
 
@@ -237,7 +238,9 @@ static void settings_tap(int tag, int col)
         return;
     case TAG_SET_DEMO:
     case TAG_SET_DEMO_FULL:
-        s_demo_full = tag == TAG_SET_DEMO_FULL;
+    case TAG_SET_DEMO_FAIL:
+        s_demo_mode = tag == TAG_SET_DEMO_FULL ? DEMO_MODE_FULL
+                    : tag == TAG_SET_DEMO_FAIL ? DEMO_MODE_LIMITS : DEMO_MODE_SHORT;
         s_demo_ready = true;                // the main loop owns the arenas
         app_ui_page(PAGE_CHAT);
         return;

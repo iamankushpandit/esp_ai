@@ -486,13 +486,13 @@ void app_main(void)
                 shown = -1;
             }
         }
-        bool demo_full = false;
-        if (!start && !app_ui_is_busy() && touch_ui_take_demo(&demo_full)) {
+        int demo_mode = 0;
+        if (!start && !app_ui_is_busy() && touch_ui_take_demo(&demo_mode)) {
             // /settings > Run demo: a scripted conversation, no microphone.
             wake_stop();
             screen_on();
             app_ui_busy(true);
-            pipeline_demo(demo_full);
+            pipeline_demo((demo_mode_t)demo_mode);
             app_ui_busy(false);
             if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
         }

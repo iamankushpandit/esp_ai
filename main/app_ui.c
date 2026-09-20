@@ -238,6 +238,7 @@ static void build_settings(void)
     clock_short(clk, sizeof clk);
     add_para(UI_G_DIAMOND " Run demo  60 s  >", TAG_SET_DEMO);
     add_para(UI_G_DIAMOND " Full demo  >", TAG_SET_DEMO_FULL);
+    add_para(UI_G_DIAMOND " What it gets wrong  >", TAG_SET_DEMO_FAIL);
     add_para(UI_G_ROWMARK "  it asks and answers itself", TAG_SET_DEMO);
     add_para("", -1);
     add_para(UI_G_DIAMOND " Wi-Fi & clock  >", TAG_WIFI_SETUP);
