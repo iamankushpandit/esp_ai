@@ -34,6 +34,7 @@ Native **ESP-IDF v6.1**, C. No LVGL, no Arduino.
 | **Typing** | on-screen T9 keypad, for when you'd rather not talk |
 | **Screen** | pink/white/black CLI-style UI, dirty-row redraw only — nothing ever flashes |
 | **Sleep** | lock button; the logo drifts through colours, then the backlight goes off |
+| **Demo** | /settings > Run demo: a scripted conversation it asks itself in a second voice and answers in its own — hands-free, for filming |
 
 ## Performance, measured on the board
 

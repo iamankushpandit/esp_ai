@@ -42,6 +42,9 @@ ASSETS = [
     ("models_out/llm3m/embed/tok_neo.bin", "/sd/story/llm/tok.bin"),
     (".refs/conformer-stt-s3/checkpoints/model.bin", "/sd/story/stt/model.bin"),
     (".refs/esp-picotts/pico/lang/en-US_ta.bin", "/sd/story/tts/en-US_ta.bin"),
+    # Second voice, for the demo's question/answer contrast.
+    (".refs/esp-picotts/pico/lang/en-GB_ta.bin", "/sd/story/tts/en-GB_ta.bin"),
+    (".refs/esp-picotts/pico/lang/en-GB_kh0_sg.bin", "/sd/story/tts/en-GB_kh0_sg.bin"),
     (".refs/esp-picotts/pico/lang/en-US_lh0_sg.bin", "/sd/story/tts/en-US_lh0_sg.bin"),
 ]
 

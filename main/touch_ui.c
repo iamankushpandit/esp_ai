@@ -182,6 +182,15 @@ bool touch_ui_take_volume_preview(void)
 static char s_typed[128];
 static volatile bool s_typed_ready;
 
+static volatile bool s_demo_ready;
+
+bool touch_ui_take_demo(void)
+{
+    if (!s_demo_ready) return false;
+    s_demo_ready = false;
+    return true;
+}
+
 bool touch_ui_take_typed(char *out, size_t cap)
 {
     if (!s_typed_ready) return false;
@@ -224,6 +233,10 @@ static void settings_tap(int tag, int col)
         break;
     case TAG_SET_ABOUT:
         app_ui_page(PAGE_ABOUT);
+        return;
+    case TAG_SET_DEMO:
+        s_demo_ready = true;                // the main loop owns the arenas
+        app_ui_page(PAGE_CHAT);
         return;
     default:
         return;
@@ -356,4 +369,16 @@ void touch_ui_start(void)
     xTaskCreatePinnedToCore(touch_task, "touch_ui", 4096, NULL, 4, NULL, 0);
 }
 
-void touch_ui_sim_tap(int x, int y) { page_tap(x, y); }
+// Serial "tap x y": drives the same handlers a finger does, including the
+// bottom pills and the header buttons, so a scripted test is not a special case.
+void touch_ui_sim_tap(int x, int y)
+{
+    int bar = app_ui_bar_hit(x, y);
+    if (bar >= 0) {
+        if (!app_ui_is_busy() || bar == BAR_ASK) bar_action(bar);
+    } else if (app_ui_lock_hit(x, y) && !app_ui_is_busy()) {
+        screen_off();
+    } else {
+        page_tap(x, y);
+    }
+}

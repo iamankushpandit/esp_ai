@@ -486,6 +486,15 @@ void app_main(void)
                 shown = -1;
             }
         }
+        if (!start && !app_ui_is_busy() && touch_ui_take_demo()) {
+            // /settings > Run demo: a scripted conversation, no microphone.
+            wake_stop();
+            screen_on();
+            app_ui_busy(true);
+            pipeline_demo();
+            app_ui_busy(false);
+            if (wake_ok && prefs()->wake) wake_start(touch_ui_post_ask);
+        }
         static char typed[128];
         if (!start && !app_ui_is_busy() && touch_ui_take_typed(typed, sizeof typed)) {
             // Typed on the T9 keypad: same answer path as a spoken question.

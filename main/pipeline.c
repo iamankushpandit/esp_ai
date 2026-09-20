@@ -10,6 +10,8 @@
 #include "builtin.h"
 #include "story_intent.h"
 #include "touch_ui.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "ui.h"
 #include "esp_log.h"
 #include <stdio.h>
@@ -42,8 +44,9 @@ static void speak_error(const char *msg)
 }
 
 // typed != NULL: the question was typed on the T9 keypad; skip listening.
+// ask_aloud: demo mode - speak the question first, in the other voice.
 static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns,
-                                   const char *typed)
+                                   const char *typed, bool ask_aloud)
 {
     bool followup = turn > 1;
     bool last = turn >= max_turns;
@@ -81,6 +84,11 @@ static pipeline_result_t turn_impl(const hear_params_t *hp, llm_history_t *hist,
         goto done;
     }
     app_ui_you(question);                 // appends a new turn to the transcript
+    if (ask_aloud) {                      // demo: the question, in the asking voice
+        app_ui_status("Asking...", UI_BUSY);
+        speak_text_voice(question, VOICE_ASKER, &s_cancel, NULL);
+        if (s_cancel) { res = PIPE_CANCELLED; goto done; }
+    }
 
     // ---- BYE (no model needed)
     char topic[8];
@@ -159,16 +167,56 @@ done:
 
 pipeline_result_t pipeline_turn(const hear_params_t *hp, llm_history_t *hist, int turn, int max_turns)
 {
-    return turn_impl(hp, hist, turn, max_turns, NULL);
+    return turn_impl(hp, hist, turn, max_turns, NULL, false);
 }
 
 pipeline_result_t pipeline_typed(const char *question)
 {
     // One stand-alone turn: answer on screen and spoken, no follow-ups.
     cancel_reset();
-    pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question);
+    pipeline_result_t r = turn_impl(NULL, NULL, 1, 2, question, false);
     app_ui_status(r == PIPE_CANCELLED ? "Stopped" : "Ready", r == PIPE_CANCELLED ? UI_GREY : UI_OK);
     return r;
+}
+
+// ---------------------------------------------------------------- demo
+// A hands-free conversation for filming: the device asks each question in the
+// en-GB voice and answers in its own, keeping the transcript on screen and the
+// history between turns so it reads as one chat rather than six lookups. The
+// script mixes what the model answers (facts, arithmetic, a story) with what
+// plain C answers (identity, the clock), because the screen marks the
+// difference and that is worth showing. Stop ends it.
+static const char *DEMO_SCRIPT[] = {
+    "hello",
+    "what are you",
+    "what is the capital of japan",
+    "what is half of twelve",
+    "how many legs does a spider have",
+    "what time is it",
+    "tell me a story about a cat",
+};
+#define DEMO_N (int)(sizeof DEMO_SCRIPT / sizeof DEMO_SCRIPT[0])
+
+void pipeline_demo(void)
+{
+    static llm_history_t hist;
+    llm_history_clear(&hist);
+    cancel_reset();
+    app_ui_clear_turn();
+    screen_on();
+    story_mem_log("demo-start");
+    int n = 0;
+    for (; n < DEMO_N; n++) {
+        // max_turns is DEMO_N + 1 so no turn is treated as the last one and
+        // gets "Bye bye." appended mid-demo.
+        pipeline_result_t r = turn_impl(NULL, &hist, n + 1, DEMO_N + 1, DEMO_SCRIPT[n], true);
+        if (r == PIPE_CANCELLED || r == PIPE_ERROR) break;
+        if (n + 1 < DEMO_N) vTaskDelay(pdMS_TO_TICKS(700));   // a beat between turns
+    }
+    llm_history_clear(&hist);
+    ESP_LOGI(TAG, "DEMO END after %d/%d turn(s)", n, DEMO_N);
+    app_ui_status(s_cancel ? "Stopped" : "Demo ended", UI_GREY);
+    story_mem_log("demo-end");
 }
 
 // A session: first question + up to (max_turns - 1) follow-ups without the
