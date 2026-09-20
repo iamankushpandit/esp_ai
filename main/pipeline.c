@@ -10,6 +10,7 @@
 #include "builtin.h"
 #include "story_intent.h"
 #include "touch_ui.h"
+#include "timer.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "ui.h"
@@ -186,35 +187,62 @@ pipeline_result_t pipeline_typed(const char *question)
 // script mixes what the model answers (facts, arithmetic, a story) with what
 // plain C answers (identity, the clock), because the screen marks the
 // difference and that is worth showing. Stop ends it.
-static const char *DEMO_SCRIPT[] = {
+// A turn costs roughly 5.5 s + 0.43 s per generated token (question spoken,
+// model loaded, generated, answer spoken), so the 60-second script is chosen
+// for short answers: identity, geography, arithmetic, fractions, a joke, the
+// clock. The full one adds what does not fit in a minute.
+static const char *DEMO_SHORT[] = {
+    "what are you",                      // built-in: no AI, the screen says so
+    "what is the capital of japan",      // 7 tokens
+    "what is half of twelve",            // 22 - the fractions work v8 fixed,
+                                         //      and it shows its arithmetic
+    "tell me a joke",                    // 19
+    "what time is it",                   // built-in: the device clock
+};
+static const char *DEMO_FULL[] = {
     "hello",
     "what are you",
     "what is the capital of japan",
+    "what continent is kenya in",
+    "what is nine plus six",
     "what is half of twelve",
+    "what is fifty percent of twenty",
     "how many legs does a spider have",
+    "why is the sky blue",
+    "what is a noun",
+    "how does a bishop move",
+    "tell me a joke",
     "what time is it",
-    "tell me a story about a cat",
+    "set a timer for two minutes",       // built-in: no AI
+    "tell me a story about a cat",       // sampled, so every take differs
 };
-#define DEMO_N (int)(sizeof DEMO_SCRIPT / sizeof DEMO_SCRIPT[0])
+#define DEMO_SHORT_N (int)(sizeof DEMO_SHORT / sizeof DEMO_SHORT[0])
+#define DEMO_FULL_N (int)(sizeof DEMO_FULL / sizeof DEMO_FULL[0])
 
-void pipeline_demo(void)
+void pipeline_demo(bool full)
 {
+    const char **script = full ? DEMO_FULL : DEMO_SHORT;
+    const int DEMO_N = full ? DEMO_FULL_N : DEMO_SHORT_N;
     static llm_history_t hist;
     llm_history_clear(&hist);
     cancel_reset();
+    timer_cancel();          // so "set a timer" reads "Timer set", not "I changed your timer"
     app_ui_clear_turn();
     screen_on();
     story_mem_log("demo-start");
+    int64_t t0 = story_time_us();
     int n = 0;
     for (; n < DEMO_N; n++) {
         // max_turns is DEMO_N + 1 so no turn is treated as the last one and
         // gets "Bye bye." appended mid-demo.
-        pipeline_result_t r = turn_impl(NULL, &hist, n + 1, DEMO_N + 1, DEMO_SCRIPT[n], true);
+        pipeline_result_t r = turn_impl(NULL, &hist, n + 1, DEMO_N + 1, script[n], true);
         if (r == PIPE_CANCELLED || r == PIPE_ERROR) break;
-        if (n + 1 < DEMO_N) vTaskDelay(pdMS_TO_TICKS(700));   // a beat between turns
+        if (n + 1 < DEMO_N) vTaskDelay(pdMS_TO_TICKS(300));   // a beat between turns
     }
     llm_history_clear(&hist);
-    ESP_LOGI(TAG, "DEMO END after %d/%d turn(s)", n, DEMO_N);
+    ESP_LOGI(TAG, "DEMO END after %d/%d turn(s) in %.1f s", n, DEMO_N,
+             (story_time_us() - t0) / 1e6);
+    printf("DEMO END turns=%d secs=%.1f\n", n, (story_time_us() - t0) / 1e6);
     app_ui_status(s_cancel ? "Stopped" : "Demo ended", UI_GREY);
     story_mem_log("demo-end");
 }

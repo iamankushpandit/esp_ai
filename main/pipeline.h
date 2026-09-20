@@ -31,4 +31,4 @@ void pipeline_session(const hear_params_t *hp, int max_turns);
 // Demo (/settings): a scripted conversation with no microphone. Each question
 // is spoken in a second voice, answered by the model or by the built-ins, and
 // the whole thing stays on screen as one chat. For filming. Stop ends it.
-void pipeline_demo(void);
+void pipeline_demo(bool full);
