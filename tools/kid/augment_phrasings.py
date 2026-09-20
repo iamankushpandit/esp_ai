@@ -27,6 +27,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from phrasing import pools_disjoint, variants  # noqa: E402
+from restructure import restructure  # noqa: E402
+from restructure import pools_disjoint as struct_disjoint  # noqa: E402
 
 BLOCK = re.compile(r"User: (.*?)\nBot: (.*?)<\|endoftext\|>", re.S)
 
@@ -63,9 +65,14 @@ def main():
                     help="training questions per fact after augmentation")
     ap.add_argument("--eval-per-fact", type=int, default=2)
     ap.add_argument("--seed", type=int, default=17)
+    ap.add_argument("--structural", action="store_true",
+                    help="rewrite the question STEM as well as decorating it. "
+                         "v7 showed decoration alone does not close the "
+                         "phrasing gap: 14 -> 20 variants widened it from "
+                         "+53.3 to +55.0 while trained accuracy hit 100.0%%.")
     a = ap.parse_args()
 
-    leaks = pools_disjoint()
+    leaks = pools_disjoint() + struct_disjoint()
     if leaks:
         raise SystemExit("refusing to run, train/eval wording pools overlap: "
                          + ", ".join(leaks))
@@ -87,8 +94,16 @@ def main():
         want = a.per_fact
         got = []
         # spread the budget across the seed wordings
+        # Structural rewrites first: they are the scarce, valuable kind. Each
+        # one then becomes a seed for decoration, so the budget buys varied
+        # STEMS wearing varied hats rather than one stem wearing many.
+        if a.structural:
+            for b in list(bases):
+                bases += restructure(b)
+            bases = list(dict.fromkeys(bases))
         per_seed = max(1, want // len(bases))
         for b in bases:
+            got.append(b)
             got += variants(b, rng, per_seed)
         got = list(dict.fromkeys(got))[:want]
         for q in got:
@@ -97,7 +112,13 @@ def main():
 
     eval_out = []
     for e in eval_answers:
-        for q in variants(base_form(e["q"]), rng, a.eval_per_fact, eval_pool=True):
+        base = base_form(e["q"])
+        forms = variants(base, rng, a.eval_per_fact, eval_pool=True)
+        if a.structural:
+            # Held-out STRUCTURES too, or the experiment measures nothing: a
+            # model trained on new stems must be tested on unseen stems.
+            forms += restructure(base, eval_pool=True)
+        for q in dict.fromkeys(forms):
             eval_out.append(dict(e, q=q))
 
     out = Path(a.out_dir)
