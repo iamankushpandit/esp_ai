@@ -43,6 +43,39 @@ def load_safetensors(path):
     return out
 
 
+def load_torch_bin(path):
+    """-> {name: float32 array} from a pytorch_model.bin (a zip of pickled
+    tensors), without torch: each tensor is rebuilt from its storage blob."""
+    import pickle
+    import zipfile
+
+    z = zipfile.ZipFile(path)
+    root = z.namelist()[0].split("/")[0]
+    DT = {"FloatStorage": np.float32, "HalfStorage": np.float16, "BFloat16Storage": np.uint16,
+          "DoubleStorage": np.float64, "LongStorage": np.int64, "IntStorage": np.int32}
+
+    def rebuild(storage, offset, shape, stride, *_):
+        _, dtype, key, _, _ = storage
+        a = np.frombuffer(z.read(f"{root}/data/{key}"), dtype)
+        if dtype is np.uint16:                               # bfloat16
+            a = (a.astype(np.uint32) << 16).view(np.float32)
+        n = int(np.prod(shape)) if shape else a.size
+        return a[offset:offset + n].reshape(shape).astype(np.float32)
+
+    class U(pickle.Unpickler):
+        def find_class(self, mod, name):
+            if name == "_rebuild_tensor_v2":
+                return rebuild
+            if mod.startswith("torch") and name in DT:
+                return DT[name]
+            return super().find_class(mod, name)
+
+        def persistent_load(self, pid):
+            return pid                                       # ("storage", dtype, key, location, numel)
+
+    return dict(U(z.open(f"{root}/data.pkl")).load())
+
+
 def permute(w, n_head):
     # HF rotates halves; llama.cpp (rope "normal") rotates adjacent pairs.
     return w.reshape(n_head, 2, w.shape[0] // n_head // 2, *w.shape[1:]).swapaxes(1, 2).reshape(w.shape)
@@ -61,7 +94,8 @@ def main():
     dim, n_head = cfg["hidden_size"], cfg["num_attention_heads"]
     n_kv = cfg.get("num_key_value_heads", n_head)
     n_layer = cfg["num_hidden_layers"]
-    t = load_safetensors(os.path.join(a.hf_dir, "model.safetensors"))
+    sf = os.path.join(a.hf_dir, "model.safetensors")
+    t = load_safetensors(sf) if os.path.exists(sf) else load_torch_bin(os.path.join(a.hf_dir, "pytorch_model.bin"))
 
 
     w = GGUFWriter(a.out, "llama")

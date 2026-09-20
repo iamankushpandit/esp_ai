@@ -37,15 +37,25 @@ Check a result on the PC before copying it (same C code as the device):
 
 ## Models tested on the device
 
-| file | source | size | speed |
-|---|---|---|---|
-| stories15M-ivy.gguf | ggml-org/models tinyllamas/stories15M-q4_0, vocab 32000 -> 6997 | 5.5 MB | 7.0 tok/s |
-| tinyllama15M-alpaca.gguf | mradermacher/tinyllama-15M-alpaca-finetuned Q8_0 -> Q4_0, vocab -> 7846, Alpaca prompt | 4.6 MB | 6.6 tok/s |
-| tinyllama-v0.gguf | Maykeye/TinyLLama-v0 (HF, bf16) -> GGUF, vocab -> 5814 | 0.8 MB | 22 tok/s |
-| stories260K.gguf | ggml-org/models tinyllamas/stories260K | 1.1 MB | 32 tok/s |
+| file | source | size | speed | what it does |
+|---|---|---|---|---|
+| delphi6.4m.gguf | delphi-suite/v0-llama2-6.4m (HF .bin) -> Q4_0, vocab 4096 kept | 3.8 MB | 7.3 tok/s | TinyStories; loads in 0.9 s |
+| stories15M-ivy.gguf | ggml-org/models tinyllamas/stories15M-q4_0, vocab 32000 -> 6997 | 5.5 MB | 7.3 tok/s | best storyteller |
+| tinyllama15M-alpaca.gguf | mradermacher/tinyllama-15M-alpaca-finetuned Q8_0 -> Q4_0, vocab -> 7846, Alpaca prompt | 4.6 MB | 6.6 tok/s | follows instructions, weak answers |
+| tinyllama-v0.gguf | Maykeye/TinyLLama-v0 (HF, bf16) -> GGUF, vocab -> 5814 | 0.8 MB | 22 tok/s | short simple stories |
+| stories260K.gguf | ggml-org/models tinyllamas/stories260K | 1.1 MB | 32 tok/s | demo of raw speed |
 
-Too big even after shrinking: stories42M (~14 MB of layers), TinyStories-LLaMA2-25M
-(feed-forward layers alone ~5.2 MB), SmolLM2-135M and up.
+Rules of thumb for "will it fit":
+
+* Q4_0 costs 0.5625 bytes per weight, so the budget is about **10M weights**.
+* Non-embedding weights = layers x (2 x dim^2 + 2 x dim x kv_dim + 3 x dim x ffn).
+* **dim and ffn must be multiples of 32**, or the weights cannot be quantized
+  (delphi-suite 1.6m/3.2m have dim 168/216 and stay F32 -> too big).
+* A 32,000-token vocabulary is usually most of a tiny model; shrink it.
+
+Too big even after shrinking: delphi-suite v0-llama2-12.8m (7.9 MB), stories42M
+(~14 MB of layers), TinyStories-LLaMA2-25M (feed-forward layers alone ~5.2 MB),
+Felladrin/Minueza-32M (~7 MB of layers), SmolLM2-135M and up.
 `mradermacher/TinyStories-LLaMA2-20M-256h-4l-GQA-GGUF` is a broken conversion
 (garbage in llama.cpp's own maths too); converting the sibling
 `Mxode/TinyStories-LLaMA2-25M-256h-4l-GQA` with `hf_llama_to_gguf.py` works.
