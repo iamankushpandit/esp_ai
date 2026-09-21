@@ -1,0 +1,61 @@
+Ivy AI — additional permission under GNU GPL version 3 section 7
+
+Copyright (C) 2026 iamankushpandit <https://github.com/iamankushpandit>
+
+This file grants one narrow permission on top of the GNU General Public
+License version 3 (see LICENSE). It adds a permission; it removes none.
+
+
+THE PERMISSION
+
+As an additional permission under section 7 of the GNU General Public
+License version 3, you have permission to link or combine this program
+with components of the Espressif Systems SDK — including ESP-IDF and any
+component distributed through the ESP Component Registry, such as
+`esp-sr`, `esp-dl` and `esp_new_jpeg` — that are distributed under the
+ESPRESSIF MIT License or other terms that would otherwise be incompatible
+with the GPL, and to convey the resulting work.
+
+The terms of the GNU General Public License continue to apply to this
+program and to every other part of the combined work.
+
+If you modify this program, you may extend this exception to your version
+of it, but you are not obliged to do so. If you do not wish to do so,
+delete this exception statement from your version.
+
+
+WHY IT EXISTS
+
+The wake word runs on Espressif's `esp-sr` (WakeNet), and `esp-sr` is not
+under the ordinary MIT licence. It is under the "ESPRESSIF MIT License",
+whose grant begins:
+
+    Permission is hereby granted for use on all ESPRESSIF SYSTEMS
+    products, in which case, it is free of charge, to any person
+    obtaining a copy of this software ...
+
+That clause restricts the field of use to Espressif hardware. It is a
+restriction the GPL does not permit to be imposed on a recipient, so
+without this exception a binary combining our GPL code with `esp-sr` —
+a release asset, or an image served by a web installer — would carry two
+sets of terms that contradict each other. The person receiving it would
+have no way to obey both.
+
+Handing someone a GPL-licensed binary and then telling them it may only
+run on one manufacturer's chips is not a licence, it is a puzzle. This
+paragraph removes the contradiction, and it costs the recipient nothing:
+every freedom the GPL gives them over our code is untouched, and the only
+thing added is permission to combine it with the vendor SDK the hardware
+needs — which is the combination the program exists to be.
+
+Publishing our source has never had this problem; the SDK is fetched by
+the component manager and is not redistributed here. The exception is
+about the binaries, and about anyone who forks this and ships one.
+
+If Espressif's terms ever become unacceptable to you, the wake word is
+the only thing that depends on them: `docs/ARCHITECTURE.md` records
+microWakeWord on TFLM (Apache-2.0, trainable by us on the host) as the
+free replacement for WakeNet.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->

@@ -267,3 +267,10 @@ Licences:
   3. The amp pin GPIO1 has a pull-up, so the amp is off in deep sleep with no action needed.
   4. Backlight GPIO45 has a 10K gate pulldown, so the backlight is off in deep sleep.
   5. BOOT (GPIO0) is also RTC-capable and is an alternative wake key.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

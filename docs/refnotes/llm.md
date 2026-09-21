@@ -458,3 +458,10 @@ For 8M, the blob plus tokenizer plus runtime is about 6.3 MB. That is feasible o
 4. **Licensing.** The TinyTalk fine-tunes are **non-commercial** (DailyDialog, SciQ). For a storyteller, convert the **base TinyStories-Instruct-3M/8M** directly (`--model 3M`) and use the `Summary:/Words:/Story:` prompt format. That avoids the NC data, but the base weights still carry no explicit license; confirm with the author before any commercial use.
 5. **Refactor list** (§2.2): convert to C, move globals into the context, use a caller-provided two-tier arena, handle both blob sources, manage the worker lifecycle explicitly, provide `llm_generate` with an `on_token` callback and a stop flag, build an O(1) decode index, and replace the WDT workaround with a periodic yield.
 6. **Test gate.** Fix the Windows host toolchain (§4) and run the scalar core against `embed/*.bin` with greedy decoding for golden outputs before trusting the PIE build on hardware.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*

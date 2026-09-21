@@ -332,3 +332,10 @@ compute and the O(n²) attention.
    partition as a hybrid. Add a double-buffered prefetch to hide the ~0.6 to 1.3 s of SD reads. Expect about 1 to 2 days of refactoring in `tlib_flash`
    plus 3 call sites, and plenty of PC-side testing via a new host WAV→text main.
 3. **Do not plan on SD→PSRAM full copy (option a)**: 13.8 MB does not fit in 8 MB of PSRAM.
+
+<!-- SPDX-License-Identifier: GPL-3.0-or-later -->
+<!-- SPDX-FileCopyrightText: Copyright (C) 2026 iamankushpandit -->
+
+---
+
+*Part of [Ivy AI](https://github.com/iamankushpandit/esp_ai) by [iamankushpandit](https://github.com/iamankushpandit). Copyright © 2026 iamankushpandit, licensed [GPL-3.0-or-later](https://github.com/iamankushpandit/esp_ai/blob/main/LICENSE) alongside the code — reuse of this document, in whole or in part, must keep this attribution and stay under the same licence. See [NOTICE.md](https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md).*
