@@ -117,6 +117,36 @@ nav.tabs a.tab[aria-selected="true"]{background:var(--pink); color:#2B1A21}
 .btn.primary{background:var(--ink); color:var(--paper)}
 .btn.ghost{color:var(--ink)}
 
+/* ---- the hero film ---------------------------------------------------- */
+/* The film is a YouTube short, and nothing is fetched from YouTube until the
+   reader asks for it. A page whose whole argument is that the device talks to
+   nobody cannot open by handing a third party a request on load -- so the
+   still is drawn here, from CSS and the logo already inlined on the page, and
+   the iframe replaces it on a click. With no JS the caption's plain link is
+   what remains, which is the right fallback: a link, not a dead rectangle. */
+@media(min-width:900px){
+  .hero .wrap{display:grid; grid-template-columns:1.15fr .85fr;
+    gap:clamp(1.5rem,4vw,3.5rem); align-items:center}
+}
+.film{margin:2.6rem auto 0; max-width:290px; width:100%}
+@media(min-width:900px){.film{margin:0}}
+.film .frame{position:relative; aspect-ratio:9/16; border-radius:22px;
+  overflow:hidden; border:1.5px solid var(--ink);
+  background:linear-gradient(160deg,var(--pink-wash),var(--pink));
+  box-shadow:0 18px 40px rgba(43,26,33,.18)}
+.film iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+.film button{position:absolute; inset:0; width:100%; height:100%; padding:1rem;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:.75rem; background:none; border:0; cursor:pointer; color:var(--ink);
+  font:inherit; font-weight:700; font-size:.95rem}
+.film button .disc{width:62px; height:62px; border-radius:50%;
+  background:var(--ink); color:var(--paper); display:grid; place-items:center;
+  font-size:1.15rem; line-height:1; padding-left:.18rem}
+.film button:hover .disc{background:var(--pink-deep)}
+.film button .mark{width:78px; height:auto; opacity:.7}
+.film figcaption{margin:.75rem 0 0; font-size:.84rem; line-height:1.5;
+  color:var(--ink-soft); text-align:center}
+
 /* ---- colour bands ----------------------------------------------------- */
 .band{padding:clamp(2.6rem,7vw,5.5rem) 0; color:var(--band-fg)}
 .band h2{color:var(--band-fg)}
@@ -279,6 +309,7 @@ footer a{color:var(--ink-soft)}
 
 <header class="hero">
   <div class="wrap">
+    <div>
     <span class="kicker">Offline LLM assistant · proof of concept</span>
     <h1><span>It listens.</span><span>It answers.</span><span class="accent">Wi-Fi off.</span></h1>
     <p class="lede">A speech recogniser, a language model and a speech synthesiser
@@ -299,6 +330,20 @@ footer a{color:var(--ink-soft)}
       <a class="btn primary" href="#install">Flash it from your browser</a>
       <a class="btn ghost" href="#log">Read the build log</a>
     </div>
+    </div>
+
+    <figure class="film">
+      <div class="frame">
+        <button type="button" id="film-play">
+          <svg class="mark" viewBox="{{LOGO_MARK_VIEWBOX}}" aria-hidden="true"><use href="#ivy-lockup"/></svg>
+          <span class="disc" aria-hidden="true">&#9654;</span>
+          <span>Watch it answer</span>
+        </button>
+      </div>
+      <figcaption>A minute of it running, on the device. Nothing is requested
+      from YouTube until you press play &mdash; or
+      <a href="https://www.youtube.com/shorts/lKE4J6aogrc">watch it there instead</a>.</figcaption>
+    </figure>
   </div>
 </header>
 
@@ -1106,6 +1151,27 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     window.scrollTo(0, 0);
   });
   show(location.hash.slice(1) || 'home');
+})();
+</script>
+<script>
+// The hero film. It is a YouTube short, and it is the only thing on this page
+// that could talk to anyone at all -- so it does not, until it is asked to.
+// The still is the page's own logo and some CSS; pressing play is what builds
+// the iframe, and it points at youtube-nocookie.com. Saying "no cloud" at the
+// top of a page that has already pinged Google by the time it is read is the
+// kind of small dishonesty the rest of this write-up is trying not to commit.
+(function(){
+  var button = document.getElementById('film-play');
+  if (!button) return;
+  button.addEventListener('click', function(){
+    var frame = document.createElement('iframe');
+    frame.src = 'https://www.youtube-nocookie.com/embed/lKE4J6aogrc'
+              + '?autoplay=1&rel=0&playsinline=1';
+    frame.title = 'Ivy AI answering on the device';
+    frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    frame.setAttribute('allowfullscreen', '');
+    button.parentNode.replaceChild(frame, button);
+  });
 })();
 </script>
 <script>
