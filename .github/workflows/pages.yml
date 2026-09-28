@@ -19,9 +19,11 @@ name: Pages
 # a hand-updated copy of a measurement is one that will be wrong and cannot
 # say so, and this project's whole argument is that its numbers are real.
 #
-# It runs on `docs/` rather than an artifact-only build because docs/ is what
-# the repository already serves, and keeping the generated page committed means
-# a reader of the repo sees the same page a visitor does.
+# The generated page is also committed under docs/, and a pull request checks
+# the two agree, so a reader of the repository sees what a visitor sees.
+#
+# The deploy publishes the artifact at the site root, and publishes the same
+# page again under /docs/ -- see "Keep the /docs/ URL alive" below for why.
 #
 # Enabling: `configure-pages` with enablement below turns Pages on for the
 # repository the first time this runs, so it does not need a visit to
@@ -94,6 +96,20 @@ jobs:
 
       - name: Every file we wrote carries its licence notice
         run: python tools/check_licenses.py
+
+      # /esp_ai/docs/ has to keep working. Until this workflow's deploy first
+      # succeeded, Pages served this repository's branch, where Jekyll put the
+      # committed docs/index.html at /docs/ and the README at the root. The
+      # artifact deploy moved the page to the root and took /docs/ with it --
+      # and that URL is already out in the world, on a CV among other places.
+      # A link a stranger has is not ours to break, so the page ships at both
+      # paths. It is one file and its assets; the duplication costs less than
+      # a 404 on a link someone was given.
+      - name: Keep the /docs/ URL alive
+        run: |
+          mkdir -p _site/docs
+          cp _site/index.html _site/docs/index.html
+          cp -r _site/assets _site/docs/assets
 
       - name: Report the page size
         run: |
