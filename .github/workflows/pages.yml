@@ -83,13 +83,30 @@ jobs:
       # If it does not, someone edited the generated page by hand -- which is
       # the one thing the header of every generated file asks them not to do,
       # because the next run silently throws the edit away.
+      #
+      # The footer's build date is the exception, and is normalised away on
+      # both sides before the diff. It comes from the last commit (see
+      # built_date in tools/gen_site.py), and on a pull request the checkout
+      # is GitHub's merge commit -- dated when that ref was last recomputed,
+      # not when the author ran the generator. main moving underneath a branch
+      # is enough to change it, so the line drifts with no edit behind it and
+      # turns a green pull request red on its own. It is generated from git
+      # rather than written by hand, so there is no hand edit for the
+      # normalisation to hide. Every other line is still compared exactly.
       - name: docs/ must match the generators
         if: github.event_name == 'pull_request'
         run: |
-          if ! diff -q _site/index.html docs/index.html >/dev/null 2>&1; then
+          undate() {
+            sed -E 's/(Built from [^,]*, )[0-9]{4}-[0-9]{2}-[0-9]{2}/\1DATE/' "$1"
+          }
+          undate _site/index.html > "$RUNNER_TEMP/generated.html"
+          undate docs/index.html > "$RUNNER_TEMP/committed.html"
+          if ! diff -q "$RUNNER_TEMP/committed.html" \
+                       "$RUNNER_TEMP/generated.html" >/dev/null 2>&1; then
             echo "::error::docs/index.html is not what tools/gen_site.py produces."
             echo "Run: python tools/gen_demo_gifs.py && python tools/gen_site.py --out docs"
-            diff -u docs/index.html _site/index.html | head -40 || true
+            diff -u "$RUNNER_TEMP/committed.html" \
+                    "$RUNNER_TEMP/generated.html" | head -40 || true
             exit 1
           fi
           echo "docs/index.html matches."
