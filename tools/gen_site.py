@@ -518,11 +518,16 @@ def first_number(text):
 def built_date():
     """The date of the last commit, not today's date.
 
-    The generated page is committed under docs/ and CI regenerates it to check
-    the two still agree. today() would make them disagree the moment the clock
-    rolls over in UTC -- a check that fails daily for no reason is a check
-    people turn off. The commit date changes only when the content does, which
-    is what the line is actually telling the reader.
+    The commit date changes only when the content does, which is what the line
+    is actually telling the reader -- today() would move it on a page nobody
+    had touched.
+
+    It is still not stable enough to diff on. The generated page is committed
+    under docs/ and CI regenerates it to check the two agree, but on a pull
+    request CI builds from GitHub's merge commit, dated when that ref was last
+    recomputed rather than when the generator was run. So the Pages workflow
+    normalises this one date away before comparing; everything else on the
+    page is compared exactly.
     """
     try:
         out = subprocess.run(["git", "log", "-1", "--format=%cs"], cwd=ROOT,
