@@ -1,3 +1,10 @@
+<p align="center">
+  <a href="https://www.youtube.com/shorts/lKE4J6aogrc">
+    <img src="https://img.youtube.com/vi/lKE4J6aogrc/maxresdefault.jpg" width="640" alt="Watch Ivy AI answer, on the device (YouTube)">
+  </a>
+</p>
+<p align="center"><a href="https://www.youtube.com/shorts/lKE4J6aogrc"><b>&#9654;&nbsp; Watch it answer</b></a> &mdash; a minute of it running, on the device.</p>
+
 # Ivy AI
 
 A voice assistant that listens, thinks and speaks **entirely on a $20
