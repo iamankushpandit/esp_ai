@@ -15,7 +15,7 @@
 
 The page is *derived*. Nothing on it is typed twice: the per-turn timings and
 the memory table come from docs/STAGE_E_RESULTS.md, the model comparison from
-docs/GGUF.md, the press list from docs/PRESS.md, the training scores from docs/TECHNICAL_REPORT.md (or the
+docs/GGUF.md, the featured-in list from docs/FEATURED.md, the training scores from docs/TECHNICAL_REPORT.md (or the
 fallback table below when that document is on another branch), and the firmware
 size from the last build. A hand-maintained copy of a measurement is a
 measurement that will be wrong and will not say so -- and a landing page is
@@ -506,37 +506,48 @@ def render_still_broken():
     return "\n".join(out)
 
 
-def render_press(press):
-    """The press cards, one per row of docs/PRESS.md's Coverage table.
+def render_featured(featured):
+    """The cards, one per row of docs/FEATURED.md's Coverage table.
 
     A press page is the easiest thing on a site to let rot: a list typed into
-    the HTML, never touched again. So the list is a Markdown table in docs/,
-    the same as every measurement on this page, and this is the only renderer.
-    Newest first, because the reader wants to know whether anyone has written
-    about it lately, not what came first.
+    the HTML, never touched again, pointing at pages that get edited or taken
+    down. So the list is a Markdown table in docs/, the same as every
+    measurement on this page, this is the only renderer, and each row names a
+    screenshot in site/assets/ taken the day it was added -- the page keeps
+    its own copy of what was said. Newest first, because the reader wants to
+    know whether anyone has written about it lately, not what came first.
     """
-    headers, rows = md_table(press, "## Coverage", "the press table")
-    want = ["Date", "Outlet", "Title", "Link", "What they said"]
+    headers, rows = md_table(featured, "## Coverage", "the featured table")
+    want = ["Date", "Outlet", "Title", "Link", "Image", "What they said"]
     if headers != want:
-        die("the press table's columns are %r; expected %r" % (headers, want))
-    out = ['<div class="grid2 press">']
-    for date, outlet, title, link, said in sorted(rows, key=lambda r: r[0], reverse=True):
+        die("the featured table's columns are %r; expected %r" % (headers, want))
+    out = ['<div class="grid2 featured">']
+    for date, outlet, title, link, image, said in sorted(rows, key=lambda r: r[0], reverse=True):
         if not re.match(r"\d{4}-\d{2}-\d{2}$", date):
-            die("press row %r has date %r; expected YYYY-MM-DD" % (title, date))
+            die("featured row %r has date %r; expected YYYY-MM-DD" % (title, date))
         if not link.startswith("https://"):
-            die("press row %r has link %r; expected https://" % (title, link))
+            die("featured row %r has link %r; expected https://" % (title, link))
+        figure = ""
+        if image:
+            if not os.path.isfile(os.path.join(ROOT, "site", "assets", image)):
+                die("featured row %r names image %r, which is not in site/assets/"
+                    % (title, image))
+            figure = ('<a class="shot" href="%s" rel="noopener"><img src="assets/%s" '
+                      'alt="%s, as published on %s" loading="lazy" width="960" height="600"></a>'
+                      % (html.escape(link, quote=True), html.escape(image, quote=True),
+                         html.escape(outlet), pretty_date(date)))
         out.append(
-            '<div class="card"><p class="who">%s · <time datetime="%s">%s</time></p>'
-            '<h3><a href="%s" rel="noopener">%s</a></h3><p>%s</p></div>'
-            % (html.escape(outlet), date, pretty_date(date),
-               html.escape(link, quote=True), inline(title), inline(said)))
+            '<div class="card%s">%s<div class="body"><p class="who">%s · <time datetime="%s">%s</time></p>'
+            '<h3><a href="%s" rel="noopener">%s</a></h3><p>%s</p></div></div>'
+            % ("" if image else " noshot", figure, html.escape(outlet), date,
+               pretty_date(date), html.escape(link, quote=True), inline(title),
+               inline(said)))
     out.append("</div>")
     return "\n".join(out)
 
-
-def render_derived(press):
-    """The derived-work list under the press cards, from the same file."""
-    headers, rows = md_table(press, "## Derived work", "the derived-work table")
+def render_derived(featured):
+    """The derived-work list under the featured cards, from the same file."""
+    headers, rows = md_table(featured, "## Derived work", "the derived-work table")
     want = ["Date", "Who", "What", "Link"]
     if headers != want:
         die("the derived-work table's columns are %r; expected %r" % (headers, want))
@@ -611,7 +622,7 @@ def main():
     stage_e = read("docs", "STAGE_E_RESULTS.md")
     gguf = read("docs", "GGUF.md")
     readme = read("README.md")
-    press = read("docs", "PRESS.md")
+    featured = read("docs", "FEATURED.md")
 
     # The shipped model's speed lives in README.md's measured table, NOT in
     # STAGE_E_RESULTS.md -- that soak measured TinyTalk 3M and its 13.0-13.4
@@ -727,9 +738,9 @@ def main():
         ("{{DEMO}}", render_demo()),
         ("{{TIMELINE}}", render_timeline()),
         ("{{STILL_BROKEN}}", render_still_broken()),
-        ("{{PRESS}}", render_press(press)),
-        ("{{N_PRESS}}", num_word(len(md_table(press, "## Coverage", "press")[1])).capitalize()),
-        ("{{DERIVED}}", render_derived(press)),
+        ("{{FEATURED}}", render_featured(featured)),
+        ("{{N_FEATURED}}", num_word(len(md_table(featured, "## Coverage", "featured")[1])).capitalize()),
+        ("{{DERIVED}}", render_derived(featured)),
         ("{{LOGO_SPRITE}}", logo_sprite()),
         ("{{LOGO_MARK_VIEWBOX}}", LOGO_MARK_VIEWBOX),
         ("{{LOGO_FULL_VIEWBOX}}", LOGO_FULL_VIEWBOX),
