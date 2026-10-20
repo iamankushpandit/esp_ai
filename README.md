@@ -163,7 +163,7 @@ training/       model results and test-question sheets
 
 ## Featured in
 
-Who has written about Ivy AI, and a fork that builds on it: [docs/PRESS.md](docs/PRESS.md), also rendered as the Press tab on [the site](https://iamankushpandit.github.io/esp_ai/#press).
+Who has written about Ivy AI, and a fork that builds on it: [docs/FEATURED.md](docs/FEATURED.md), also rendered as the Featured tab on [the site](https://iamankushpandit.github.io/esp_ai/#featured).
 
 ## Licensing
 

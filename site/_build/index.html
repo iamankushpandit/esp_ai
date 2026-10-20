@@ -261,10 +261,17 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .note{background:var(--pink-wash); border-left:4px solid var(--pink);
   padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin:1.4rem 0}
 .note p:last-child{margin-bottom:0}
-.press .card .who{font-size:.8rem; font-weight:700; letter-spacing:.06em;
+.featured{align-items:start}
+.featured .card{padding:0; overflow:hidden}
+.featured .card .body{padding:1.1rem 1.2rem}
+.featured .card .shot{display:block; border-bottom:1px solid var(--line);
+  background:var(--paper-2); aspect-ratio:16/10}
+.featured .card .shot img{display:block; width:100%; height:100%; object-fit:cover}
+.featured .card.noshot{border-top:4px solid var(--pink)}
+.featured .card .who{font-size:.8rem; font-weight:700; letter-spacing:.06em;
   text-transform:uppercase; color:var(--pink-deep); margin-bottom:.4rem}
-.press .card h3 a{color:var(--ink); text-decoration:none}
-.press .card h3 a:hover{text-decoration:underline}
+.featured .card h3 a{color:var(--ink); text-decoration:none}
+.featured .card h3 a:hover{text-decoration:underline}
 .no-ai{display:inline-flex; align-items:center; gap:.4rem; font-weight:700;
   color:#0E7C7B; font-size:.9rem}
 .no-ai i{width:.62rem; height:.62rem; background:#19B3B0; transform:rotate(45deg);
@@ -452,7 +459,7 @@ footer a{color:var(--ink-soft)}
     <a class="tab" id="tab-ask" href="#ask">Ask it</a>
     <a class="tab" id="tab-train" href="#train">Training</a>
     <a class="tab" id="tab-privacy" href="#privacy">Privacy</a>
-    <a class="tab" id="tab-press" href="#press">Featured</a>
+    <a class="tab" id="tab-featured" href="#featured">Featured</a>
     <a class="tab" id="tab-community" href="#community">Community</a>
   </div>
 </nav>
@@ -1385,8 +1392,8 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
 </section>
 </div>
 
-<!-- =================== PRESS =================== -->
-<div class="tabpanel" id="panel-press" aria-labelledby="tab-press" hidden>
+<!-- =================== FEATURED =================== -->
+<div class="tabpanel" id="panel-featured" aria-labelledby="tab-featured" hidden>
 <section class="paper">
   <div class="wrap">
     <h2>What people wrote.</h2>
@@ -1395,19 +1402,21 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     the build log, which makes them a test of whether this page is honest
     enough to be reported from — not a review. Read them as that.</p>
 
-    <div class="grid2 press">
-<div class="card"><p class="who">Open Source For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI Runs Entirely On ESP32-S3</a></h3><p>A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from.</p></div>
-<div class="card"><p class="who">Electronics For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids" rel="noopener">This ESP32 Board Runs An Offline AI Tutor For Kids</a></h3><p>Framed it as a kids&#x27; tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus.</p></div>
-<div class="card"><p class="who">Adafruit blog · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI runs entirely on ESP32-S3</a></h3><p>A short pick-up of the Open Source For You story.</p></div>
-<div class="card"><p class="who">MechaNoticias (Chile) · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3" rel="noopener">Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3</a></h3><p>The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand.</p></div>
-<div class="card"><p class="who">r/esp32 · <time datetime="2026-09-20">20 September 2026</time></p><h3><a href="https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/" rel="noopener">I built an offline voice assistant that runs the whole pipeline on an ESP32-S3</a></h3><p>The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so.</p></div>
+    <div class="grid2 featured">
+<div class="card"><a class="shot" href="https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener"><img src="assets/featured/osfy.jpg" alt="Open Source For You, as published on 12 October 2026" loading="lazy" width="960" height="600"></a><div class="body"><p class="who">Open Source For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI Runs Entirely On ESP32-S3</a></h3><p>A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from.</p></div></div>
+<div class="card"><a class="shot" href="https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids" rel="noopener"><img src="assets/featured/efy.jpg" alt="Electronics For You, as published on 12 October 2026" loading="lazy" width="960" height="600"></a><div class="body"><p class="who">Electronics For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids" rel="noopener">This ESP32 Board Runs An Offline AI Tutor For Kids</a></h3><p>Framed it as a kids&#x27; tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus.</p></div></div>
+<div class="card"><a class="shot" href="https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener"><img src="assets/featured/adafruit.jpg" alt="Adafruit blog, as published on 12 October 2026" loading="lazy" width="960" height="600"></a><div class="body"><p class="who">Adafruit blog · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI runs entirely on ESP32-S3</a></h3><p>A pick-up of the Open Source For You story, with the pipeline, the board and the speed figures restated.</p></div></div>
+<div class="card"><a class="shot" href="https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3" rel="noopener"><img src="assets/featured/mecha.jpg" alt="MechaNoticias (Chile), as published on 12 October 2026" loading="lazy" width="960" height="600"></a><div class="body"><p class="who">MechaNoticias (Chile) · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3" rel="noopener">Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3</a></h3><p>The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand.</p></div></div>
+<div class="card"><a class="shot" href="https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/" rel="noopener"><img src="assets/featured/reddit.jpg" alt="r/esp32, as published on 20 September 2026" loading="lazy" width="960" height="600"></a><div class="body"><p class="who">r/esp32 · <time datetime="2026-09-20">20 September 2026</time></p><h3><a href="https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/" rel="noopener">I built an offline voice assistant that runs the whole pipeline on an ESP32-S3</a></h3><p>The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so.</p></div></div>
 </div>
 
     <div class="note">
       <p>The list is a table in
-      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/PRESS.md">PRESS.md</a>, rendered here
-      the same way as every measurement on this page. Wrote something? Open a
-      pull request that adds a row; the page follows.</p>
+      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/FEATURED.md">FEATURED.md</a>, rendered
+      here the same way as every measurement on this page, and each card keeps
+      a screenshot of the article as it was on the day — links rot and pages
+      get edited, and a thank-you should not depend on either. Wrote something?
+      Open a pull request that adds a row; the page follows.</p>
     </div>
 
     <h3 style="margin-top:2rem">Built on it</h3>
@@ -1485,6 +1494,7 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
   var tabs = [].slice.call(document.querySelectorAll('nav.tabs a.tab'));
   var names = tabs.map(function(t){ return t.getAttribute('href').slice(1); });
   function show(name){
+    if (name === 'press') name = 'featured'; // the tab's old name
     if (names.indexOf(name) < 0) name = names[0];
     names.forEach(function(n){
       var panel = document.getElementById('panel-' + n);
