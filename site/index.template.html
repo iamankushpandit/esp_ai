@@ -261,6 +261,10 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .note{background:var(--pink-wash); border-left:4px solid var(--pink);
   padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin:1.4rem 0}
 .note p:last-child{margin-bottom:0}
+.press .card .who{font-size:.8rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--pink-deep); margin-bottom:.4rem}
+.press .card h3 a{color:var(--ink); text-decoration:none}
+.press .card h3 a:hover{text-decoration:underline}
 .no-ai{display:inline-flex; align-items:center; gap:.4rem; font-weight:700;
   color:#0E7C7B; font-size:.9rem}
 .no-ai i{width:.62rem; height:.62rem; background:#19B3B0; transform:rotate(45deg);
@@ -298,6 +302,7 @@ footer a{color:var(--ink-soft)}
     <a class="tab" id="tab-ask" href="#ask">Ask it</a>
     <a class="tab" id="tab-train" href="#train">Training</a>
     <a class="tab" id="tab-privacy" href="#privacy">Privacy</a>
+    <a class="tab" id="tab-press" href="#press">Press</a>
     <a class="tab" id="tab-community" href="#community">Community</a>
   </div>
 </nav>
@@ -1047,6 +1052,31 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
       microphone, that is not a licensing preference — it is the only audit
       anybody gets.</p>
     </div>
+  </div>
+</section>
+</div>
+
+<!-- =================== PRESS =================== -->
+<div class="tabpanel" id="panel-press" aria-labelledby="tab-press" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>What people wrote.</h2>
+    <p class="standfirst">{{N_PRESS}} write-ups so far, none of them by anyone
+    who had a board in hand. Every piece below was written from the README and
+    the build log, which makes them a test of whether this page is honest
+    enough to be reported from — not a review. Read them as that.</p>
+
+    {{PRESS}}
+
+    <div class="note">
+      <p>The list is a table in
+      <a href="{{REPO}}/blob/main/docs/PRESS.md">PRESS.md</a>, rendered here
+      the same way as every measurement on this page. Wrote something? Open a
+      pull request that adds a row; the page follows.</p>
+    </div>
+
+    <h3 style="margin-top:2rem">Built on it</h3>
+    {{DERIVED}}
   </div>
 </section>
 </div>

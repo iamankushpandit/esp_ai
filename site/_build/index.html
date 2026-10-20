@@ -117,6 +117,36 @@ nav.tabs a.tab[aria-selected="true"]{background:var(--pink); color:#2B1A21}
 .btn.primary{background:var(--ink); color:var(--paper)}
 .btn.ghost{color:var(--ink)}
 
+/* ---- the hero film ---------------------------------------------------- */
+/* The film is a YouTube short, and nothing is fetched from YouTube until the
+   reader asks for it. A page whose whole argument is that the device talks to
+   nobody cannot open by handing a third party a request on load -- so the
+   still is drawn here, from CSS and the logo already inlined on the page, and
+   the iframe replaces it on a click. With no JS the caption's plain link is
+   what remains, which is the right fallback: a link, not a dead rectangle. */
+@media(min-width:900px){
+  .hero .wrap{display:grid; grid-template-columns:1.15fr .85fr;
+    gap:clamp(1.5rem,4vw,3.5rem); align-items:center}
+}
+.film{margin:2.6rem auto 0; max-width:290px; width:100%}
+@media(min-width:900px){.film{margin:0}}
+.film .frame{position:relative; aspect-ratio:9/16; border-radius:22px;
+  overflow:hidden; border:1.5px solid var(--ink);
+  background:linear-gradient(160deg,var(--pink-wash),var(--pink));
+  box-shadow:0 18px 40px rgba(43,26,33,.18)}
+.film iframe{position:absolute; inset:0; width:100%; height:100%; border:0}
+.film button{position:absolute; inset:0; width:100%; height:100%; padding:1rem;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:.75rem; background:none; border:0; cursor:pointer; color:var(--ink);
+  font:inherit; font-weight:700; font-size:.95rem}
+.film button .disc{width:62px; height:62px; border-radius:50%;
+  background:var(--ink); color:var(--paper); display:grid; place-items:center;
+  font-size:1.15rem; line-height:1; padding-left:.18rem}
+.film button:hover .disc{background:var(--pink-deep)}
+.film button .mark{width:78px; height:auto; opacity:.7}
+.film figcaption{margin:.75rem 0 0; font-size:.84rem; line-height:1.5;
+  color:var(--ink-soft); text-align:center}
+
 /* ---- colour bands ----------------------------------------------------- */
 .band{padding:clamp(2.6rem,7vw,5.5rem) 0; color:var(--band-fg)}
 .band h2{color:var(--band-fg)}
@@ -231,6 +261,10 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .note{background:var(--pink-wash); border-left:4px solid var(--pink);
   padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin:1.4rem 0}
 .note p:last-child{margin-bottom:0}
+.press .card .who{font-size:.8rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--pink-deep); margin-bottom:.4rem}
+.press .card h3 a{color:var(--ink); text-decoration:none}
+.press .card h3 a:hover{text-decoration:underline}
 .no-ai{display:inline-flex; align-items:center; gap:.4rem; font-weight:700;
   color:#0E7C7B; font-size:.9rem}
 .no-ai i{width:.62rem; height:.62rem; background:#19B3B0; transform:rotate(45deg);
@@ -418,6 +452,7 @@ footer a{color:var(--ink-soft)}
     <a class="tab" id="tab-ask" href="#ask">Ask it</a>
     <a class="tab" id="tab-train" href="#train">Training</a>
     <a class="tab" id="tab-privacy" href="#privacy">Privacy</a>
+    <a class="tab" id="tab-press" href="#press">Press</a>
     <a class="tab" id="tab-community" href="#community">Community</a>
   </div>
 </nav>
@@ -429,6 +464,7 @@ footer a{color:var(--ink-soft)}
 
 <header class="hero">
   <div class="wrap">
+    <div>
     <span class="kicker">Offline LLM assistant · proof of concept</span>
     <h1><span>It listens.</span><span>It answers.</span><span class="accent">Wi-Fi off.</span></h1>
     <p class="lede">A speech recogniser, a language model and a speech synthesiser
@@ -449,6 +485,20 @@ footer a{color:var(--ink-soft)}
       <a class="btn primary" href="#install">Flash it from your browser</a>
       <a class="btn ghost" href="#log">Read the build log</a>
     </div>
+    </div>
+
+    <figure class="film">
+      <div class="frame">
+        <button type="button" id="film-play">
+          <svg class="mark" viewBox="117 48 286 317" aria-hidden="true"><use href="#ivy-lockup"/></svg>
+          <span class="disc" aria-hidden="true">&#9654;</span>
+          <span>Watch it answer</span>
+        </button>
+      </div>
+      <figcaption>A minute of it running, on the device. Nothing is requested
+      from YouTube until you press play &mdash; or
+      <a href="https://www.youtube.com/shorts/lKE4J6aogrc">watch it there instead</a>.</figcaption>
+    </figure>
   </div>
 </header>
 
@@ -1335,6 +1385,39 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
 </section>
 </div>
 
+<!-- =================== PRESS =================== -->
+<div class="tabpanel" id="panel-press" aria-labelledby="tab-press" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>What people wrote.</h2>
+    <p class="standfirst">Five write-ups so far, none of them by anyone
+    who had a board in hand. Every piece below was written from the README and
+    the build log, which makes them a test of whether this page is honest
+    enough to be reported from — not a review. Read them as that.</p>
+
+    <div class="grid2 press">
+<div class="card"><p class="who">Open Source For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI Runs Entirely On ESP32-S3</a></h3><p>A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from.</p></div>
+<div class="card"><p class="who">Electronics For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids" rel="noopener">This ESP32 Board Runs An Offline AI Tutor For Kids</a></h3><p>Framed it as a kids&#x27; tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus.</p></div>
+<div class="card"><p class="who">Adafruit blog · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI runs entirely on ESP32-S3</a></h3><p>A short pick-up of the Open Source For You story.</p></div>
+<div class="card"><p class="who">MechaNoticias (Chile) · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3" rel="noopener">Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3</a></h3><p>The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand.</p></div>
+<div class="card"><p class="who">r/esp32 · <time datetime="2026-09-20">20 September 2026</time></p><h3><a href="https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/" rel="noopener">I built an offline voice assistant that runs the whole pipeline on an ESP32-S3</a></h3><p>The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so.</p></div>
+</div>
+
+    <div class="note">
+      <p>The list is a table in
+      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/PRESS.md">PRESS.md</a>, rendered here
+      the same way as every measurement on this page. Wrote something? Open a
+      pull request that adds a row; the page follows.</p>
+    </div>
+
+    <h3 style="margin-top:2rem">Built on it</h3>
+    <ul>
+<li><a href="https://github.com/iamtilakpatel/pundit-brain" rel="noopener">iamtilakpatel</a> — Pundit Brain, a fork that reuses the pipeline for an offline wearable note-taker and is porting the board layer to Waveshare ESP32-S3 hardware (7 October 2026).</li>
+</ul>
+  </div>
+</section>
+</div>
+
 <!-- =================== COMMUNITY =================== -->
 <div class="tabpanel" id="panel-community" aria-labelledby="tab-community" hidden>
 <section class="paper">
@@ -1389,7 +1472,7 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     exception</a>. <strong>Ivy AI</strong> is a product name and is not licensed by
     the GPL — <a href="https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md">NOTICE.md</a> explains the one
     thing a fork is asked to change.</p>
-    <p class="built">Built from stage-e-poc, 2026-09-20 · every figure on this
+    <p class="built">Built from stage-e-poc, 2026-10-13 · every figure on this
     page is derived from the repository, not typed twice.</p>
   </div>
 </footer>
@@ -1435,6 +1518,27 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     window.scrollTo(0, 0);
   });
   show(location.hash.slice(1) || 'home');
+})();
+</script>
+<script>
+// The hero film. It is a YouTube short, and it is the only thing on this page
+// that could talk to anyone at all -- so it does not, until it is asked to.
+// The still is the page's own logo and some CSS; pressing play is what builds
+// the iframe, and it points at youtube-nocookie.com. Saying "no cloud" at the
+// top of a page that has already pinged Google by the time it is read is the
+// kind of small dishonesty the rest of this write-up is trying not to commit.
+(function(){
+  var button = document.getElementById('film-play');
+  if (!button) return;
+  button.addEventListener('click', function(){
+    var frame = document.createElement('iframe');
+    frame.src = 'https://www.youtube-nocookie.com/embed/lKE4J6aogrc'
+              + '?autoplay=1&rel=0&playsinline=1';
+    frame.title = 'Ivy AI answering on the device';
+    frame.allow = 'autoplay; encrypted-media; picture-in-picture; fullscreen';
+    frame.setAttribute('allowfullscreen', '');
+    button.parentNode.replaceChild(frame, button);
+  });
 })();
 </script>
 <script>

@@ -161,6 +161,10 @@ training/       model results and test-question sheets
 * The wake word is verified against played-back recordings; sensitivity to
   individual voices is still being measured (`wakemon on`).
 
+## In the press
+
+Who has written about Ivy AI, and a fork that builds on it: [docs/PRESS.md](docs/PRESS.md), also rendered as the Press tab on [the site](https://iamankushpandit.github.io/esp_ai/#press).
+
 ## Licensing
 
 Engines: conformer STT (code Apache-2.0, **weights CC-BY-4.0**), SVOX Pico

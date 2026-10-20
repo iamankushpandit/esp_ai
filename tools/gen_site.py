@@ -15,7 +15,7 @@
 
 The page is *derived*. Nothing on it is typed twice: the per-turn timings and
 the memory table come from docs/STAGE_E_RESULTS.md, the model comparison from
-docs/GGUF.md, the training scores from docs/TECHNICAL_REPORT.md (or the
+docs/GGUF.md, the press list from docs/PRESS.md, the training scores from docs/TECHNICAL_REPORT.md (or the
 fallback table below when that document is on another branch), and the firmware
 size from the last build. A hand-maintained copy of a measurement is a
 measurement that will be wrong and will not say so -- and a landing page is
@@ -506,6 +506,59 @@ def render_still_broken():
     return "\n".join(out)
 
 
+def render_press(press):
+    """The press cards, one per row of docs/PRESS.md's Coverage table.
+
+    A press page is the easiest thing on a site to let rot: a list typed into
+    the HTML, never touched again. So the list is a Markdown table in docs/,
+    the same as every measurement on this page, and this is the only renderer.
+    Newest first, because the reader wants to know whether anyone has written
+    about it lately, not what came first.
+    """
+    headers, rows = md_table(press, "## Coverage", "the press table")
+    want = ["Date", "Outlet", "Title", "Link", "What they said"]
+    if headers != want:
+        die("the press table's columns are %r; expected %r" % (headers, want))
+    out = ['<div class="grid2 press">']
+    for date, outlet, title, link, said in sorted(rows, key=lambda r: r[0], reverse=True):
+        if not re.match(r"\d{4}-\d{2}-\d{2}$", date):
+            die("press row %r has date %r; expected YYYY-MM-DD" % (title, date))
+        if not link.startswith("https://"):
+            die("press row %r has link %r; expected https://" % (title, link))
+        out.append(
+            '<div class="card"><p class="who">%s · <time datetime="%s">%s</time></p>'
+            '<h3><a href="%s" rel="noopener">%s</a></h3><p>%s</p></div>'
+            % (html.escape(outlet), date, pretty_date(date),
+               html.escape(link, quote=True), inline(title), inline(said)))
+    out.append("</div>")
+    return "\n".join(out)
+
+
+def render_derived(press):
+    """The derived-work list under the press cards, from the same file."""
+    headers, rows = md_table(press, "## Derived work", "the derived-work table")
+    want = ["Date", "Who", "What", "Link"]
+    if headers != want:
+        die("the derived-work table's columns are %r; expected %r" % (headers, want))
+    out = ["<ul>"]
+    for date, who, what, link in sorted(rows, key=lambda r: r[0], reverse=True):
+        out.append('<li><a href="%s" rel="noopener">%s</a> — %s (%s).</li>'
+                   % (html.escape(link, quote=True), html.escape(who),
+                      inline(what), pretty_date(date)))
+    out.append("</ul>")
+    return "\n".join(out)
+
+
+def pretty_date(iso):
+    """2026-10-12 -> 12 October 2026. No locale: CI and a laptop must agree."""
+    d = datetime.date.fromisoformat(iso)
+    return "%d %s %d" % (d.day, MONTHS[d.month - 1], d.year)
+
+
+MONTHS = ["January", "February", "March", "April", "May", "June", "July",
+          "August", "September", "October", "November", "December"]
+
+
 def first_number(text):
     """The first number in a cell like '2.7-4.6 s for ...' or '425 ms'."""
     match = re.search(r"(\d+(?:\.\d+)?)\s*(ms|s)\b", text)
@@ -558,6 +611,7 @@ def main():
     stage_e = read("docs", "STAGE_E_RESULTS.md")
     gguf = read("docs", "GGUF.md")
     readme = read("README.md")
+    press = read("docs", "PRESS.md")
 
     # The shipped model's speed lives in README.md's measured table, NOT in
     # STAGE_E_RESULTS.md -- that soak measured TinyTalk 3M and its 13.0-13.4
@@ -673,6 +727,9 @@ def main():
         ("{{DEMO}}", render_demo()),
         ("{{TIMELINE}}", render_timeline()),
         ("{{STILL_BROKEN}}", render_still_broken()),
+        ("{{PRESS}}", render_press(press)),
+        ("{{N_PRESS}}", num_word(len(md_table(press, "## Coverage", "press")[1])).capitalize()),
+        ("{{DERIVED}}", render_derived(press)),
         ("{{LOGO_SPRITE}}", logo_sprite()),
         ("{{LOGO_MARK_VIEWBOX}}", LOGO_MARK_VIEWBOX),
         ("{{LOGO_FULL_VIEWBOX}}", LOGO_FULL_VIEWBOX),
