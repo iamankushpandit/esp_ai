@@ -261,6 +261,10 @@ td.num,th.num{text-align:right; font-variant-numeric:tabular-nums}
 .note{background:var(--pink-wash); border-left:4px solid var(--pink);
   padding:1rem 1.1rem; border-radius:0 10px 10px 0; margin:1.4rem 0}
 .note p:last-child{margin-bottom:0}
+.press .card .who{font-size:.8rem; font-weight:700; letter-spacing:.06em;
+  text-transform:uppercase; color:var(--pink-deep); margin-bottom:.4rem}
+.press .card h3 a{color:var(--ink); text-decoration:none}
+.press .card h3 a:hover{text-decoration:underline}
 .no-ai{display:inline-flex; align-items:center; gap:.4rem; font-weight:700;
   color:#0E7C7B; font-size:.9rem}
 .no-ai i{width:.62rem; height:.62rem; background:#19B3B0; transform:rotate(45deg);
@@ -448,6 +452,7 @@ footer a{color:var(--ink-soft)}
     <a class="tab" id="tab-ask" href="#ask">Ask it</a>
     <a class="tab" id="tab-train" href="#train">Training</a>
     <a class="tab" id="tab-privacy" href="#privacy">Privacy</a>
+    <a class="tab" id="tab-press" href="#press">Press</a>
     <a class="tab" id="tab-community" href="#community">Community</a>
   </div>
 </nav>
@@ -1380,6 +1385,39 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
 </section>
 </div>
 
+<!-- =================== PRESS =================== -->
+<div class="tabpanel" id="panel-press" aria-labelledby="tab-press" hidden>
+<section class="paper">
+  <div class="wrap">
+    <h2>What people wrote.</h2>
+    <p class="standfirst">Five write-ups so far, none of them by anyone
+    who had a board in hand. Every piece below was written from the README and
+    the build log, which makes them a test of whether this page is honest
+    enough to be reported from — not a review. Read them as that.</p>
+
+    <div class="grid2 press">
+<div class="card"><p class="who">Open Source For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI Runs Entirely On ESP32-S3</a></h3><p>A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from.</p></div>
+<div class="card"><p class="who">Electronics For You · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids" rel="noopener">This ESP32 Board Runs An Offline AI Tutor For Kids</a></h3><p>Framed it as a kids&#x27; tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus.</p></div>
+<div class="card"><p class="who">Adafruit blog · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/" rel="noopener">Open-Source Voice AI runs entirely on ESP32-S3</a></h3><p>A short pick-up of the Open Source For You story.</p></div>
+<div class="card"><p class="who">MechaNoticias (Chile) · <time datetime="2026-10-12">12 October 2026</time></p><h3><a href="https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3" rel="noopener">Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3</a></h3><p>The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand.</p></div>
+<div class="card"><p class="who">r/esp32 · <time datetime="2026-09-20">20 September 2026</time></p><h3><a href="https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/" rel="noopener">I built an offline voice assistant that runs the whole pipeline on an ESP32-S3</a></h3><p>The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so.</p></div>
+</div>
+
+    <div class="note">
+      <p>The list is a table in
+      <a href="https://github.com/iamankushpandit/esp_ai/blob/main/docs/PRESS.md">PRESS.md</a>, rendered here
+      the same way as every measurement on this page. Wrote something? Open a
+      pull request that adds a row; the page follows.</p>
+    </div>
+
+    <h3 style="margin-top:2rem">Built on it</h3>
+    <ul>
+<li><a href="https://github.com/iamtilakpatel/pundit-brain" rel="noopener">iamtilakpatel</a> — Pundit Brain, a fork that reuses the pipeline for an offline wearable note-taker and is porting the board layer to Waveshare ESP32-S3 hardware (7 October 2026).</li>
+</ul>
+  </div>
+</section>
+</div>
+
 <!-- =================== COMMUNITY =================== -->
 <div class="tabpanel" id="panel-community" aria-labelledby="tab-community" hidden>
 <section class="paper">
@@ -1434,7 +1472,7 @@ python tools/sd_put.py --manifest --only /llm/</code></pre>
     exception</a>. <strong>Ivy AI</strong> is a product name and is not licensed by
     the GPL — <a href="https://github.com/iamankushpandit/esp_ai/blob/main/NOTICE.md">NOTICE.md</a> explains the one
     thing a fork is asked to change.</p>
-    <p class="built">Built from stage-e-poc, 2026-09-28 · every figure on this
+    <p class="built">Built from stage-e-poc, 2026-10-20 · every figure on this
     page is derived from the repository, not typed twice.</p>
   </div>
 </footer>
