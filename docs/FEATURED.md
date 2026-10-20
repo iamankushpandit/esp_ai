@@ -19,14 +19,13 @@ the card renders without one; the generator fails if a named file is missing.
 |---|---|---|---|---|---|
 | 2026-10-12 | Open Source For You | Open-Source Voice AI Runs Entirely On ESP32-S3 | https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/ | featured/osfy.jpg | A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from. |
 | 2026-10-12 | Electronics For You | This ESP32 Board Runs An Offline AI Tutor For Kids | https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids | featured/efy.jpg | Framed it as a kids' tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus. |
-| 2026-10-12 | Adafruit blog | Open-Source Voice AI runs entirely on ESP32-S3 | https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/ | | A short pick-up of the Open Source For You story. |
+| 2026-10-12 | Adafruit blog | Open-Source Voice AI runs entirely on ESP32-S3 | https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/ | featured/adafruit.jpg | A pick-up of the Open Source For You story, with the pipeline, the board and the speed figures restated. |
 | 2026-10-12 | MechaNoticias (Chile) | Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3 | https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3 | featured/mecha.jpg | The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand. |
-| 2026-09-20 | r/esp32 | I built an offline voice assistant that runs the whole pipeline on an ESP32-S3 | https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/ | | The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so. |
+| 2026-09-20 | r/esp32 | I built an offline voice assistant that runs the whole pipeline on an ESP32-S3 | https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/ | featured/reddit.jpg | The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so. |
 
-Screenshots of the Adafruit post and the Reddit thread are still wanted:
-both sites put a bot check in front of any automated browser, so they have
-to be captured by hand. Save as `site/assets/featured/adafruit.jpg` and
-`site/assets/featured/reddit.jpg`, 960 by 600, and fill in the Image cell.
+Adafruit and Reddit put a bot check in front of any automated browser, so
+those two were captured by hand from a signed-in browser and cropped to the
+article column.
 
 ## Derived work
 
