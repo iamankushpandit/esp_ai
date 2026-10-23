@@ -249,7 +249,8 @@ STILL_BROKEN_NOTE = ("Per-subject figures are v7's, the last version with a "
 
 
 WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven",
-         "eight", "nine", "ten", "eleven", "twelve")
+         "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
+         "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty")
 
 
 def num_word(n):

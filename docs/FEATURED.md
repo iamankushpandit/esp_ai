@@ -17,15 +17,27 @@ the card renders without one; the generator fails if a named file is missing.
 
 | Date | Outlet | Title | Link | Image | What they said |
 |---|---|---|---|---|---|
+| 2026-10-23 | Google Open Source Blog | This Week in Open Source for October 23, 2026 | https://opensource.googleblog.com/2026/10/this-week-in-open-source-for-october-23.html | featured/googleoss.jpg | Daryl Ducharme's weekly roundup from Google's Open Source Programs Office picks up the story and asks what other everyday devices could run entirely offline. |
+| 2026-10-19 | 小墨同学 on X (Chinese) | 一块 ESP32，也能跑一整套离线语音助手 | https://x.com/xiaomovps/status/2112109068584473072 | featured/x_xiaomovps.jpg | A long post for a Chinese-speaking audience on what you need, the memory problem and the 63% score. Six and a half thousand views, and where the Chinese-language forks came from. |
+| 2026-10-19 | esp32.diy | Ivy AI: Fully Offline Voice Assistant on ESP32-S3 | https://esp32.diy/esp-ai/ | featured/esp32diy.jpg | A five-minute project write-up with a parts list, built from the README. |
+| 2026-10-19 | raullenchai/esp32-thinks | ESP32 community survey and feature ideas | https://github.com/raullenchai/esp32-thinks/blob/main/docs/IDEAS.md | featured/esp32thinks.jpg | A 250-star voice-assistant project cites Ivy as the reference for fully offline voice in its ideas document. |
+| 2026-10-15 | DEEO AI (YouTube, French) | Veille IA, 12 → 14 oct. | https://www.youtube.com/watch?v=gLHy4hVMHh0 | featured/deeo.jpg | A French AI-news roundup gives Ivy its own three-minute chapter, and is the one outlet so far to spell the author's name right. |
+| 2026-10-13 | NEURAL DROP (Instagram) | A whole voice assistant now runs on one microcontroller, with no cloud | https://www.instagram.com/neuraldrop.aitech/reel/Deb-lCBjc38/ | featured/ig_neuraldrop.jpg | A reel summarising the pipeline, with "the catch" stated plainly: 5.4 to 5.9 tokens per second. |
+| 2026-10-13 | NEURAL DROP (YouTube Shorts) | A full voice AI running offline on one tiny chip | https://www.youtube.com/shorts/bDJTXXeUgbQ | featured/yt_neuraldrop.jpg | The same script as the reel, as a Short. |
+| 2026-10-13 | Voice AI Space | esp_ai | https://www.voiceaispace.com/knowledge/repo/esp-ai | featured/voiceaispace.jpg | A knowledge-hub entry with a plain-language explainer for non-technical readers. |
+| 2026-10-12 | Wisevoter | Developer Released Ivy AI for ESP32-S3 Microcontrollers | https://wisevoter.com/world/2026/10/12/ivy-ai-esp32-s3-release | featured/wisevoter.jpg | The earliest piece of the wave, filed before dawn on 12 October, framed around privacy and children. |
+| 2026-10-12 | Jay's AI (podcast) | Daily Brief, 12 October 2026 | https://rss.jaysserver.ai/ | featured/jaysserver.jpg | A one-line segment at 5:49 in an AI-hosted daily briefing: a full offline voice AI pipeline on a twenty-dollar board. |
 | 2026-10-12 | Open Source For You | Open-Source Voice AI Runs Entirely On ESP32-S3 | https://www.opensourceforu.com/2026/10/open-source-voice-ai-runs-entirely-on-esp32-s3/ | featured/osfy.jpg | A walk through the whole pipeline and the licensing caveats, and the piece most readers arrived from. |
 | 2026-10-12 | Electronics For You | This ESP32 Board Runs An Offline AI Tutor For Kids | https://www.electronicsforu.com/news/this-esp32-board-runs-an-offline-ai-tutor-for-kids | featured/efy.jpg | Framed it as a kids' tutor and, fairly, led with the limits: the 14–17 second turn, English only, a US geography syllabus. |
 | 2026-10-12 | Adafruit blog | Open-Source Voice AI runs entirely on ESP32-S3 | https://blog.adafruit.com/2026/10/12/open-source-voice-ai-runs-entirely-on-esp32-s3/ | featured/adafruit.jpg | A pick-up of the Open Source For You story, with the pipeline, the board and the speed figures restated. |
 | 2026-10-12 | MechaNoticias (Chile) | Ivy AI, un tutor de voz sin internet que corre en un ESP32-S3 | https://noticias.mechatronicstore.cl/electronica/ivy-ai-un-tutor-de-voz-sin-internet-que-corre-en-un-esp32-s3 | featured/mecha.jpg | The Electronics For You piece in Spanish, with a note that the translation was machine-assisted and checked by hand. |
+| 2026-09-19 | HardwareLab | esp_ai: fully offline speech, LLM and TTS on one ESP32-S3 | https://hardwarelab.dev/projects/esp-ai-offline/ | featured/hardwarelab.jpg | A project card that indexed the repository the day it was created, before anyone had been told about it. |
 | 2026-09-20 | r/esp32 | I built an offline voice assistant that runs the whole pipeline on an ESP32-S3 | https://www.reddit.com/r/esp32/comments/1wlyum9/i_built_an_offline_voice_assistant_that_runs_the/ | featured/reddit.jpg | The launch thread. The engineering landed; the sharpest replies were about disclosing the AI assistance, which is why the README now says so. |
 
 Adafruit and Reddit put a bot check in front of any automated browser, so
 those two were captured by hand from a signed-in browser and cropped to the
-article column.
+article column. The X and Instagram captures are the logged-out view of the
+post, cropped to the post itself.
 
 ## Derived work
 
