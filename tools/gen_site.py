@@ -523,7 +523,10 @@ def render_featured(featured):
     if headers != want:
         die("the featured table's columns are %r; expected %r" % (headers, want))
     out = ['<div class="grid2 featured">']
-    for date, outlet, title, link, image, said in sorted(rows, key=lambda r: r[0], reverse=True):
+    # The newest write-up leads, full width. Derived from the date, not
+    # flagged by hand, so the lead changes by itself when the next one lands.
+    for n, (date, outlet, title, link, image, said) in enumerate(
+            sorted(rows, key=lambda r: r[0], reverse=True)):
         if not re.match(r"\d{4}-\d{2}-\d{2}$", date):
             die("featured row %r has date %r; expected YYYY-MM-DD" % (title, date))
         if not link.startswith("https://"):
@@ -538,9 +541,10 @@ def render_featured(featured):
                       % (html.escape(link, quote=True), html.escape(image, quote=True),
                          html.escape(outlet), pretty_date(date)))
         out.append(
-            '<div class="card%s">%s<div class="body"><p class="who">%s · <time datetime="%s">%s</time></p>'
+            '<div class="card%s%s">%s<div class="body"><p class="who">%s%s · <time datetime="%s">%s</time></p>'
             '<h3><a href="%s" rel="noopener">%s</a></h3><p>%s</p></div></div>'
-            % ("" if image else " noshot", figure, html.escape(outlet), date,
+            % ("" if image else " noshot", " lead" if n == 0 else "", figure,
+               "Latest · " if n == 0 else "", html.escape(outlet), date,
                pretty_date(date), html.escape(link, quote=True), inline(title),
                inline(said)))
     out.append("</div>")
