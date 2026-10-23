@@ -163,7 +163,9 @@ training/       model results and test-question sheets
 
 ## Featured in
 
-Who has written about Ivy AI, and a fork that builds on it: [docs/FEATURED.md](docs/FEATURED.md), also rendered as the Featured tab on [the site](https://iamankushpandit.github.io/esp_ai/#featured).
+Picked by Google's Open Source Programs Office for [This Week in Open Source, 23 October 2026](https://opensource.googleblog.com/2026/10/this-week-in-open-source-for-october-23.html), and written up by Open Source For You, Electronics For You, Adafruit and a dozen others.
+
+The full list, with a capture of each piece: [docs/FEATURED.md](docs/FEATURED.md), also rendered as the Featured tab on [the site](https://iamankushpandit.github.io/esp_ai/#featured).
 
 ## Licensing
 
