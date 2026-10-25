@@ -17,6 +17,7 @@ the card renders without one; the generator fails if a named file is missing.
 
 | Date | Outlet | Title | Link | Image | What they said |
 |---|---|---|---|---|---|
+| 2026-10-24 | BigTon News (Brazil, Portuguese) | Esta semana no open source em 23 de outubro de 2026 | https://bigton.com.br/noticia.php?slug=esta-semana-no-open-source-em-23-de-outubro-de-2026 | featured/bigton.jpg | A Portuguese summary of the Google roundup, with Ivy under "compact models and offline AI". |
 | 2026-10-23 | Google Open Source Blog | This Week in Open Source for October 23, 2026 | https://opensource.googleblog.com/2026/10/this-week-in-open-source-for-october-23.html | featured/googleoss.jpg | Daryl Ducharme's weekly roundup from Google's Open Source Programs Office picks up the story and asks what other everyday devices could run entirely offline. |
 | 2026-10-19 | 小墨同学 on X (Chinese) | 一块 ESP32，也能跑一整套离线语音助手 | https://x.com/xiaomovps/status/2112109068584473072 | featured/x_xiaomovps.jpg | A long post for a Chinese-speaking audience on what you need, the memory problem and the 63% score. Six and a half thousand views, and where the Chinese-language forks came from. |
 | 2026-10-19 | esp32.diy | Ivy AI: Fully Offline Voice Assistant on ESP32-S3 | https://esp32.diy/esp-ai/ | featured/esp32diy.jpg | A five-minute project write-up with a parts list, built from the README. |
