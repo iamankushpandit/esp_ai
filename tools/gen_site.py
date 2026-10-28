@@ -250,7 +250,9 @@ STILL_BROKEN_NOTE = ("Per-subject figures are v7's, the last version with a "
 
 WORDS = ("zero", "one", "two", "three", "four", "five", "six", "seven",
          "eight", "nine", "ten", "eleven", "twelve", "thirteen", "fourteen",
-         "fifteen", "sixteen", "seventeen", "eighteen", "nineteen", "twenty")
+         "fifteen", "sixteen", "seventeen", "eighteen", "nineteen")
+TENS = ("", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy",
+        "eighty", "ninety")
 
 
 def num_word(n):
@@ -260,7 +262,12 @@ def num_word(n):
     sentences wrong at once -- on a page whose argument is that its numbers are
     derived. If it can be counted, count it.
     """
-    return WORDS[n] if n < len(WORDS) else str(n)
+    if n < len(WORDS):
+        return WORDS[n]
+    if n < 100:
+        tens, ones = divmod(n, 10)
+        return TENS[tens] + ("-" + WORDS[ones] if ones else "")
+    return str(n)
 
 
 def die(message):
